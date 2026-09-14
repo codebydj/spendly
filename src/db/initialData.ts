@@ -1,0 +1,186 @@
+import type { Account, Category, Transaction, Budget, RecurringPayment, NotificationItem, AppSettings } from '../types/finance';
+
+export const INITIAL_CATEGORIES: Category[] = [
+  { id: 'cat-food', name: 'Food', iconName: 'Utensils', color: '#10B981', type: 'EXPENSE' },
+  { id: 'cat-shopping', name: 'Shopping', iconName: 'ShoppingBag', color: '#3B82F6', type: 'EXPENSE' },
+  { id: 'cat-transport', name: 'Transport', iconName: 'Car', color: '#F59E0B', type: 'EXPENSE' },
+  { id: 'cat-bills', name: 'Bills', iconName: 'FileText', color: '#EC4899', type: 'EXPENSE' },
+  { id: 'cat-education', name: 'Education', iconName: 'GraduationCap', color: '#8B5CF6', type: 'EXPENSE' },
+  { id: 'cat-entertainment', name: 'Entertainment', iconName: 'Film', color: '#06B6D4', type: 'EXPENSE' },
+  { id: 'cat-other', name: 'Other', iconName: 'MoreHorizontal', color: '#6B7280', type: 'EXPENSE' },
+  { id: 'cat-salary', name: 'Salary', iconName: 'Briefcase', color: '#10B981', type: 'INCOME' },
+  { id: 'cat-freelance', name: 'Freelance', iconName: 'Laptop', color: '#34D399', type: 'INCOME' },
+  { id: 'cat-transfer', name: 'Transfer', iconName: 'ArrowLeftRight', color: '#9CA3AF', type: 'EXPENSE' },
+];
+
+export const PRODUCTION_ACCOUNTS: Account[] = [];
+export const PRODUCTION_TRANSACTIONS: Transaction[] = [];
+export const PRODUCTION_BUDGETS: Budget[] = [];
+export const PRODUCTION_RECURRING: RecurringPayment[] = [];
+export const PRODUCTION_NOTIFICATIONS: NotificationItem[] = [];
+
+export const DEMO_ACCOUNTS: Account[] = [
+  {
+    id: 'acc-sbi',
+    name: 'SBI Savings',
+    type: 'BANK',
+    balance: 24500,
+    openingBalance: 4500,
+    institution: 'State Bank of India',
+    color: '#059669',
+    currency: '₹',
+    isArchived: false,
+    updatedAt: '2026-09-10T20:32:00Z',
+  },
+  {
+    id: 'acc-hdfc',
+    name: 'HDFC Savings',
+    type: 'BANK',
+    balance: 12300,
+    openingBalance: 8730,
+    institution: 'HDFC Bank',
+    color: '#2563EB',
+    currency: '₹',
+    isArchived: false,
+    updatedAt: '2026-09-10T19:15:00Z',
+  },
+  {
+    id: 'acc-cash',
+    name: 'Cash',
+    type: 'CASH',
+    balance: 2000,
+    openingBalance: 4100,
+    institution: 'Physical Cash',
+    color: '#D97706',
+    currency: '₹',
+    isArchived: false,
+    updatedAt: '2026-09-06T14:10:00Z',
+  },
+  {
+    id: 'acc-upi',
+    name: 'UPI Wallet',
+    type: 'WALLET',
+    balance: 1250,
+    openingBalance: 1950,
+    institution: 'UPI Account',
+    color: '#7C3AED',
+    currency: '₹',
+    isArchived: false,
+    updatedAt: '2026-09-09T18:45:00Z',
+  },
+];
+
+export const DEMO_TRANSACTIONS: Transaction[] = [
+  {
+    id: 'tx-1',
+    type: 'EXPENSE',
+    amount: 250,
+    accountId: 'acc-sbi',
+    categoryId: 'cat-food',
+    date: '2026-09-10',
+    time: '20:32',
+    merchant: 'Swiggy',
+    note: 'Swiggy Dinner',
+    paymentMethod: 'UPI',
+    createdAt: '2026-09-10T20:32:00Z',
+    updatedAt: '2026-09-10T20:32:00Z',
+  },
+  {
+    id: 'tx-2',
+    type: 'EXPENSE',
+    amount: 80,
+    accountId: 'acc-hdfc',
+    categoryId: 'cat-transport',
+    date: '2026-09-10',
+    time: '18:15',
+    merchant: 'Rapido',
+    note: 'Rapido Bike Ride',
+    paymentMethod: 'UPI',
+    createdAt: '2026-09-10T18:15:00Z',
+    updatedAt: '2026-09-10T18:15:00Z',
+  },
+  {
+    id: 'tx-3',
+    type: 'INCOME',
+    amount: 25000,
+    accountId: 'acc-sbi',
+    categoryId: 'cat-salary',
+    date: '2026-09-01',
+    time: '09:00',
+    merchant: 'Employer Inc',
+    note: 'Monthly Salary Credit',
+    paymentMethod: 'Net Banking',
+    createdAt: '2026-09-01T09:00:00Z',
+    updatedAt: '2026-09-01T09:00:00Z',
+  },
+  {
+    id: 'tx-4',
+    type: 'TRANSFER',
+    amount: 5000,
+    accountId: 'acc-sbi',
+    toAccountId: 'acc-hdfc',
+    categoryId: 'cat-transfer',
+    date: '2026-09-05',
+    time: '11:45',
+    note: 'Self Transfer to HDFC',
+    paymentMethod: 'UPI',
+    createdAt: '2026-09-05T11:45:00Z',
+    updatedAt: '2026-09-05T11:45:00Z',
+  },
+  {
+    id: 'tx-5',
+    type: 'EXPENSE',
+    amount: 1250,
+    accountId: 'acc-hdfc',
+    categoryId: 'cat-shopping',
+    date: '2026-09-07',
+    time: '14:20',
+    merchant: 'Amazon',
+    note: 'Amazon Electronics',
+    paymentMethod: 'Debit Card',
+    createdAt: '2026-09-07T14:20:00Z',
+    updatedAt: '2026-09-07T14:20:00Z',
+  },
+];
+
+export const DEMO_BUDGETS: Budget[] = [
+  { id: 'b-food', categoryId: 'cat-food', monthlyLimit: 4000 },
+  { id: 'b-transport', categoryId: 'cat-transport', monthlyLimit: 2000 },
+  { id: 'b-shopping', categoryId: 'cat-shopping', monthlyLimit: 1000 },
+];
+
+export const DEMO_RECURRING: RecurringPayment[] = [
+  {
+    id: 'rec-1',
+    title: 'House Rent',
+    amount: 8000,
+    frequency: 'MONTHLY',
+    nextDueDate: '2026-10-05',
+    accountId: 'acc-sbi',
+    categoryId: 'cat-bills',
+    isPaused: false,
+    reminderDaysBefore: 2,
+    note: 'Owner Transfer',
+  },
+  {
+    id: 'rec-2',
+    title: 'Netflix Subscription',
+    amount: 649,
+    frequency: 'MONTHLY',
+    nextDueDate: '2026-09-15',
+    accountId: 'acc-hdfc',
+    categoryId: 'cat-entertainment',
+    isPaused: false,
+    reminderDaysBefore: 1,
+    note: 'Auto Debit',
+  },
+];
+
+export const INITIAL_SETTINGS: AppSettings = {
+  hideBalances: false,
+  pinEnabled: false,
+  hashedPin: '',
+  currency: '₹',
+  lastSyncedAt: new Date().toISOString(),
+  demoModeLoaded: false,
+};

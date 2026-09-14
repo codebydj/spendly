@@ -1,0 +1,16 @@
+{
+  "short_name": "Spendly",
+  "name": "Spendly Personal Finance",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "background_color": "#080b12",
+  "theme_color": "#10b981",
+  "display": "standalone",
+  "orientation": "portrait"
+}
