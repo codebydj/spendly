@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import type { Transaction, TransactionType } from '../types/finance';
 import { MapPin, Filter, Sparkles, X, ChevronRight, Compass, ExternalLink, List as ListIcon, Search, Pencil, Plus } from 'lucide-react';
 import { LocationService } from '../services/locationService';
+import { SelectLocationMapModal } from '../components/modals/SelectLocationMapModal';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -51,6 +52,8 @@ export const MapsView: React.FC = () => {
 
   // Edit Location Modal State
   const [isEditLocationOpen, setIsEditLocationOpen] = useState(false);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [isGettingEditGPS, setIsGettingEditGPS] = useState(false);
   const [editNameInput, setEditNameInput] = useState('');
   const [editAddressInput, setEditAddressInput] = useState('');
   const [editLatInput, setEditLatInput] = useState('');
@@ -207,13 +210,11 @@ export const MapsView: React.FC = () => {
   }, [locationGroups]);
 
   // Real Location Statistics
-  const knownLocationsCount = useMemo(() => locationGroups.filter((g) => !g.isUnknown && !g.isManual).length, [locationGroups]);
   const unknownLocationsCount = useMemo(() => locationGroups.filter((g) => g.isUnknown || g.isManual).length, [locationGroups]);
   const totalLocationSpending = useMemo(() => {
     return filteredTransactions.filter((t) => t.type === 'EXPENSE').reduce((sum, t) => sum + t.amount, 0);
   }, [filteredTransactions]);
 
-  // 3. Initialize & Update Leaflet Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -285,7 +286,26 @@ export const MapsView: React.FC = () => {
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
       }
     }
+
+    const handleResize = () => {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.invalidateSize();
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, [locationGroups, selectedGroup]);
+
+  // Invalidate Leaflet map size whenever switching back to MAP mode
+  useEffect(() => {
+    if (viewMode === 'MAP' && leafletMapRef.current) {
+      setTimeout(() => {
+        leafletMapRef.current?.invalidateSize();
+      }, 60);
+    }
+  }, [viewMode]);
 
   // Handle Near Me Toggle
   const handleToggleNearMe = async () => {
@@ -476,16 +496,6 @@ export const MapsView: React.FC = () => {
 
         <div className="card-level-2" style={{ padding: '16px 20px' }}>
           <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
-            KNOWN PLACES
-          </span>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-emerald)', marginTop: '4px' }}>
-            {knownLocationsCount}
-          </div>
-          <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Resolved place names</span>
-        </div>
-
-        <div className="card-level-2" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
             UNKNOWN / MANUAL
           </span>
           <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#F59E0B', marginTop: '4px' }}>
@@ -496,7 +506,7 @@ export const MapsView: React.FC = () => {
       </div>
 
       {/* 3. Filter Bar & View Toggle */}
-      <div className="card-level-2" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+      <div className="card-level-2 maps-filter-bar" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
             <Filter size={14} color="var(--accent-cyan)" />
@@ -607,8 +617,20 @@ export const MapsView: React.FC = () => {
 
       {/* 4. Main Content Grid (Interactive Map / List + Right Details Panel) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 340px)', gap: '20px', flexWrap: 'wrap' }} className="maps-responsive-grid">
-        {viewMode === 'LIST' ? (
-          <div className="card-level-2" style={{ padding: '20px', height: '520px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {/* Left Container Wrapper */}
+        <div style={{ position: 'relative', width: '100%', height: '520px' }}>
+          {/* LIST Container */}
+          <div
+            className="card-level-2"
+            style={{
+              display: viewMode === 'LIST' ? 'flex' : 'none',
+              padding: '20px',
+              height: '100%',
+              overflowY: 'auto',
+              flexDirection: 'column',
+              gap: '12px',
+            }}
+          >
             <h3 style={{ fontSize: '0.94rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Location Summaries ({displayedLocationGroups.length})
             </h3>
@@ -662,9 +684,19 @@ export const MapsView: React.FC = () => {
               ))
             )}
           </div>
-        ) : (
-          /* Left Interactive Map Container */
-          <div className="card-level-2" style={{ padding: '0', position: 'relative', overflow: 'hidden', height: '520px', borderRadius: 'var(--radius-lg)' }}>
+
+          {/* MAP Container */}
+          <div
+            className="card-level-2 maps-container-responsive"
+            style={{
+              display: viewMode === 'MAP' ? 'block' : 'none',
+              padding: '0',
+              position: 'relative',
+              overflow: 'hidden',
+              height: '100%',
+              borderRadius: 'var(--radius-lg)',
+            }}
+          >
             <div ref={mapContainerRef} style={{ width: '100%', height: '100%', borderRadius: 'var(--radius-lg)' }} />
 
             {/* Overlay if zero map markers */}
@@ -695,7 +727,7 @@ export const MapsView: React.FC = () => {
               </div>
             )}
           </div>
-        )}
+        </div>
 
         {/* Right Side Panel: Selected Group Details & Top Locations */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -886,6 +918,44 @@ export const MapsView: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveLocationEdit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Map Selection Action Bar */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsMapModalOpen(true)}
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '9px 12px', fontSize: '0.84rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                >
+                  <MapPin size={16} color="var(--accent-cyan)" />
+                  <span>Pick on Map</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsGettingEditGPS(true);
+                    try {
+                      const coords = await LocationService.getCurrentLocation();
+                      const details = await LocationService.reverseGeocode(coords.latitude, coords.longitude);
+                      setEditNameInput(details.name ? details.name : 'Unknown Location');
+                      setEditAddressInput(details.address || '');
+                      setEditLatInput(String(details.latitude));
+                      setEditLngInput(String(details.longitude));
+                      showToast(`Location set: ${details.name}`, 'info');
+                    } catch (err: any) {
+                      showToast(err.message || 'Location access unavailable.', 'warning');
+                    } finally {
+                      setIsGettingEditGPS(false);
+                    }
+                  }}
+                  disabled={isGettingEditGPS}
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '9px 12px', fontSize: '0.84rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                >
+                  <Compass size={16} color="var(--accent-cyan)" />
+                  <span>{isGettingEditGPS ? 'Locating...' : 'Current Location'}</span>
+                </button>
+              </div>
+
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
                   Location Name *
@@ -1080,6 +1150,36 @@ export const MapsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal 3: Map Picker Modal for Location Editing */}
+      <SelectLocationMapModal
+        isOpen={isMapModalOpen}
+        onClose={() => setIsMapModalOpen(false)}
+        initialLocation={
+          editLatInput && editLngInput && !isNaN(parseFloat(editLatInput)) && !isNaN(parseFloat(editLngInput))
+            ? {
+                name: editNameInput,
+                address: editAddressInput,
+                latitude: parseFloat(editLatInput),
+                longitude: parseFloat(editLngInput),
+              }
+            : selectedGroup?.latitude && selectedGroup?.longitude
+            ? {
+                name: selectedGroup.name,
+                address: selectedGroup.address || '',
+                latitude: selectedGroup.latitude,
+                longitude: selectedGroup.longitude,
+              }
+            : undefined
+        }
+        onSelectLocation={(loc) => {
+          setEditNameInput(loc.name ? loc.name : 'Unknown Location');
+          setEditAddressInput(loc.address || '');
+          setEditLatInput(String(loc.latitude));
+          setEditLngInput(String(loc.longitude));
+          setIsMapModalOpen(false);
+        }}
+      />
     </div>
   );
 };

@@ -12,5 +12,6 @@
   "background_color": "#080A18",
   "theme_color": "#080A18",
   "display": "standalone",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
   "orientation": "portrait"
 }

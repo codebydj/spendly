@@ -16,20 +16,23 @@ export const SpendlyLogo: React.FC<SpendlyLogoProps> = ({
   style,
 }) => {
   const iconSize = type === 'full' ? height : size;
+  const isBadge = type === 'icon';
+  const logoSrc = isBadge ? '/spendly-icon.png' : '/spendly-logo.png';
 
   const iconElement = (
     <img
-      src="/spendly-icon.png"
+      src={logoSrc}
       alt="Spendly"
       style={{
         width: `${iconSize}px`,
         height: `${iconSize}px`,
         objectFit: 'contain',
-        borderRadius: '22%',
         display: 'inline-block',
         verticalAlign: 'middle',
         flexShrink: 0,
-        filter: 'drop-shadow(0 4px 10px rgba(139, 92, 246, 0.4))',
+        filter: isBadge
+          ? 'drop-shadow(0 4px 12px rgba(139, 92, 246, 0.35))'
+          : 'drop-shadow(0 4px 10px rgba(139, 92, 246, 0.3))',
       }}
     />
   );
@@ -63,6 +66,7 @@ export const SpendlyLogo: React.FC<SpendlyLogoProps> = ({
           color: 'var(--text-primary)',
           fontFamily: "'Manrope', 'Inter', sans-serif",
           lineHeight: 1,
+          textShadow: '0 2px 10px rgba(139, 92, 246, 0.3)',
         }}
       >
         spendly

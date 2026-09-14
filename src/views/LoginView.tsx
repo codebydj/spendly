@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { supabase } from '../services/supabase';
 import { GlassCard } from '../components/ui/GlassCard';
 import { SpendlyLogo } from '../components/ui/SpendlyLogo';
+import { Modal } from '../components/ui/Modal';
 import { Mail, Lock, Eye, EyeOff, LogIn, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
@@ -14,6 +15,13 @@ export const LoginView: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Forgot password state
+  const [isForgotOpen, setIsForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [isSendingForgot, setIsSendingForgot] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
+  const [forgotError, setForgotError] = useState<string | null>(null);
 
   const getFriendlyErrorMessage = (rawError: string): string => {
     const msg = rawError.toLowerCase();
@@ -63,6 +71,37 @@ export const LoginView: React.FC = () => {
       setErrorMessage(friendly);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Forgot Password Action
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = forgotEmail.trim();
+    if (!cleanEmail) {
+      setForgotError('Please enter your account email address.');
+      return;
+    }
+
+    setIsSendingForgot(true);
+    setForgotError(null);
+    setForgotSuccess(null);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo: `${window.location.origin}`,
+      });
+
+      if (error) {
+        setForgotError(error.message || 'Unable to send password reset email.');
+      } else {
+        setForgotSuccess('Password reset link sent! Please check your email inbox.');
+        showToast('Password reset link sent to your email', 'success');
+      }
+    } catch (err: any) {
+      setForgotError(err.message || 'Email address not found or reset could not be sent.');
+    } finally {
+      setIsSendingForgot(false);
     }
   };
 
@@ -149,6 +188,18 @@ export const LoginView: React.FC = () => {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Password</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotEmail(email);
+                  setForgotError(null);
+                  setForgotSuccess(null);
+                  setIsForgotOpen(true);
+                }}
+                style={{ background: 'none', border: 'none', fontSize: '0.78rem', color: 'var(--accent-cyan)', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Forgot password?
+              </button>
             </div>
             <div style={{ position: 'relative' }}>
               <Lock
@@ -219,6 +270,77 @@ export const LoginView: React.FC = () => {
           </button>
         </div>
       </GlassCard>
+
+      {/* Forgot Password Reset Modal */}
+      <Modal
+        isOpen={isForgotOpen}
+        onClose={() => setIsForgotOpen(false)}
+        title="Reset Password"
+        subtitle="Enter your email to receive a password reset link."
+      >
+        {forgotSuccess ? (
+          <div style={{ padding: '20px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+            <CheckCircle2 size={44} color="var(--accent-emerald)" />
+            <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Reset Link Sent</h4>
+            <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)' }}>{forgotSuccess}</p>
+            <button
+              type="button"
+              onClick={() => setIsForgotOpen(false)}
+              className="btn btn-primary"
+              style={{ marginTop: '12px', padding: '10px 24px' }}
+            >
+              Back to Sign In
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleResetPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {forgotError && (
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: 'var(--status-danger-subtle)',
+                  color: 'var(--status-danger)',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <AlertCircle size={16} />
+                <span>{forgotError}</span>
+              </div>
+            )}
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+                Email Address
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Mail size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="email"
+                  required
+                  placeholder="name@example.com"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  style={{ width: '100%', paddingLeft: '38px' }}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+              <button type="button" onClick={() => setIsForgotOpen(false)} className="btn btn-secondary">
+                Cancel
+              </button>
+              <button type="submit" disabled={isSendingForgot} className="btn btn-primary" style={{ padding: '10px 20px' }}>
+                {isSendingForgot ? 'Sending...' : 'Send Reset Link'}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 };

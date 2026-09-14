@@ -170,7 +170,13 @@ export class SyncService {
 
       if (data.recurringPayments.length > 0) {
         const rRows = data.recurringPayments.map((r) => this.mapRecurringToDb(r, userId));
-        const { error } = await supabase.from('recurring_payments').upsert(rRows);
+        let { error } = await supabase.from('recurring_payments').upsert(rRows);
+        if (error && (error.code === 'PGRST204' || error.message?.includes('due_time'))) {
+          // Safe fallback for legacy Supabase schema cache before migration script execution
+          const fallbackRows = rRows.map(({ due_time, ...rest }: any) => rest);
+          const fallbackRes = await supabase.from('recurring_payments').upsert(fallbackRows);
+          error = fallbackRes.error;
+        }
         if (error) {
           console.error('SUPABASE ERROR [recurring_payments.upsert]:', {
             message: error.message,
@@ -631,6 +637,7 @@ export class SyncService {
       amount: Number(row.amount || 0),
       frequency: row.frequency,
       nextDueDate: row.next_due_date,
+      dueTime: row.due_time || undefined,
       accountId: row.account_id,
       categoryId: row.category_id,
       isPaused: row.is_paused || false,
@@ -647,6 +654,7 @@ export class SyncService {
       amount: r.amount,
       frequency: r.frequency,
       next_due_date: r.nextDueDate,
+      due_time: r.dueTime || null,
       account_id: r.accountId,
       category_id: r.categoryId,
       is_paused: r.isPaused || false,

@@ -1,3 +1,6 @@
+import { Geolocation } from '@capacitor/geolocation';
+import { Capacitor } from '@capacitor/core';
+
 export interface LocationResult {
   placeId?: string;
   name: string;
@@ -9,6 +12,104 @@ export interface LocationResult {
 }
 
 export class LocationService {
+  // Check location permission state
+  public static async checkPermissionState(): Promise<'granted' | 'denied' | 'prompt'> {
+    if (!Capacitor.isNativePlatform()) {
+      return 'granted';
+    }
+    try {
+      const status = await Geolocation.checkPermissions();
+      if (status.location === 'granted') return 'granted';
+      if (status.location === 'denied') return 'denied';
+      return 'prompt';
+    } catch {
+      return 'prompt';
+    }
+  }
+
+  // Request location permission explicitly
+  public static async requestPermission(): Promise<boolean> {
+    if (!Capacitor.isNativePlatform()) {
+      return true;
+    }
+    try {
+      const status = await Geolocation.requestPermissions();
+      return status.location === 'granted' || status.coarseLocation === 'granted';
+    } catch (err) {
+      console.warn('Location permission request failed:', err);
+      return false;
+    }
+  }
+
+  // Get current device GPS coordinates with native Capacitor plugin & browser fallback
+  public static async getCurrentCoordinates(): Promise<{ latitude: number; longitude: number }> {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const perm = await Geolocation.checkPermissions();
+        if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') {
+          const req = await Geolocation.requestPermissions();
+          if (req.location !== 'granted' && req.coarseLocation !== 'granted') {
+            throw new Error('Access denied to location. Please tap "Allow Location" to enable GPS access.');
+          }
+        }
+
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 12000,
+          maximumAge: 10000,
+        });
+
+        return {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+      } catch (err: any) {
+        console.warn('Native Capacitor geolocation error:', err);
+        const msg = err.message ? err.message.toLowerCase() : '';
+        if (msg.includes('denied') || msg.includes('permission')) {
+          throw new Error('Access denied to location. Please grant location permissions in device settings.');
+        }
+        if (msg.includes('disabled') || msg.includes('services') || msg.includes('turned off')) {
+          throw new Error('Location services/GPS is disabled on your device. Please turn on Location.');
+        }
+        if (msg.includes('timeout')) {
+          throw new Error('Location request timed out. Please try again or pick location on map.');
+        }
+        throw new Error(err.message || 'Unable to retrieve location coordinates. Try selecting on map.');
+      }
+    }
+
+    // Web Browser Fallback
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by your browser.'));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        },
+        (err) => {
+          if (err.code === err.PERMISSION_DENIED) {
+            reject(new Error('Access denied to location. Please allow location access or select on map.'));
+          } else if (err.code === err.POSITION_UNAVAILABLE) {
+            reject(new Error('Location unavailable. Please check GPS settings or select on map.'));
+          } else if (err.code === err.TIMEOUT) {
+            reject(new Error('Location request timed out. Please try again.'));
+          } else {
+            reject(new Error('Unable to retrieve location. You can pick location on map instead.'));
+          }
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+      );
+    });
+  }
+
+  // Alias for getCurrentCoordinates
+  public static async getCurrentLocation(): Promise<{ latitude: number; longitude: number }> {
+    return this.getCurrentCoordinates();
+  }
+
   // Advanced Place Search combining saved workspace locations, Photon POI engine, and Nominatim
   public static async searchPlaces(
     query: string,
@@ -19,8 +120,6 @@ export class LocationService {
     const cleanQuery = query.trim().replace(/\s+/g, ' ');
     const results: LocationResult[] = [];
     const seenKeys = new Set<string>();
-    let rawPhotonCount = 0;
-    let rawNominatimCount = 0;
 
     // 1. Instant match from user's existing saved transaction locations
     if (existingTransactions && existingTransactions.length > 0) {
@@ -36,7 +135,7 @@ export class LocationService {
             results.push({
               placeId: tx.locationPlaceId,
               name: tx.locationName,
-              address: tx.locationAddress || 'Saved transaction location',
+              address: tx.locationAddress || 'Saved location',
               latitude: tx.latitude,
               longitude: tx.longitude,
               isSaved: true,
@@ -46,7 +145,7 @@ export class LocationService {
       });
     }
 
-    // Prepare query variants for external geocoders
+    // Prepare intelligent query variants for external geocoders
     const searchVariants: string[] = [cleanQuery];
     const words = cleanQuery.split(' ');
     if (words.length > 2) {
@@ -60,26 +159,25 @@ export class LocationService {
       }
     }
 
-    // 2. Fetch external place data using Photon (Komoot OSMPOS) + Nominatim across search variants
+    // 2. Fetch external place data using Photon + Nominatim across variants
     for (const variant of searchVariants) {
       const encoded = encodeURIComponent(variant);
-      const photonUrl = `https://photon.komoot.io/api/?q=${encoded}&limit=8`;
-      const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encoded}&addressdetails=1&dedupe=1&limit=8`;
+      const photonUrl = `https://photon.komoot.io/api/?q=${encoded}&limit=10`;
+      const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encoded}&addressdetails=1&dedupe=1&limit=10`;
 
       try {
         const [photonRes, nominatimRes] = await Promise.all([
           fetch(photonUrl).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(nominatimUrl, {
             headers: {
-              'User-Agent': 'SpendlyApp/1.0 (Personal Finance Application)',
+              'User-Agent': 'SpendlyApp/3.0 (Personal Finance Application)',
               'Accept-Language': 'en',
             },
           }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
         ]);
 
-        // Process Photon POI Results
+        // Process Photon Results
         if (photonRes && Array.isArray(photonRes.features)) {
-          rawPhotonCount += photonRes.features.length;
           photonRes.features.forEach((feature: any) => {
             const props = feature.properties || {};
             const coords = feature.geometry?.coordinates;
@@ -113,7 +211,6 @@ export class LocationService {
 
         // Process Nominatim Results
         if (nominatimRes && Array.isArray(nominatimRes)) {
-          rawNominatimCount += nominatimRes.length;
           nominatimRes.forEach((item: any) => {
             const addr = item.address || {};
             const lat = parseFloat(item.lat);
@@ -125,6 +222,7 @@ export class LocationService {
               addr.amenity ||
               addr.college ||
               addr.university ||
+              addr.school ||
               addr.hospital ||
               addr.bank ||
               addr.shop ||
@@ -155,16 +253,15 @@ export class LocationService {
           });
         }
       } catch (err) {
-        console.warn('Location search error:', err);
+        console.warn('Location search fetch error:', err);
       }
     }
 
-    // 3. Brand-token relevance scoring & ranking algorithm
-    const qTokens = cleanQuery.toLowerCase().split(/\s+/).filter((w) => !['of', 'and', 'the', 'in', 'near', 'at', 'campus'].includes(w));
+    // 3. Relevance scoring & ranking
+    const qTokens = cleanQuery.toLowerCase().split(/\s+/).filter((w) => !['of', 'and', 'the', 'in', 'near', 'at'].includes(w));
     const brandToken = qTokens.length > 0 ? qTokens[0] : '';
 
     results.sort((a, b) => {
-      // Saved local history comes first
       if (a.isSaved && !b.isSaved) return -1;
       if (!a.isSaved && b.isSaved) return 1;
 
@@ -176,85 +273,28 @@ export class LocationService {
       const addrA = (a.address || '').toLowerCase();
       const addrB = (b.address || '').toLowerCase();
 
-      // Brand token matching (+100 for brand match, -50 penalty if brand missing)
       if (brandToken) {
         if (nameA.includes(brandToken)) scoreA += 100;
         else if (addrA.includes(brandToken)) scoreA += 50;
-        else scoreA -= 50;
 
         if (nameB.includes(brandToken)) scoreB += 100;
         else if (addrB.includes(brandToken)) scoreB += 50;
-        else scoreB -= 50;
       }
 
-      // Secondary Token Matches
       qTokens.slice(1).forEach((tok) => {
-        if (nameA.includes(tok)) scoreA += 20;
+        if (nameA.includes(tok)) scoreA += 25;
         if (addrA.includes(tok)) scoreA += 10;
-        if (nameB.includes(tok)) scoreB += 20;
+        if (nameB.includes(tok)) scoreB += 25;
         if (addrB.includes(tok)) scoreB += 10;
       });
 
-      // Exact name match boost
-      if (nameA === cleanQuery.toLowerCase()) scoreA += 50;
-      if (nameB === cleanQuery.toLowerCase()) scoreB += 50;
+      if (nameA === cleanQuery.toLowerCase()) scoreA += 60;
+      if (nameB === cleanQuery.toLowerCase()) scoreB += 60;
 
       return scoreB - scoreA;
     });
 
-    const finalResults = results.slice(0, 8);
-
-    // Development Debug Logging
-    console.log('LOCATION SEARCH', {
-      query: cleanQuery,
-      photonRaw: rawPhotonCount,
-      nominatimRaw: rawNominatimCount,
-      parsed: results.length,
-      final: finalResults.length,
-    });
-
-    return finalResults;
-  }
-
-  // Create manual location entry when place is not found in geocoder
-  public static createManualLocation(name: string, areaOrCity?: string): LocationResult {
-    return {
-      name: name.trim(),
-      address: areaOrCity?.trim() || undefined,
-      isManual: true,
-    };
-  }
-
-  // Get current device GPS location
-  public static async getCurrentLocation(): Promise<{ latitude: number; longitude: number }> {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not supported by your device browser.'));
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          });
-        },
-        (error) => {
-          console.warn('GPS location error:', error);
-          if (error.code === error.PERMISSION_DENIED) {
-            reject(new Error('Location access is turned off. You can enter a place manually instead.'));
-          } else {
-            reject(new Error('Unable to determine current location. Please enter location manually.'));
-          }
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 30000,
-        }
-      );
-    });
+    return results.slice(0, 10);
   }
 
   // Reverse geocode latitude/longitude to place name & address
@@ -263,7 +303,7 @@ export class LocationService {
       const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`;
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'SpendlyApp/1.0 (Personal Finance Application)',
+          'User-Agent': 'SpendlyApp/3.0 (Personal Finance Application)',
           'Accept-Language': 'en',
         },
       });
@@ -286,11 +326,12 @@ export class LocationService {
         addr.building ||
         addr.road ||
         addr.suburb ||
-        'Current Location';
+        addr.city ||
+        'Selected Location';
 
       const areaDetails = [
         addr.suburb || addr.neighbourhood,
-        addr.city || addr.town || addr.village || addr.county,
+        addr.city || addr.town || addr.village || addr.state,
       ]
         .filter(Boolean)
         .join(', ');
@@ -312,22 +353,12 @@ export class LocationService {
     }
   }
 
-  // Get device current GPS coordinates
-  public static async getCurrentCoordinates(): Promise<{ latitude: number; longitude: number }> {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not supported by your device browser.'));
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
-        },
-        (err) => {
-          reject(new Error(err.message || 'Unable to retrieve location coordinates.'));
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-      );
-    });
+  // Create manual location entry
+  public static createManualLocation(name: string, areaOrCity?: string): LocationResult {
+    return {
+      name: name.trim() || 'Manual Location',
+      address: areaOrCity?.trim() || undefined,
+      isManual: true,
+    };
   }
 }

@@ -4,6 +4,7 @@ import { Modal } from '../ui/Modal';
 import type { Transaction, TransactionType } from '../../types/finance';
 import { Trash2, MapPin, Navigation, Loader2, Plus } from 'lucide-react';
 import { LocationService, type LocationResult } from '../../services/locationService';
+import { SelectLocationMapModal } from '../modals/SelectLocationMapModal';
 
 interface EditTransactionModalProps {
   isOpen: boolean;
@@ -46,6 +47,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const [isSearchingLocations, setIsSearchingLocations] = useState<boolean>(false);
   const [isGettingGPS, setIsGettingGPS] = useState<boolean>(false);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+  const [isMapModalOpen, setIsMapModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (transaction) {
@@ -360,6 +362,15 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             <div style={{ display: 'flex', gap: '6px' }}>
               <button
                 type="button"
+                onClick={() => setIsMapModalOpen(true)}
+                className="btn btn-secondary"
+                style={{ padding: '4px 10px', minHeight: '30px', fontSize: '0.76rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                <MapPin size={13} color="var(--accent-cyan)" />
+                <span>Pick on map</span>
+              </button>
+              <button
+                type="button"
                 onClick={handleUseCurrentLocation}
                 disabled={isGettingGPS}
                 className="btn btn-secondary"
@@ -561,6 +572,20 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           </div>
         </div>
       </form>
+
+      <SelectLocationMapModal
+        isOpen={isMapModalOpen}
+        onClose={() => setIsMapModalOpen(false)}
+        initialLocation={latitude && longitude ? { name: locationName, address: locationAddress, latitude, longitude } : undefined}
+        onSelectLocation={(loc) => {
+          setLocationName(loc.name);
+          setLocationAddress(loc.address || '');
+          setLatitude(loc.latitude);
+          setLongitude(loc.longitude);
+          setLocationPlaceId(loc.placeId);
+          setLocationQuery(loc.name);
+        }}
+      />
     </Modal>
   );
 };

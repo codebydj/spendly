@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Eye, EyeOff, Search, Plus, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck, Bell } from 'lucide-react';
+import { Eye, EyeOff, Search, Plus, Wifi, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck, Bell } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const {
@@ -173,6 +173,37 @@ export const Header: React.FC = () => {
 
       {/* Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        {/* Network Status Indicator */}
+        <div
+          title={isOffline ? 'Network status: Offline' : 'Network status: Online'}
+          aria-label={isOffline ? 'Network Offline' : 'Network Online'}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '6px 10px',
+            borderRadius: 'var(--radius-sm)',
+            backgroundColor: isOffline ? 'var(--status-warning-subtle)' : 'rgba(16, 185, 129, 0.1)',
+            border: isOffline ? '1px solid rgba(245, 158, 11, 0.25)' : '1px solid rgba(16, 185, 129, 0.25)',
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            color: isOffline ? 'var(--status-warning)' : 'var(--accent-emerald)',
+            gap: '6px',
+          }}
+        >
+          {isOffline ? (
+            <>
+              <WifiOff size={16} color="var(--status-warning)" />
+              <span className="desktop-only">Offline</span>
+            </>
+          ) : (
+            <>
+              <Wifi size={16} color="var(--accent-emerald)" />
+              <span className="desktop-only">Online</span>
+            </>
+          )}
+        </div>
+
         {/* Manual Sync Status Badge */}
         {renderSyncBadge()}
 

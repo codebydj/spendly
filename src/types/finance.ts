@@ -60,6 +60,7 @@ export interface RecurringPayment {
   amount: number;
   frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
   nextDueDate: string; // YYYY-MM-DD
+  dueTime?: string; // HH:mm
   accountId: string;
   categoryId: string;
   isPaused: boolean;

@@ -8,13 +8,11 @@ import {
   Wallet,
   PiggyBank,
   PieChart,
-  Repeat,
+  Bell,
   Calendar as CalendarIcon,
   MapPin,
   Settings,
   Plus,
-  Wifi,
-  WifiOff,
   Lock,
   LogOut,
 } from 'lucide-react';
@@ -31,7 +29,6 @@ export const DesktopSidebar: React.FC = () => {
     currentView,
     setCurrentView,
     setIsAddTransactionOpen,
-    isOffline,
     setIsPinLocked,
     settings,
     user,
@@ -44,7 +41,7 @@ export const DesktopSidebar: React.FC = () => {
     { id: 'accounts', label: 'Accounts', icon: <Wallet size={22} /> },
     { id: 'budgets', label: 'Budgets', icon: <PiggyBank size={22} /> },
     { id: 'analytics', label: 'Analytics', icon: <PieChart size={22} /> },
-    { id: 'recurring', label: 'Recurring', icon: <Repeat size={22} /> },
+    { id: 'recurring', label: 'Reminders', icon: <Bell size={22} /> },
     { id: 'calendar', label: 'Calendar', icon: <CalendarIcon size={22} /> },
     { id: 'maps', label: 'Maps', icon: <MapPin size={22} /> },
   ];
@@ -162,24 +159,6 @@ export const DesktopSidebar: React.FC = () => {
           <Settings size={22} />
           <span>Settings</span>
         </button>
-
-        {/* Offline / Online Status */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '9px 14px',
-            fontSize: '0.82rem',
-            color: isOffline ? 'var(--status-warning)' : 'var(--text-muted)',
-            backgroundColor: 'var(--bg-surface)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border-color)',
-          }}
-        >
-          {isOffline ? <WifiOff size={18} color="var(--status-warning)" /> : <Wifi size={18} color="var(--accent-emerald)" />}
-          <span>{isOffline ? 'Offline mode' : 'Cloud synchronized'}</span>
-        </div>
 
         {/* Profile / App Lock / Sign Out */}
         <div

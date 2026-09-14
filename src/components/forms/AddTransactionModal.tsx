@@ -4,6 +4,7 @@ import { Modal } from '../ui/Modal';
 import type { TransactionType } from '../../types/finance';
 import { ArrowLeftRight, Check, Sparkles, CheckCircle2, MapPin, Navigation, X, Loader2, Plus } from 'lucide-react';
 import { LocationService, type LocationResult } from '../../services/locationService';
+import { SelectLocationMapModal } from '../modals/SelectLocationMapModal';
 
 export const AddTransactionModal: React.FC = () => {
   const {
@@ -41,6 +42,7 @@ export const AddTransactionModal: React.FC = () => {
   const [isSearchingLocations, setIsSearchingLocations] = useState<boolean>(false);
   const [isGettingGPS, setIsGettingGPS] = useState<boolean>(false);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+  const [isMapModalOpen, setIsMapModalOpen] = useState<boolean>(false);
 
   // Form Reset Function: Reset all fields for new transaction
   const resetFormState = () => {
@@ -528,24 +530,43 @@ export const AddTransactionModal: React.FC = () => {
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                 Location <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span>
               </label>
-              <button
-                type="button"
-                onClick={handleUseCurrentLocation}
-                disabled={isGettingGPS}
-                className="btn btn-secondary"
-                style={{
-                  padding: '4px 10px',
-                  minHeight: '30px',
-                  fontSize: '0.76rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  borderRadius: 'var(--radius-sm)',
-                }}
-              >
-                {isGettingGPS ? <Loader2 size={13} style={{ animation: 'spin 1.5s linear infinite' }} /> : <Navigation size={13} color="var(--accent-cyan)" />}
-                <span>{isGettingGPS ? 'Locating...' : 'Use current location'}</span>
-              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsMapModalOpen(true)}
+                  className="btn btn-secondary"
+                  style={{
+                    padding: '4px 10px',
+                    minHeight: '30px',
+                    fontSize: '0.76rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    borderRadius: 'var(--radius-sm)',
+                  }}
+                >
+                  <MapPin size={13} color="var(--accent-cyan)" />
+                  <span>Pick on map</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUseCurrentLocation}
+                  disabled={isGettingGPS}
+                  className="btn btn-secondary"
+                  style={{
+                    padding: '4px 10px',
+                    minHeight: '30px',
+                    fontSize: '0.76rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    borderRadius: 'var(--radius-sm)',
+                  }}
+                >
+                  {isGettingGPS ? <Loader2 size={13} style={{ animation: 'spin 1.5s linear infinite' }} /> : <Navigation size={13} color="var(--accent-cyan)" />}
+                  <span>{isGettingGPS ? 'Locating...' : 'Use current location'}</span>
+                </button>
+              </div>
             </div>
 
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -751,6 +772,20 @@ export const AddTransactionModal: React.FC = () => {
           </div>
         </form>
       )}
+
+      <SelectLocationMapModal
+        isOpen={isMapModalOpen}
+        onClose={() => setIsMapModalOpen(false)}
+        initialLocation={latitude && longitude ? { name: locationName, address: locationAddress, latitude, longitude } : undefined}
+        onSelectLocation={(loc) => {
+          setLocationName(loc.name);
+          setLocationAddress(loc.address || '');
+          setLatitude(loc.latitude);
+          setLongitude(loc.longitude);
+          setLocationPlaceId(loc.placeId);
+          setLocationQuery(loc.name);
+        }}
+      />
     </Modal>
   );
 };

@@ -1,26 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Modal } from '../ui/Modal';
+import type { RecurringPayment } from '../../types/finance';
 
-export const AddRecurringModal: React.FC = () => {
-  const { isAddRecurringOpen, setIsAddRecurringOpen, accounts, categories, addRecurring } = useApp();
+interface EditRecurringModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  reminder: RecurringPayment | null;
+}
+
+export const EditRecurringModal: React.FC<EditRecurringModalProps> = ({
+  isOpen,
+  onClose,
+  reminder,
+}) => {
+  const { accounts, categories, editRecurring } = useApp();
 
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState<'MONTHLY' | 'WEEKLY' | 'YEARLY' | 'DAILY'>('MONTHLY');
-  const [nextDueDate, setNextDueDate] = useState(new Date().toISOString().slice(0, 10));
+  const [nextDueDate, setNextDueDate] = useState('');
   const [dueTime, setDueTime] = useState('09:00');
   const [reminderDaysBefore, setReminderDaysBefore] = useState<number>(1);
-  const [accountId, setAccountId] = useState(accounts[0]?.id || '');
-  const [categoryId, setCategoryId] = useState(categories[0]?.id || '');
-  const [note, setNote] = useState('');
+  const [accountId, setAccountId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+
+  useEffect(() => {
+    if (reminder) {
+      setTitle(reminder.title);
+      setAmount(String(reminder.amount));
+      setFrequency(reminder.frequency || 'MONTHLY');
+      setNextDueDate(reminder.nextDueDate);
+      setDueTime(reminder.dueTime || '09:00');
+      setReminderDaysBefore(reminder.reminderDaysBefore ?? 1);
+      setAccountId(reminder.accountId || (accounts[0]?.id || ''));
+      setCategoryId(reminder.categoryId || (categories[0]?.id || ''));
+    }
+  }, [reminder, accounts, categories]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!reminder) return;
     const parsedAmount = parseFloat(amount);
     if (!title.trim() || isNaN(parsedAmount) || parsedAmount <= 0) return;
 
-    addRecurring({
+    editRecurring(reminder.id, {
       title: title.trim(),
       amount: parsedAmount,
       frequency,
@@ -29,22 +53,21 @@ export const AddRecurringModal: React.FC = () => {
       reminderDaysBefore,
       accountId: accountId || accounts[0]?.id || '',
       categoryId: categoryId || categories[0]?.id || '',
-      isPaused: false,
-      note: note.trim() || undefined,
+      isPaused: reminder.isPaused,
+      note: reminder.note,
     });
 
-    setTitle('');
-    setAmount('');
-    setNote('');
-    setIsAddRecurringOpen(false);
+    onClose();
   };
+
+  if (!reminder) return null;
 
   return (
     <Modal
-      isOpen={isAddRecurringOpen}
-      onClose={() => setIsAddRecurringOpen(false)}
-      title="Add Bill & Payment Reminder"
-      subtitle="Track monthly house rent, electricity, Netflix, credit card EMI, or insurance."
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Edit Reminder / Bill"
+      subtitle="Update reminder title, amount, due date & notification settings."
     >
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div>
@@ -53,7 +76,7 @@ export const AddRecurringModal: React.FC = () => {
           </label>
           <input
             type="text"
-            placeholder="e.g. Electricity Bill, House Rent, Netflix, Insurance"
+            placeholder="e.g. Rent, Electricity, Netflix, EMI"
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -139,7 +162,7 @@ export const AddRecurringModal: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-              Deduct Account
+              Account
             </label>
             <select value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '100%' }}>
               {accounts.map((acc) => (
@@ -165,7 +188,7 @@ export const AddRecurringModal: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-          <button type="button" onClick={() => setIsAddRecurringOpen(false)} className="btn btn-secondary">
+          <button type="button" onClick={onClose} className="btn btn-secondary">
             Cancel
           </button>
           <button type="submit" className="btn btn-primary">

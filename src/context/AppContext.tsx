@@ -6,6 +6,7 @@ import { supabase } from '../services/supabase';
 import { SyncService } from '../services/syncService';
 import { soundService } from '../services/soundService';
 import { hashPin, verifyPin } from '../utils/crypto';
+import { scheduleReminderNotification, cancelReminderNotification } from '../services/nativeNotifications';
 import {
   calculateAccountBalance,
   calculateNetWorth,
@@ -91,7 +92,12 @@ interface AppContextType {
   archiveAccount: (id: string) => void;
   addBudget: (b: Omit<Budget, 'id'>) => void;
   deleteBudget: (id: string) => void;
+  addCategory: (cat: Omit<Category, 'id'>) => void;
+  editCategory: (id: string, name: string) => void;
+  reorderCategories: (cats: Category[]) => void;
+  deleteCategory: (id: string, reassignCategoryId?: string) => void;
   addRecurring: (r: Omit<RecurringPayment, 'id'>) => void;
+  editRecurring: (id: string, r: Omit<RecurringPayment, 'id'>) => void;
   togglePauseRecurring: (id: string) => void;
   deleteRecurring: (id: string) => void;
   markNotificationRead: (id: string) => void;
@@ -735,18 +741,76 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // Add Recurring
+  // Category Management
+  const addCategory = (catData: Omit<Category, 'id'>) => {
+    const newCat: Category = {
+      id: 'cat-' + Date.now(),
+      ...catData,
+    };
+    setCategories((prev) => {
+      const updated = [...prev, newCat];
+      StorageEngine.saveCategories(updated, user?.id);
+      return updated;
+    });
+    showToast(`Category "${newCat.name}" added`, 'success');
+  };
+
+  const editCategory = (id: string, name: string) => {
+    setCategories((prev) => {
+      const updated = prev.map((c) => (c.id === id ? { ...c, name: name.trim() } : c));
+      StorageEngine.saveCategories(updated, user?.id);
+      return updated;
+    });
+    showToast('Category renamed', 'info');
+  };
+
+  const reorderCategories = (newCats: Category[]) => {
+    setCategories(newCats);
+    StorageEngine.saveCategories(newCats, user?.id);
+  };
+
+  const deleteCategory = (id: string, reassignCategoryId?: string) => {
+    if (reassignCategoryId) {
+      setTransactions((prev) =>
+        prev.map((t) => (t.categoryId === id ? { ...t, categoryId: reassignCategoryId } : t))
+      );
+    }
+    setCategories((prev) => {
+      const updated = prev.filter((c) => c.id !== id);
+      StorageEngine.saveCategories(updated, user?.id);
+      return updated;
+    });
+    showToast('Category deleted', 'info');
+  };
+
+  // Add / Edit / Pause / Delete Reminders
   const addRecurring = async (rData: Omit<RecurringPayment, 'id'>) => {
     const newR: RecurringPayment = {
       id: 'rec-' + Date.now(),
       ...rData,
     };
     setRecurringPayments((prev) => [...prev, newR]);
-    showToast(`Recurring payment "${newR.title}" saved`, 'success');
+    scheduleReminderNotification(newR);
+    showToast(`Reminder "${newR.title}" saved`, 'success');
 
     if (user?.id && navigator.onLine) {
       setSyncStatus('SYNCING');
       const ok = await SyncService.upsertRecurring(newR, user.id);
+      setSyncStatus(ok ? 'SYNCED' : 'SYNC_FAILED');
+    } else {
+      setSyncStatus('LOCAL_CHANGES');
+    }
+  };
+
+  const editRecurring = async (id: string, rData: Omit<RecurringPayment, 'id'>) => {
+    const updated: RecurringPayment = { id, ...rData };
+    setRecurringPayments((prev) => prev.map((r) => (r.id === id ? updated : r)));
+    scheduleReminderNotification(updated);
+    showToast(`Reminder "${updated.title}" updated`, 'success');
+
+    if (user?.id && navigator.onLine) {
+      setSyncStatus('SYNCING');
+      const ok = await SyncService.upsertRecurring(updated, user.id);
       setSyncStatus(ok ? 'SYNCED' : 'SYNC_FAILED');
     } else {
       setSyncStatus('LOCAL_CHANGES');
@@ -759,7 +823,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const updated = { ...target, isPaused: !target.isPaused };
 
     setRecurringPayments((prev) => prev.map((r) => (r.id === id ? updated : r)));
-    showToast('Recurring payment status updated', 'info');
+    if (updated.isPaused) {
+      cancelReminderNotification(id);
+      showToast(`Reminder "${updated.title}" paused`, 'info');
+    } else {
+      scheduleReminderNotification(updated);
+      showToast(`Reminder "${updated.title}" resumed`, 'info');
+    }
 
     if (user?.id && navigator.onLine) {
       setSyncStatus('SYNCING');
@@ -772,7 +842,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const deleteRecurring = async (id: string) => {
     setRecurringPayments((prev) => prev.filter((r) => r.id !== id));
-    showToast('Recurring payment removed', 'info');
+    cancelReminderNotification(id);
+    showToast('Reminder removed', 'info');
 
     if (user?.id && navigator.onLine) {
       setSyncStatus('SYNCING');
@@ -1011,7 +1082,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         archiveAccount,
         addBudget,
         deleteBudget,
+        addCategory,
+        editCategory,
+        reorderCategories,
+        deleteCategory,
         addRecurring,
+        editRecurring,
         togglePauseRecurring,
         deleteRecurring,
         markNotificationRead,

@@ -159,12 +159,15 @@ CREATE TABLE IF NOT EXISTS public.recurring_payments (
   amount NUMERIC NOT NULL,
   frequency TEXT NOT NULL,
   next_due_date TEXT NOT NULL,
+  due_time TEXT,
   account_id TEXT NOT NULL,
   category_id TEXT NOT NULL,
   is_paused BOOLEAN DEFAULT FALSE,
   reminder_days_before INTEGER DEFAULT 1,
   note TEXT
 );
+
+ALTER TABLE public.recurring_payments ADD COLUMN IF NOT EXISTS due_time TEXT;
 
 ALTER TABLE public.recurring_payments ENABLE ROW LEVEL SECURITY;
 

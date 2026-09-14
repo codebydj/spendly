@@ -48,20 +48,103 @@ export const requestNativeNotificationPermission = async (): Promise<boolean> =>
   }
 };
 
-// 1. Test Notification (Schedules ~1 minute in the future)
+function hashStringToInt(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0;
+  }
+  return Math.abs(hash) % 1000000;
+}
+
+export const cancelReminderNotification = async (reminderId: string) => {
+  try {
+    const notificationId = hashStringToInt(reminderId);
+    await LocalNotifications.cancel({ notifications: [{ id: notificationId }] });
+  } catch (err) {
+    // Ignore non-native platform
+  }
+};
+
+export const scheduleReminderNotification = async (reminder: {
+  id: string;
+  title: string;
+  amount: number;
+  nextDueDate: string;
+  dueTime?: string;
+  reminderDaysBefore?: number;
+  isPaused?: boolean;
+}): Promise<boolean> => {
+  if (reminder.isPaused) {
+    await cancelReminderNotification(reminder.id);
+    return false;
+  }
+
+  try {
+    const hasPermission = await requestNativeNotificationPermission();
+    if (!hasPermission) return false;
+
+    const daysBefore = reminder.reminderDaysBefore ?? 1;
+    const dueDate = new Date(reminder.nextDueDate);
+
+    if (reminder.dueTime) {
+      const [h, m] = reminder.dueTime.split(':').map(Number);
+      if (!isNaN(h) && !isNaN(m)) {
+        dueDate.setHours(h, m, 0, 0);
+      }
+    } else {
+      dueDate.setHours(9, 0, 0, 0); // Default 9 AM
+    }
+
+    const triggerTime = new Date(dueDate.getTime() - daysBefore * 86400000);
+
+    if (triggerTime.getTime() <= Date.now()) {
+      await cancelReminderNotification(reminder.id);
+      return false;
+    }
+
+    const notificationId = hashStringToInt(reminder.id);
+    const daysText = daysBefore === 0 ? 'today' : daysBefore === 1 ? 'tomorrow' : `in ${daysBefore} days`;
+    const titleText = `${reminder.title} due ${daysText}`;
+    const bodyText = `₹${reminder.amount.toLocaleString()} • Due ${reminder.nextDueDate}`;
+
+    await cancelReminderNotification(reminder.id);
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: notificationId,
+          title: titleText,
+          body: bodyText,
+          schedule: { at: triggerTime },
+          channelId: 'spendly-reminders',
+          extra: { reminderId: reminder.id, amount: reminder.amount },
+        },
+      ],
+    });
+
+    return true;
+  } catch (err) {
+    console.warn('scheduleReminderNotification error:', err);
+    return false;
+  }
+};
+
+// Test Notification
 export const scheduleTestNotification = async (): Promise<boolean> => {
   try {
     const hasPermission = await requestNativeNotificationPermission();
     if (!hasPermission) return false;
 
-    const targetTime = new Date(Date.now() + 60000); // 1 minute from now
+    const targetTime = new Date(Date.now() + 60000);
 
     await LocalNotifications.schedule({
       notifications: [
         {
           id: 99991,
-          title: 'Spendly test reminder',
-          body: 'Your Spendly notifications are working.',
+          title: 'Spendly reminder test',
+          body: 'Your Spendly bill and payment notifications are active.',
           schedule: { at: targetTime },
           channelId: 'spendly-reminders',
           extra: { type: 'TEST' },
@@ -75,7 +158,7 @@ export const scheduleTestNotification = async (): Promise<boolean> => {
   }
 };
 
-// 2. Daily Expense Reminder
+// Daily Expense Reminder
 export const scheduleDailyExpenseReminder = async (timeStr: string = '20:00'): Promise<boolean> => {
   try {
     const hasPermission = await requestNativeNotificationPermission();
@@ -86,7 +169,7 @@ export const scheduleDailyExpenseReminder = async (timeStr: string = '20:00'): P
     target.setHours(hours, minutes, 0, 0);
 
     if (target.getTime() <= Date.now()) {
-      target.setDate(target.getDate() + 1); // Tomorrow
+      target.setDate(target.getDate() + 1);
     }
 
     await LocalNotifications.schedule({
@@ -107,7 +190,7 @@ export const scheduleDailyExpenseReminder = async (timeStr: string = '20:00'): P
   }
 };
 
-// 3. Natural Budget Alerts
+// Natural Budget Alert
 export const scheduleNaturalBudgetAlert = async (
   categoryName: string,
   spent: number,
@@ -135,86 +218,6 @@ export const scheduleNaturalBudgetAlert = async (
           schedule: { at: new Date(Date.now() + 2000) },
           channelId: 'spendly-budget-alerts',
           extra: { categoryName, spent, limit, percentage },
-        },
-      ],
-    });
-  } catch (err) {
-    // Silent fallback
-  }
-};
-
-// 4. Natural Recurring Payment Reminder
-export const scheduleNaturalRecurringReminder = async (
-  title: string,
-  amount: number,
-  daysLeft: number
-) => {
-  try {
-    const hasPermission = await requestNativeNotificationPermission();
-    if (!hasPermission) return;
-
-    const body = `Your ₹${amount.toLocaleString()} ${title} bill is due in ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}.`;
-    const id = Math.floor(30000 + Math.random() * 9000);
-
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          id,
-          title: 'Payment coming up',
-          body,
-          schedule: { at: new Date(Date.now() + 2000) },
-          channelId: 'spendly-reminders',
-          extra: { title, amount, daysLeft },
-        },
-      ],
-    });
-  } catch (err) {
-    // Silent fallback
-  }
-};
-
-// 5. Weekly Spending Summary
-export const scheduleWeeklySummary = async (weeklySpent: number) => {
-  try {
-    const hasPermission = await requestNativeNotificationPermission();
-    if (!hasPermission) return;
-
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          id: 40001,
-          title: 'Your week in spending',
-          body: `You spent ₹${weeklySpent.toLocaleString()} this week. Here's a quick look at where your money went.`,
-          schedule: { at: new Date(Date.now() + 2000) },
-          channelId: 'spendly-summaries',
-          extra: { weeklySpent },
-        },
-      ],
-    });
-  } catch (err) {
-    // Silent fallback
-  }
-};
-
-// 6. Monthly Spending Summary
-export const scheduleMonthlySummary = async (
-  monthlySpent: number,
-  monthlySaved: number,
-  monthName: string
-) => {
-  try {
-    const hasPermission = await requestNativeNotificationPermission();
-    if (!hasPermission) return;
-
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          id: 50001,
-          title: 'Your monthly money check',
-          body: `${monthName} is almost over. You've spent ₹${monthlySpent.toLocaleString()} and saved ₹${monthlySaved.toLocaleString()} so far.`,
-          schedule: { at: new Date(Date.now() + 2000) },
-          channelId: 'spendly-summaries',
-          extra: { monthlySpent, monthlySaved, monthName },
         },
       ],
     });

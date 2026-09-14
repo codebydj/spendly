@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { Capacitor } from '@capacitor/core';
 import { AppProvider, useApp } from './context/AppContext';
 import { DesktopSidebar } from './components/layout/DesktopSidebar';
 import { MobileNav } from './components/layout/MobileNav';
@@ -75,6 +77,15 @@ const AppShell: React.FC = () => {
     selectedAccountIdForDetail,
     setSelectedAccountIdForDetail,
   } = useApp();
+
+  // Edge-to-edge StatusBar Setup
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
+      StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: '#00000000' }).catch(() => {});
+    }
+  }, []);
 
   // Capacitor Native Android Back Button Handling
   useEffect(() => {

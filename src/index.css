@@ -493,8 +493,10 @@ input:focus, select:focus, textarea:focus {
   }
 
   header {
-    padding: 0 16px !important;
-    height: var(--header-height) !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    height: calc(var(--header-height) + env(safe-area-inset-top, 0px)) !important;
   }
 }
 
@@ -605,3 +607,50 @@ input:focus, select:focus, textarea:focus {
     opacity: 0;
   }
 }
+
+/* Comprehensive Mobile Responsiveness Fixes */
+@media (max-width: 900px) {
+  .maps-responsive-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .maps-container-responsive {
+    height: 380px !important;
+  }
+
+  .maps-filter-bar {
+    padding: 12px 14px !important;
+    gap: 8px !important;
+  }
+
+  .maps-filter-bar select,
+  .maps-filter-bar input {
+    font-size: 0.78rem !important;
+    padding: 6px 8px !important;
+    flex: 1 1 120px;
+    max-width: 100%;
+  }
+
+  .grid-responsive-2col,
+  .grid-responsive-3col {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .maps-container-responsive {
+    height: 320px !important;
+  }
+
+  .form-grid-2col {
+    grid-template-columns: 1fr !important;
+  }
+
+  .btn {
+    padding: 8px 14px;
+    font-size: 0.84rem;
+  }
+}
+

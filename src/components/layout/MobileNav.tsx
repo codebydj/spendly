@@ -9,7 +9,6 @@ import {
   Target,
   MoreHorizontal,
   PieChart,
-  Repeat,
   Calendar,
   MapPin,
   Bell,
@@ -72,9 +71,9 @@ export const MobileNav: React.FC = () => {
     },
     {
       id: 'recurring' as ViewType,
-      title: 'Recurring',
-      description: 'Manage recurring bills',
-      icon: <Repeat size={24} color="var(--accent-blue)" />,
+      title: 'Reminders',
+      description: 'Bill & payment reminders',
+      icon: <Bell size={24} color="var(--accent-blue)" />,
     },
     {
       id: 'calendar' as ViewType,

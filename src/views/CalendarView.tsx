@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/ui/GlassCard';
 import { TransactionRow } from '../components/ui/TransactionRow';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus } from 'lucide-react';
 
 export const CalendarView: React.FC = () => {
-  const { transactions, accounts, categories, settings } = useApp();
+  const { transactions, accounts, categories, settings, setIsAddTransactionOpen } = useApp();
 
   const [currentDateObj, setCurrentDateObj] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -45,6 +45,12 @@ export const CalendarView: React.FC = () => {
     setCurrentDateObj(new Date(year, month + 1, 1));
   };
 
+  const handleTodayClick = () => {
+    const now = new Date();
+    setCurrentDateObj(now);
+    setSelectedDate(now.toISOString().slice(0, 10));
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Calendar Header */}
@@ -57,6 +63,9 @@ export const CalendarView: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button onClick={handleTodayClick} className="btn btn-secondary" style={{ padding: '6px 14px', fontSize: '0.82rem' }}>
+            <CalendarIcon size={14} color="var(--accent-cyan)" /> Today
+          </button>
           <button onClick={prevMonth} className="btn-icon btn-secondary" title="Previous month">
             <ChevronLeft size={18} />
           </button>
@@ -67,9 +76,9 @@ export const CalendarView: React.FC = () => {
         </div>
       </GlassCard>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-        {/* Calendar Grid Card */}
-        <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', alignItems: 'flex-start' }}>
+        {/* Calendar Grid Card - Controlled Height */}
+        <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', height: 'fit-content', alignSelf: 'flex-start' }}>
           {/* Days of week header */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-lavender)' }}>
             <span>Sun</span>
@@ -142,44 +151,53 @@ export const CalendarView: React.FC = () => {
           </div>
         </GlassCard>
 
-        {/* Selected Date Breakdown Panel */}
-        <GlassCard elevated style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--accent-lavender)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>SELECTED DATE</span>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-              {new Date(selectedDate).toLocaleDateString('en-IN', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
-            </h3>
+        {/* Selected Date Breakdown Panel - Independently Scrollable */}
+        <GlassCard elevated style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '620px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--accent-lavender)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>SELECTED DATE</span>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                {new Date(selectedDate).toLocaleDateString('en-IN', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </h3>
+            </div>
+            <button
+              onClick={() => setIsAddTransactionOpen(true)}
+              className="btn btn-secondary"
+              style={{ padding: '6px 12px', fontSize: '0.78rem', minHeight: '32px' }}
+            >
+              <Plus size={14} color="var(--accent-cyan)" /> Add entry
+            </button>
           </div>
 
           {/* Summary Strip */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', padding: '14px', backgroundColor: 'rgba(15, 19, 42, 0.6)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', padding: '12px 14px', backgroundColor: 'rgba(15, 19, 42, 0.6)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)' }}>
             <div style={{ flex: '1 1 80px' }}>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Income</span>
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-cyan)', display: 'block', marginTop: '2px' }} className="tabular-nums">
+              <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--accent-cyan)', display: 'block', marginTop: '2px' }} className="tabular-nums">
                 {settings.hideBalances ? '₹•••••' : `₹${selectedDayIncome.toLocaleString()}`}
               </span>
             </div>
             <div style={{ flex: '1 1 80px' }}>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Expenses</span>
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--status-expense)', display: 'block', marginTop: '2px' }} className="tabular-nums">
+              <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--status-expense)', display: 'block', marginTop: '2px' }} className="tabular-nums">
                 {settings.hideBalances ? '₹•••••' : `₹${selectedDayExpense.toLocaleString()}`}
               </span>
             </div>
             <div style={{ flex: '1 1 80px' }}>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Transfers</span>
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-blue)', display: 'block', marginTop: '2px' }} className="tabular-nums">
+              <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--accent-blue)', display: 'block', marginTop: '2px' }} className="tabular-nums">
                 {settings.hideBalances ? '₹•••••' : `₹${selectedDayTransfer.toLocaleString()}`}
               </span>
             </div>
           </div>
 
-          {/* Transactions List for Date */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {/* Transactions List for Date - Independent Scroll */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '420px', paddingRight: '4px' }}>
             {selectedDateTxs.length === 0 ? (
               <div style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                 No activity recorded on this date.
