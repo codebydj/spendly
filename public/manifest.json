@@ -3,14 +3,14 @@
   "name": "Spendly Personal Finance",
   "icons": [
     {
-      "src": "favicon.svg",
-      "type": "image/svg+xml",
+      "src": "spendly-icon.png",
+      "type": "image/png",
       "sizes": "512x512"
     }
   ],
   "start_url": ".",
-  "background_color": "#080b12",
-  "theme_color": "#10b981",
+  "background_color": "#080A18",
+  "theme_color": "#080A18",
   "display": "standalone",
   "orientation": "portrait"
 }

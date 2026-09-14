@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../services/supabase';
 import { GlassCard } from '../components/ui/GlassCard';
+import { SpendlyLogo } from '../components/ui/SpendlyLogo';
 import { User, Mail, Lock, Eye, EyeOff, UserPlus, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const SignupView: React.FC = () => {
@@ -113,24 +114,7 @@ export const SignupView: React.FC = () => {
     <div style={{ maxWidth: '420px', margin: '32px auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Header */}
       <div style={{ textAlign: 'center' }}>
-        <div
-          style={{
-            width: '44px',
-            height: '44px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: 'var(--accent-emerald)',
-            color: '#042f2e',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 14px auto',
-            fontWeight: 800,
-            fontSize: '1.3rem',
-            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
-          }}
-        >
-          ₹
-        </div>
+        <SpendlyLogo type="icon" size={60} style={{ margin: '0 auto 16px auto' }} />
         <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)' }}>Create Your Account</h2>
         <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
           Start managing your personal finances securely.

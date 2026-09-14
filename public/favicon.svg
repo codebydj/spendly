@@ -1,4 +1,65 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-  <rect width="100" height="100" rx="24" fill="#10B981"/>
-  <text x="50" y="68" font-family="sans-serif" font-weight="800" font-size="54" fill="#042f2e" text-anchor="middle">₹</text>
+  <defs>
+    <linearGradient id="spendly-bg-grad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E1B4B" />
+      <stop offset="50%" stop-color="#131635" />
+      <stop offset="100%" stop-color="#0B0D21" />
+    </linearGradient>
+
+    <radialGradient id="spendly-glow-violet" cx="20" cy="80" r="55" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="spendly-glow-cyan" cx="80" cy="20" r="55" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#22D3EE" stop-opacity="0" />
+    </radialGradient>
+
+    <linearGradient id="spendly-wallet-back" x1="15" y1="20" x2="45" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6366F1" />
+      <stop offset="60%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#4F46E5" />
+    </linearGradient>
+
+    <linearGradient id="spendly-wallet-front" x1="40" y1="25" x2="85" y2="75" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#3B82F6" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#1D4ED8" stop-opacity="0.95" />
+    </linearGradient>
+
+    <linearGradient id="spendly-wallet-pocket" x1="68" y1="44" x2="84" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#1E40AF" />
+    </linearGradient>
+
+    <linearGradient id="spendly-chart-grad" x1="10" y1="65" x2="85" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#A855F7" />
+      <stop offset="40%" stop-color="#6366F1" />
+      <stop offset="75%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#22D3EE" />
+    </linearGradient>
+
+    <linearGradient id="spendly-glass-spec" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.25" />
+      <stop offset="35%" stop-color="#FFFFFF" stop-opacity="0.05" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <rect width="100" height="100" rx="26" fill="url(#spendly-bg-grad)" />
+  <rect width="100" height="100" rx="26" fill="url(#spendly-glow-violet)" />
+  <rect width="100" height="100" rx="26" fill="url(#spendly-glow-cyan)" />
+  <rect width="100" height="100" rx="26" fill="url(#spendly-glass-spec)" stroke="rgba(255, 255, 255, 0.18)" stroke-width="1.5" />
+
+  <g>
+    <path d="M 22 28 C 22 25 24 23 27 24 L 46 30 C 49 31 51 34 51 37 L 51 75 C 51 78 48 81 45 80 L 27 73 C 24 72 22 69 22 66 Z" fill="url(#spendly-wallet-back)" opacity="0.9" />
+    <path d="M 40 34 C 40 31 43 29 46 29 L 77 32 C 81 32 84 35 84 39 L 84 70 C 84 74 81 77 77 77 L 46 73 C 42 73 40 70 40 66 Z" fill="url(#spendly-wallet-front)" />
+    <path d="M 40 34 L 51 37 L 51 75 L 40 66 Z" fill="#0F172A" opacity="0.35" />
+    <path d="M 72 48 C 72 45 74 44 77 44 L 84 44 L 84 60 L 77 60 C 74 60 72 58 72 55 Z" fill="url(#spendly-wallet-pocket)" />
+    <circle cx="78" cy="52" r="2.5" fill="#E0F2FE" />
+
+    <path d="M 16 62 L 28 50 L 38 56 L 76 22" stroke="#0F172A" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity="0.4" />
+    <path d="M 16 62 L 28 50 L 38 56 L 76 22" stroke="url(#spendly-chart-grad)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" />
+    <polygon points="78,21 62,21 75,34" fill="url(#spendly-chart-grad)" />
+  </g>
 </svg>

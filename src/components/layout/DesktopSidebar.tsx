@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import type { ViewType } from '../../context/AppContext';
+import { SpendlyLogo } from '../ui/SpendlyLogo';
 import {
   LayoutDashboard,
   Receipt,
@@ -78,24 +79,8 @@ export const DesktopSidebar: React.FC = () => {
       {/* Top Brand & Nav */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Brand Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 8px' }}>
-          <div
-            style={{
-              width: '32px',
-              height: '32px',
-              background: 'linear-gradient(135deg, #8B5CF6 0%, #22D3EE 100%)',
-              borderRadius: 'var(--radius-md)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(139, 92, 246, 0.35)',
-            }}
-          >
-            <span style={{ color: '#FFFFFF', fontWeight: 800, fontSize: '1rem', lineHeight: 1 }}>₹</span>
-          </div>
-          <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
-            spendly
-          </span>
+        <div style={{ padding: '4px 8px' }}>
+          <SpendlyLogo type="full" height={32} />
         </div>
 
         {/* Primary Action Button */}

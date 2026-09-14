@@ -4,6 +4,7 @@ import { AppProvider, useApp } from './context/AppContext';
 import { DesktopSidebar } from './components/layout/DesktopSidebar';
 import { MobileNav } from './components/layout/MobileNav';
 import { Header } from './components/layout/Header';
+import { SpendlyLogo } from './components/ui/SpendlyLogo';
 import { ToastContainer } from './components/ui/Toast';
 import { AddTransactionModal } from './components/forms/AddTransactionModal';
 import { AddAccountModal } from './components/forms/AddAccountModal';
@@ -149,22 +150,7 @@ const AppShell: React.FC = () => {
           gap: '16px',
         }}
       >
-        <div
-          style={{
-            width: '44px',
-            height: '44px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: 'var(--accent-emerald)',
-            color: '#042f2e',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 800,
-            fontSize: '1.4rem',
-          }}
-        >
-          ₹
-        </div>
+        <SpendlyLogo type="icon" size={56} />
         <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
           Initializing Spendly...
         </span>
