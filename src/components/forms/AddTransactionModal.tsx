@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Modal } from '../ui/Modal';
 import type { TransactionType } from '../../types/finance';
-import { ArrowLeftRight, Check, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ArrowLeftRight, Check, Sparkles, CheckCircle2, MapPin, Navigation, X, Loader2 } from 'lucide-react';
+import { LocationService, type LocationResult } from '../../services/locationService';
 
 export const AddTransactionModal: React.FC = () => {
   const {
@@ -26,6 +27,17 @@ export const AddTransactionModal: React.FC = () => {
   const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
 
+  // Location State
+  const [locationName, setLocationName] = useState<string>('');
+  const [locationAddress, setLocationAddress] = useState<string>('');
+  const [latitude, setLatitude] = useState<number | undefined>(undefined);
+  const [longitude, setLongitude] = useState<number | undefined>(undefined);
+  const [locationPlaceId, setLocationPlaceId] = useState<string | undefined>(undefined);
+  const [locationQuery, setLocationQuery] = useState<string>('');
+  const [locationSuggestions, setLocationSuggestions] = useState<LocationResult[]>([]);
+  const [isGettingGPS, setIsGettingGPS] = useState<boolean>(false);
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+
   // Set initial default account & category
   useEffect(() => {
     if (accounts.length > 0 && !accountId) {
@@ -38,6 +50,63 @@ export const AddTransactionModal: React.FC = () => {
       setCategoryId(categories[0].id);
     }
   }, [accounts, categories, accountId, categoryId]);
+
+  // Debounced Place Search
+  useEffect(() => {
+    if (!locationQuery || locationQuery.trim().length < 2) {
+      setLocationSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const results = await LocationService.searchPlaces(locationQuery);
+      setLocationSuggestions(results);
+      setShowSuggestions(true);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [locationQuery]);
+
+  const handleUseCurrentLocation = async () => {
+    setIsGettingGPS(true);
+    try {
+      const coords = await LocationService.getCurrentLocation();
+      const details = await LocationService.reverseGeocode(coords.latitude, coords.longitude);
+      setLocationName(details.name);
+      setLocationAddress(details.address || '');
+      setLatitude(details.latitude);
+      setLongitude(details.longitude);
+      setLocationPlaceId(details.placeId);
+      setLocationQuery(details.name);
+      setShowSuggestions(false);
+      showToast(`Location set: ${details.name}`, 'info');
+    } catch (err: any) {
+      showToast(err.message || 'Location access is turned off. You can enter a place manually instead.', 'warning');
+    } finally {
+      setIsGettingGPS(false);
+    }
+  };
+
+  const handleSelectSuggestion = (item: LocationResult) => {
+    setLocationName(item.name);
+    setLocationAddress(item.address || '');
+    setLatitude(item.latitude);
+    setLongitude(item.longitude);
+    setLocationPlaceId(item.placeId);
+    setLocationQuery(item.name);
+    setShowSuggestions(false);
+  };
+
+  const handleClearLocation = () => {
+    setLocationName('');
+    setLocationAddress('');
+    setLatitude(undefined);
+    setLongitude(undefined);
+    setLocationPlaceId(undefined);
+    setLocationQuery('');
+    setLocationSuggestions([]);
+    setShowSuggestions(false);
+  };
 
   // Smart Category Suggestion algorithm
   useEffect(() => {
@@ -87,6 +156,8 @@ export const AddTransactionModal: React.FC = () => {
       finalCategoryId = transferCat ? transferCat.id : categories[0].id;
     }
 
+    const finalLocName = locationName.trim() || locationQuery.trim() || undefined;
+
     addTransaction({
       type,
       amount: parsedAmount,
@@ -97,6 +168,11 @@ export const AddTransactionModal: React.FC = () => {
       time,
       note: note.trim() || (type === 'TRANSFER' ? 'Internal Account Transfer' : 'Quick Entry'),
       paymentMethod,
+      locationName: finalLocName,
+      locationAddress: locationAddress.trim() || undefined,
+      latitude,
+      longitude,
+      locationPlaceId,
     });
 
     setIsSuccess(true);
@@ -104,6 +180,7 @@ export const AddTransactionModal: React.FC = () => {
       setIsSuccess(false);
       setAmount('');
       setNote('');
+      handleClearLocation();
       setSuggestedCatId(null);
       setIsAddTransactionOpen(false);
     }, 450);
@@ -362,6 +439,126 @@ export const AddTransactionModal: React.FC = () => {
                 <option value="Other">Other</option>
               </select>
             </div>
+          </div>
+
+          {/* Location Field (Optional) */}
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Location <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span>
+              </label>
+              <button
+                type="button"
+                onClick={handleUseCurrentLocation}
+                disabled={isGettingGPS}
+                className="btn btn-secondary"
+                style={{
+                  padding: '4px 10px',
+                  minHeight: '30px',
+                  fontSize: '0.76rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  borderRadius: 'var(--radius-sm)',
+                }}
+              >
+                {isGettingGPS ? <Loader2 size={13} style={{ animation: 'spin 1.5s linear infinite' }} /> : <Navigation size={13} color="var(--accent-cyan)" />}
+                <span>{isGettingGPS ? 'Locating...' : 'Use current location'}</span>
+              </button>
+            </div>
+
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <MapPin size={16} color="var(--accent-cyan)" style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }} />
+              <input
+                type="text"
+                placeholder="Search a place (e.g. Starbucks, Benz Circle)..."
+                value={locationQuery}
+                onChange={(e) => {
+                  setLocationQuery(e.target.value);
+                  setLocationName(e.target.value);
+                }}
+                onFocus={() => {
+                  if (locationSuggestions.length > 0) setShowSuggestions(true);
+                }}
+                style={{
+                  width: '100%',
+                  paddingLeft: '36px',
+                  paddingRight: (locationName || locationQuery) ? '36px' : '12px',
+                  fontSize: '0.86rem',
+                }}
+              />
+              {(locationName || locationQuery) && (
+                <button
+                  type="button"
+                  onClick={handleClearLocation}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px',
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Suggestions Dropdown */}
+            {showSuggestions && locationSuggestions.length > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  zIndex: 50,
+                  marginTop: '4px',
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  border: '1px solid var(--border-strong)',
+                  borderRadius: 'var(--radius-md)',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                }}
+              >
+                {locationSuggestions.map((item, idx) => (
+                  <button
+                    key={item.placeId || idx}
+                    type="button"
+                    onClick={() => handleSelectSuggestion(item)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 14px',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderBottom: idx < locationSuggestions.length - 1 ? '1px solid var(--border-color)' : 'none',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '8px',
+                    }}
+                  >
+                    <MapPin size={15} color="var(--accent-lavender)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{item.name}</div>
+                      {item.address && (
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+                          {item.address}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Save Action Button */}

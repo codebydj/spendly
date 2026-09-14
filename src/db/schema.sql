@@ -109,9 +109,21 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   description TEXT,
   note TEXT,
   payment_method TEXT,
+  location_name TEXT,
+  location_address TEXT,
+  latitude NUMERIC,
+  longitude NUMERIC,
+  location_place_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Safe migrations for existing databases
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS location_name TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS location_address TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS latitude NUMERIC;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS longitude NUMERIC;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS location_place_id TEXT;
 
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 

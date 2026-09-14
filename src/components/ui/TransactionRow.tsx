@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Transaction, Account, Category } from '../../types/finance';
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, MapPin } from 'lucide-react';
 
 interface TransactionRowProps {
   transaction: Transaction;
@@ -47,6 +47,10 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
   const accountInfo = isTransfer
     ? `${account?.name || 'Source'} → ${toAccount?.name || 'Destination'}`
     : account?.name || 'Account';
+
+  const locationDisplay = transaction.locationName
+    ? (transaction.locationAddress ? `${transaction.locationName}, ${transaction.locationAddress.split(',')[0]}` : transaction.locationName)
+    : undefined;
 
   return (
     <div
@@ -101,10 +105,18 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
             <span>{category?.name || 'General'}</span>
             <span>•</span>
-            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
               {accountInfo}
             </span>
           </div>
+          {locationDisplay && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--accent-cyan)', marginTop: '2px' }}>
+              <MapPin size={11} style={{ flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
+                {locationDisplay}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

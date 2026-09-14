@@ -11,6 +11,7 @@ import {
   PieChart,
   Repeat,
   Calendar,
+  MapPin,
   Bell,
   Settings,
   X,
@@ -62,6 +63,12 @@ export const MobileNav: React.FC = () => {
       title: 'Analytics',
       description: 'Spending trends & overview',
       icon: <PieChart size={20} color="var(--accent-cyan)" />,
+    },
+    {
+      id: 'maps' as ViewType,
+      title: 'Maps',
+      description: 'Transaction locations & spend map',
+      icon: <MapPin size={20} color="var(--accent-cyan)" />,
     },
     {
       id: 'recurring' as ViewType,

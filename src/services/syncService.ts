@@ -550,6 +550,11 @@ export class SyncService {
       description: row.description || undefined,
       note: row.note || '',
       paymentMethod: row.payment_method || undefined,
+      locationName: row.location_name || undefined,
+      locationAddress: row.location_address || undefined,
+      latitude: row.latitude !== null && row.latitude !== undefined ? Number(row.latitude) : undefined,
+      longitude: row.longitude !== null && row.longitude !== undefined ? Number(row.longitude) : undefined,
+      locationPlaceId: row.location_place_id || undefined,
       createdAt: row.created_at || new Date().toISOString(),
       updatedAt: row.updated_at || new Date().toISOString(),
     };
@@ -570,6 +575,11 @@ export class SyncService {
       description: tx.description || null,
       note: tx.note || '',
       payment_method: tx.paymentMethod || null,
+      location_name: tx.locationName || null,
+      location_address: tx.locationAddress || null,
+      latitude: tx.latitude !== undefined && tx.latitude !== null ? tx.latitude : null,
+      longitude: tx.longitude !== undefined && tx.longitude !== null ? tx.longitude : null,
+      location_place_id: tx.locationPlaceId || null,
       created_at: tx.createdAt || new Date().toISOString(),
       updated_at: tx.updatedAt || new Date().toISOString(),
     };

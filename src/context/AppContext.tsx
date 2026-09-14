@@ -22,6 +22,7 @@ export type ViewType =
   | 'analytics'
   | 'recurring'
   | 'calendar'
+  | 'maps'
   | 'notifications'
   | 'settings'
   | 'login'

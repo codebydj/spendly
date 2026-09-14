@@ -10,6 +10,7 @@ import {
   PieChart,
   Repeat,
   Calendar as CalendarIcon,
+  MapPin,
   Bell,
   Settings,
   Plus,
@@ -47,6 +48,7 @@ export const DesktopSidebar: React.FC = () => {
     { id: 'analytics', label: 'Analytics', icon: <PieChart size={18} /> },
     { id: 'recurring', label: 'Recurring', icon: <Repeat size={18} /> },
     { id: 'calendar', label: 'Calendar', icon: <CalendarIcon size={18} /> },
+    { id: 'maps', label: 'Maps', icon: <MapPin size={18} /> },
     {
       id: 'notifications',
       label: 'Notifications',

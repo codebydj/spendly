@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import type { TransactionType } from '../types/finance';
+import type { Transaction, TransactionType } from '../types/finance';
 import { TransactionRow } from '../components/ui/TransactionRow';
+import { EditTransactionModal } from '../components/forms/EditTransactionModal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Search, Download, Trash2, Filter, Receipt, Plus } from 'lucide-react';
 
@@ -22,6 +23,7 @@ export const TransactionsView: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<'ALL' | TransactionType>('ALL');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('ALL');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('ALL');
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
 
   // Filtered transactions calculation
   const filteredTransactions = transactions.filter((tx) => {
@@ -248,6 +250,7 @@ export const TransactionsView: React.FC = () => {
                         toAccount={toAcc}
                         category={cat}
                         hideBalances={settings.hideBalances}
+                        onEdit={(t) => setEditingTx(t)}
                       />
                       <button
                         onClick={() => {
@@ -276,6 +279,13 @@ export const TransactionsView: React.FC = () => {
           );
         })
       )}
+
+      {/* Edit Transaction Modal */}
+      <EditTransactionModal
+        isOpen={!!editingTx}
+        onClose={() => setEditingTx(null)}
+        transaction={editingTx}
+      />
     </div>
   );
 };

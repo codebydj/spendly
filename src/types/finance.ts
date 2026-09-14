@@ -38,6 +38,12 @@ export interface Transaction {
   note: string;
   paymentMethod?: string;
   receipt?: string;
+  // Optional Location fields
+  locationName?: string;
+  locationAddress?: string;
+  latitude?: number;
+  longitude?: number;
+  locationPlaceId?: string;
   createdAt: string;
   updatedAt: string;
 }

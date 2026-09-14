@@ -19,6 +19,7 @@ import { BudgetsView } from './views/BudgetsView';
 import { AnalyticsView } from './views/AnalyticsView';
 import { RecurringView } from './views/RecurringView';
 import { CalendarView } from './views/CalendarView';
+import { MapsView } from './views/MapsView';
 import { NotificationsView } from './views/NotificationsView';
 import { SettingsView } from './views/SettingsView';
 import { LoginView } from './views/LoginView';
@@ -42,6 +43,8 @@ const MainContentRouter: React.FC = () => {
       return <RecurringView />;
     case 'calendar':
       return <CalendarView />;
+    case 'maps':
+      return <MapsView />;
     case 'notifications':
       return <NotificationsView />;
     case 'settings':
