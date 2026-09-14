@@ -34,6 +34,9 @@
   --accent-violet-border: rgba(139, 92, 246, 0.35);
   --accent-cyan-subtle: rgba(34, 211, 238, 0.15);
   --accent-cyan-border: rgba(34, 211, 238, 0.35);
+  --accent-emerald: #22D3EE;
+  --accent-emerald-subtle: rgba(34, 211, 238, 0.15);
+  --accent-emerald-border: rgba(34, 211, 238, 0.35);
 
   /* Status Colors */
   --status-expense: #F43F5E;

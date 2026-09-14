@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { BudgetProgress } from '../components/ui/BudgetProgress';
 import { EmptyState } from '../components/ui/EmptyState';
-import { Plus, PiggyBank, Trash2, X } from 'lucide-react';
+import { Plus, PiggyBank, X } from 'lucide-react';
 
 export const BudgetsView: React.FC = () => {
   const {
@@ -161,24 +161,14 @@ export const BudgetsView: React.FC = () => {
               const spent = categorySpentMap[b.categoryId] || 0;
 
               return (
-                <div key={b.id} className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', padding: '18px 20px' }}>
-                  <div style={{ position: 'absolute', right: '14px', top: '14px' }}>
-                    <button
-                      onClick={() => deleteBudget(b.id)}
-                      className="btn-icon"
-                      style={{ padding: '4px', color: 'var(--text-muted)' }}
-                      title="Remove budget limit"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-
+                <div key={b.id} className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '18px 20px' }}>
                   <BudgetProgress
                     categoryName={cat?.name || 'Category'}
-                    categoryColor={cat?.color || 'var(--accent-emerald)'}
+                    categoryColor={cat?.color || 'var(--accent-violet)'}
                     spent={spent}
                     limit={b.monthlyLimit}
                     hideBalances={settings.hideBalances}
+                    onDelete={() => deleteBudget(b.id)}
                   />
                 </div>
               );

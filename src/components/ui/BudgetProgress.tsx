@@ -1,4 +1,5 @@
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 
 interface BudgetProgressProps {
   categoryName: string;
@@ -6,14 +7,16 @@ interface BudgetProgressProps {
   spent: number;
   limit: number;
   hideBalances?: boolean;
+  onDelete?: () => void;
 }
 
 export const BudgetProgress: React.FC<BudgetProgressProps> = ({
   categoryName,
-  categoryColor = 'var(--accent-emerald)',
+  categoryColor = 'var(--accent-violet)',
   spent,
   limit,
   hideBalances = false,
+  onDelete,
 }) => {
   const remaining = limit - spent;
   const percentage = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
@@ -21,7 +24,7 @@ export const BudgetProgress: React.FC<BudgetProgressProps> = ({
   const isWarning = percentage >= 80 && !isOver;
 
   let statusBadge = (
-    <span className="badge badge-emerald" style={{ fontSize: '0.68rem' }}>
+    <span className="badge badge-violet" style={{ fontSize: '0.68rem' }}>
       ON TRACK
     </span>
   );
@@ -44,13 +47,29 @@ export const BudgetProgress: React.FC<BudgetProgressProps> = ({
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: categoryColor }} />
-          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>{categoryName}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+          <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: categoryColor, flexShrink: 0 }} />
+          <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {categoryName}
+          </span>
         </div>
-        {statusBadge}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          {statusBadge}
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="btn-icon"
+              style={{ padding: '4px', color: 'var(--text-muted)', minHeight: '28px', minWidth: '28px' }}
+              title={`Remove ${categoryName} budget limit`}
+              aria-label={`Remove ${categoryName} budget limit`}
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Progress Bar Container */}

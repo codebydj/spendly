@@ -25,6 +25,8 @@ import {
   CloudSync,
 } from 'lucide-react';
 
+import { ChangePasswordModal } from '../components/forms/ChangePasswordModal';
+
 export const SettingsView: React.FC = () => {
   const {
     user,
@@ -42,23 +44,19 @@ export const SettingsView: React.FC = () => {
     toggleSoundEnabled,
     showToast,
     updateProfileName,
-    updateUserPassword,
   } = useApp();
 
   const [pinInput, setPinInput] = useState('');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'profile' | 'appearance' | 'notifications' | 'data' | 'security' | 'info'>('all');
   const [isSyncingManual, setIsSyncingManual] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const userEmail = user?.email || 'user@spendly.app';
   const existingName = user?.user_metadata?.full_name || userNameFromEmail(userEmail);
   const [fullNameInput, setFullNameInput] = useState(existingName);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-
-  const [newPasswordInput, setNewPasswordInput] = useState('');
-  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   function userNameFromEmail(email: string) {
     return email.split('@')[0];
@@ -70,25 +68,6 @@ export const SettingsView: React.FC = () => {
     setIsUpdatingProfile(true);
     await updateProfileName(fullNameInput.trim());
     setIsUpdatingProfile(false);
-  };
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPasswordInput || newPasswordInput.length < 6) {
-      showToast('Password must be at least 6 characters', 'warning');
-      return;
-    }
-    if (newPasswordInput !== confirmPasswordInput) {
-      showToast('Passwords do not match', 'danger');
-      return;
-    }
-    setIsChangingPassword(true);
-    const success = await updateUserPassword(newPasswordInput);
-    setIsChangingPassword(false);
-    if (success) {
-      setNewPasswordInput('');
-      setConfirmPasswordInput('');
-    }
   };
 
   const handleManualSyncClick = async () => {
@@ -223,11 +202,14 @@ export const SettingsView: React.FC = () => {
               </h3>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
               {/* Full Name Edit Form */}
-              <form onSubmit={handleUpdateProfile} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Full Name</span>
-                <div style={{ display: 'flex', gap: '10px', maxWidth: '500px' }}>
+              <form onSubmit={handleUpdateProfile} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Display Name</span>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>Update your account display name.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '400px' }}>
                   <input
                     type="text"
                     className="input-field"
@@ -247,44 +229,31 @@ export const SettingsView: React.FC = () => {
                 </div>
               </form>
 
-              {/* Change Password Form */}
-              <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Key size={16} color="var(--accent-cyan)" />
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Change Account Password</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '500px' }}>
-                  <input
-                    type="password"
-                    className="input-field"
-                    value={newPasswordInput}
-                    onChange={(e) => setNewPasswordInput(e.target.value)}
-                    placeholder="New Password (min 6 characters)"
-                    style={{ padding: '8px 12px', fontSize: '0.88rem' }}
-                  />
-                  <input
-                    type="password"
-                    className="input-field"
-                    value={confirmPasswordInput}
-                    onChange={(e) => setConfirmPasswordInput(e.target.value)}
-                    placeholder="Confirm New Password"
-                    style={{ padding: '8px 12px', fontSize: '0.88rem' }}
-                  />
-                  <div>
-                    <button
-                      type="submit"
-                      disabled={isChangingPassword}
-                      className="btn btn-secondary"
-                      style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}
-                    >
-                      {isChangingPassword ? 'Updating...' : 'Change Password'}
-                    </button>
+              {/* Change Password Modal Trigger */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Key size={16} color="var(--accent-cyan)" />
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Account Password</span>
                   </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>Change your cloud authentication password.</p>
                 </div>
-              </form>
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordModalOpen(true)}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}
+                >
+                  <Key size={15} color="var(--accent-cyan)" />
+                  <span>Change Password</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
+
+        {/* Dedicated Change Password Modal */}
+        <ChangePasswordModal isOpen={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} />
 
         {/* 1. APPEARANCE & AUDIO */}
         {(activeTab === 'all' || activeTab === 'appearance') && (

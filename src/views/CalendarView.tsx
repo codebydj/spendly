@@ -46,21 +46,21 @@ export const CalendarView: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Calendar Header */}
       <GlassCard elevated style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--accent-lavender)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
             FINANCIAL CALENDAR
           </span>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginTop: '2px' }}>{monthName}</h2>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginTop: '2px', color: 'var(--text-primary)' }}>{monthName}</h2>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button onClick={prevMonth} className="btn-icon btn-secondary" title="Previous month">
             <ChevronLeft size={18} />
           </button>
-          <span style={{ fontSize: '0.88rem', fontWeight: 700, minWidth: '120px', textAlign: 'center' }}>{monthName}</span>
+          <span style={{ fontSize: '0.88rem', fontWeight: 700, minWidth: '120px', textAlign: 'center', color: 'var(--text-primary)' }}>{monthName}</span>
           <button onClick={nextMonth} className="btn-icon btn-secondary" title="Next month">
             <ChevronRight size={18} />
           </button>
@@ -69,9 +69,9 @@ export const CalendarView: React.FC = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
         {/* Calendar Grid Card */}
-        <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px' }}>
           {/* Days of week header */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-lavender)' }}>
             <span>Sun</span>
             <span>Mon</span>
             <span>Tue</span>
@@ -82,9 +82,9 @@ export const CalendarView: React.FC = () => {
           </div>
 
           {/* Grid Cells */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
             {Array.from({ length: firstDayOfWeek }).map((_, idx) => (
-              <div key={`empty-${idx}`} style={{ height: '56px' }} />
+              <div key={`empty-${idx}`} style={{ minHeight: '48px' }} />
             ))}
 
             {daysArray.map((dayObj) => {
@@ -96,16 +96,16 @@ export const CalendarView: React.FC = () => {
                   key={dayObj.dateStr}
                   onClick={() => setSelectedDate(dayObj.dateStr)}
                   style={{
-                    height: '58px',
-                    padding: '6px',
+                    minHeight: '48px',
+                    padding: '4px 6px',
                     borderRadius: 'var(--radius-sm)',
                     backgroundColor: isSelected
-                      ? 'var(--glass-bg-hover)'
+                      ? 'rgba(139, 92, 246, 0.22)'
                       : hasActivity
-                      ? 'var(--bg-main)'
+                      ? 'rgba(27, 32, 66, 0.65)'
                       : 'transparent',
                     border: isSelected
-                      ? '1px solid var(--accent-emerald)'
+                      ? '1px solid var(--accent-violet)'
                       : hasActivity
                       ? '1px solid var(--border-glass)'
                       : '1px solid transparent',
@@ -113,25 +113,26 @@ export const CalendarView: React.FC = () => {
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
+                    transition: 'all 0.15s ease',
                   }}
                 >
                   <span
                     style={{
-                      fontSize: '0.82rem',
+                      fontSize: '0.8rem',
                       fontWeight: isSelected || hasActivity ? 700 : 400,
-                      color: isSelected ? 'var(--accent-emerald)' : 'var(--text-primary)',
+                      color: isSelected ? 'var(--accent-cyan)' : 'var(--text-primary)',
                     }}
                   >
                     {dayObj.day}
                   </span>
 
                   {hasActivity && (
-                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginTop: '2px' }}>
                       {dayObj.dayIncome > 0 && (
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent-emerald)' }} />
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent-cyan)', boxShadow: '0 0 4px var(--accent-cyan)' }} title={`Income: ₹${dayObj.dayIncome}`} />
                       )}
                       {dayObj.dayExpense > 0 && (
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--status-danger)' }} />
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--status-expense)', boxShadow: '0 0 4px var(--status-expense)' }} title={`Expense: ₹${dayObj.dayExpense}`} />
                       )}
                     </div>
                   )}
@@ -144,7 +145,7 @@ export const CalendarView: React.FC = () => {
         {/* Selected Date Breakdown Panel */}
         <GlassCard elevated style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>SELECTED DATE</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--accent-lavender)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>SELECTED DATE</span>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
               {new Date(selectedDate).toLocaleDateString('en-IN', {
                 weekday: 'long',
@@ -156,21 +157,21 @@ export const CalendarView: React.FC = () => {
           </div>
 
           {/* Summary Strip */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', padding: '14px', backgroundColor: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)' }}>
-            <div>
-              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Income</span>
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-emerald)', display: 'block', marginTop: '2px' }} className="tabular-nums">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', padding: '14px', backgroundColor: 'rgba(15, 19, 42, 0.6)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)' }}>
+            <div style={{ flex: '1 1 80px' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Income</span>
+              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-cyan)', display: 'block', marginTop: '2px' }} className="tabular-nums">
                 {settings.hideBalances ? '₹•••••' : `₹${selectedDayIncome.toLocaleString()}`}
               </span>
             </div>
-            <div>
-              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Expenses</span>
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--status-danger)', display: 'block', marginTop: '2px' }} className="tabular-nums">
+            <div style={{ flex: '1 1 80px' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Expenses</span>
+              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--status-expense)', display: 'block', marginTop: '2px' }} className="tabular-nums">
                 {settings.hideBalances ? '₹•••••' : `₹${selectedDayExpense.toLocaleString()}`}
               </span>
             </div>
-            <div>
-              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Transfers</span>
+            <div style={{ flex: '1 1 80px' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Transfers</span>
               <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-blue)', display: 'block', marginTop: '2px' }} className="tabular-nums">
                 {settings.hideBalances ? '₹•••••' : `₹${selectedDayTransfer.toLocaleString()}`}
               </span>

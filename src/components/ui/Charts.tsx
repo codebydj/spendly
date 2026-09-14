@@ -209,7 +209,7 @@ export const IncomeExpenseBarChart: React.FC<BarChartProps> = ({ items, currency
                     width: '35%',
                     maxWidth: '20px',
                     height: `${Math.max(incHeight, 4)}%`,
-                    backgroundColor: 'var(--accent-emerald)',
+                    backgroundColor: 'var(--accent-cyan)',
                     borderRadius: '2px 2px 0 0',
                     transition: 'height 0.3s ease',
                   }}
@@ -221,7 +221,7 @@ export const IncomeExpenseBarChart: React.FC<BarChartProps> = ({ items, currency
                     width: '35%',
                     maxWidth: '20px',
                     height: `${Math.max(expHeight, 4)}%`,
-                    backgroundColor: 'var(--status-danger)',
+                    backgroundColor: 'var(--status-expense)',
                     borderRadius: '2px 2px 0 0',
                     transition: 'height 0.3s ease',
                   }}
@@ -229,6 +229,82 @@ export const IncomeExpenseBarChart: React.FC<BarChartProps> = ({ items, currency
                 />
               </div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{item.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+interface AccountDistributionProps {
+  accounts: { name: string; balance: number; type: string }[];
+  currency?: string;
+  hideBalances?: boolean;
+}
+
+export const AccountDistributionBarChart: React.FC<AccountDistributionProps> = ({ accounts, currency = '₹', hideBalances }) => {
+  const maxBalance = Math.max(...accounts.map((a) => Math.abs(a.balance)), 1);
+
+  if (accounts.length === 0) {
+    return <div style={{ color: 'var(--text-muted)', fontSize: '0.84rem', padding: '16px' }}>No account balances available.</div>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+      {accounts.map((acc, idx) => {
+        const widthPct = Math.min(100, Math.max(8, Math.round((Math.abs(acc.balance) / maxBalance) * 100)));
+        const colors = ['#8B5CF6', '#22D3EE', '#60A5FA', '#F472B6', '#C4B5FD'];
+        const barColor = colors[idx % colors.length];
+
+        return (
+          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{acc.name}</span>
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 700 }} className="tabular-nums">
+                {hideBalances ? '₹•••••' : `${currency}${acc.balance.toLocaleString()}`}
+              </span>
+            </div>
+            <div style={{ height: '7px', width: '100%', backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: `${widthPct}%`, height: '100%', backgroundColor: barColor, borderRadius: '4px', transition: 'width 0.3s ease' }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+interface SavingsTrendProps {
+  items: { label: string; savings: number }[];
+  currency?: string;
+  hideBalances?: boolean;
+}
+
+export const SavingsTrendChart: React.FC<SavingsTrendProps> = ({ items, currency = '₹', hideBalances }) => {
+  const maxSavings = Math.max(...items.map((i) => Math.abs(i.savings)), 1);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '8px', height: '140px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+        {items.map((item, idx) => {
+          const heightPct = Math.min(100, Math.max(6, Math.round((Math.abs(item.savings) / maxSavings) * 100)));
+          const isNegative = item.savings < 0;
+
+          return (
+            <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', gap: '6px' }}>
+              <div
+                style={{
+                  width: '60%',
+                  maxWidth: '24px',
+                  height: `${heightPct}%`,
+                  backgroundColor: isNegative ? 'var(--status-expense)' : 'var(--accent-violet)',
+                  borderRadius: '3px 3px 0 0',
+                  transition: 'height 0.3s ease',
+                }}
+                title={`Savings: ${hideBalances ? '•••••' : `${currency}${item.savings.toLocaleString()}`}`}
+              />
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{item.label}</span>
             </div>
           );
         })}
