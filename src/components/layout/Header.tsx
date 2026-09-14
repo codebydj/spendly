@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Eye, EyeOff, Search, Plus, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck } from 'lucide-react';
+import { Eye, EyeOff, Search, Plus, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck, Bell } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const {
@@ -15,6 +15,7 @@ export const Header: React.FC = () => {
     triggerManualSync,
     setCurrentView,
     user,
+    unreadNotificationCount,
   } = useApp();
 
   const getPageMeta = () => {
@@ -56,18 +57,18 @@ export const Header: React.FC = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '5px',
-            padding: '4px 10px',
+            gap: '6px',
+            padding: '5px 12px',
             borderRadius: 'var(--radius-sm)',
             backgroundColor: 'var(--status-warning-subtle)',
             color: 'var(--status-warning)',
-            fontSize: '0.74rem',
+            fontSize: '0.78rem',
             fontWeight: 700,
             border: '1px solid rgba(245, 158, 11, 0.25)',
           }}
           title="Working offline - tap to try syncing"
         >
-          <WifiOff size={13} />
+          <WifiOff size={16} />
           <span>Offline</span>
         </button>
       );
@@ -79,17 +80,17 @@ export const Header: React.FC = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '5px',
-            padding: '4px 10px',
+            gap: '6px',
+            padding: '5px 12px',
             borderRadius: 'var(--radius-sm)',
             backgroundColor: 'rgba(96, 165, 250, 0.15)',
             color: 'var(--accent-blue)',
-            fontSize: '0.74rem',
+            fontSize: '0.78rem',
             fontWeight: 700,
             border: '1px solid rgba(96, 165, 250, 0.3)',
           }}
         >
-          <RefreshCw size={13} style={{ animation: 'spin 1.5s linear infinite' }} />
+          <RefreshCw size={16} style={{ animation: 'spin 1.5s linear infinite' }} />
           <span>Syncing...</span>
         </div>
       );
@@ -102,18 +103,18 @@ export const Header: React.FC = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '5px',
-            padding: '4px 10px',
+            gap: '6px',
+            padding: '5px 12px',
             borderRadius: 'var(--radius-sm)',
             backgroundColor: 'var(--status-danger-subtle)',
             color: 'var(--status-danger)',
-            fontSize: '0.74rem',
+            fontSize: '0.78rem',
             fontWeight: 700,
             border: '1px solid rgba(244, 63, 94, 0.25)',
           }}
           title="Sync issue - tap Sync Now to retry"
         >
-          <AlertTriangle size={13} />
+          <AlertTriangle size={16} />
           <span>Sync Issue</span>
         </button>
       );
@@ -125,18 +126,18 @@ export const Header: React.FC = () => {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '5px',
-          padding: '4px 10px',
+          gap: '6px',
+          padding: '5px 12px',
           borderRadius: 'var(--radius-sm)',
           backgroundColor: 'var(--accent-cyan-subtle)',
           color: 'var(--accent-cyan)',
-          fontSize: '0.74rem',
+          fontSize: '0.78rem',
           fontWeight: 700,
           border: '1px solid var(--accent-cyan-border)',
         }}
         title={`Synced at ${settings.lastSyncedAt ? new Date(settings.lastSyncedAt).toLocaleTimeString() : 'now'}. Tap to Sync Now`}
       >
-        <CloudCheck size={13} />
+        <CloudCheck size={16} />
         <span>Synced</span>
       </button>
     );
@@ -162,25 +163,25 @@ export const Header: React.FC = () => {
     >
       {/* Mobile / Desktop Title Area */}
       <div style={{ minWidth: 0, flexShrink: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <h1 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {title}
         </h1>
-        <p className="desktop-only" style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <p className="desktop-only" style={{ fontSize: '0.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           · {subtitle}
         </p>
       </div>
 
       {/* Controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
         {/* Manual Sync Status Badge */}
         {renderSyncBadge()}
 
         {/* Global Search (Desktop Only) */}
-        <div style={{ position: 'relative', width: '180px' }} className="desktop-only">
+        <div style={{ position: 'relative', width: '200px' }} className="desktop-only">
           <Search
-            size={14}
+            size={18}
             color="var(--text-muted)"
-            style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
+            style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
           />
           <input
             type="text"
@@ -194,14 +195,44 @@ export const Header: React.FC = () => {
             }}
             style={{
               width: '100%',
-              paddingLeft: '30px',
-              paddingTop: '6px',
-              paddingBottom: '6px',
-              fontSize: '0.82rem',
-              backgroundColor: 'rgba(17, 21, 46, 0.8)',
+              paddingLeft: '38px',
+              paddingTop: '8px',
+              paddingBottom: '8px',
+              fontSize: '0.86rem',
+              backgroundColor: 'rgba(17, 21, 46, 0.85)',
             }}
           />
         </div>
+
+        {/* Notification Bell with Badge */}
+        <button
+          onClick={() => setCurrentView('notifications')}
+          className="btn-icon"
+          title="Notifications"
+          aria-label="Notifications"
+          style={{ position: 'relative', padding: '8px', minHeight: '40px', minWidth: '40px' }}
+        >
+          <Bell size={22} color={unreadNotificationCount > 0 ? 'var(--accent-lavender)' : 'var(--text-secondary)'} />
+          {unreadNotificationCount > 0 && (
+            <span
+              style={{
+                position: 'absolute',
+                top: '4px',
+                right: '4px',
+                backgroundColor: 'var(--status-expense)',
+                color: '#FFFFFF',
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                borderRadius: '10px',
+                padding: '2px 6px',
+                lineHeight: 1,
+                border: '1.5px solid var(--bg-dark)',
+              }}
+            >
+              {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+            </span>
+          )}
+        </button>
 
         {/* Privacy Balance Toggle */}
         <button
@@ -209,22 +240,22 @@ export const Header: React.FC = () => {
           className="btn-icon"
           title={settings.hideBalances ? 'Show Balances' : 'Hide Balances'}
           aria-label="Toggle hide balance privacy"
-          style={{ padding: '6px 8px', minHeight: '36px', minWidth: '36px' }}
+          style={{ padding: '8px', minHeight: '40px', minWidth: '40px' }}
         >
-          {settings.hideBalances ? <EyeOff size={16} color="var(--accent-cyan)" /> : <Eye size={16} />}
+          {settings.hideBalances ? <EyeOff size={20} color="var(--accent-cyan)" /> : <Eye size={20} />}
         </button>
 
         {/* User Profile Avatar Link (Mobile Quick Settings Access) */}
         <button
           onClick={() => setCurrentView('settings')}
           className="btn-icon mobile-only"
-          style={{ padding: '4px', minHeight: '36px', minWidth: '36px' }}
+          style={{ padding: '4px', minHeight: '40px', minWidth: '40px' }}
           aria-label="User Settings"
         >
           <div
             style={{
-              width: '28px',
-              height: '28px',
+              width: '32px',
+              height: '32px',
               borderRadius: '50%',
               backgroundColor: 'var(--accent-violet-subtle)',
               border: '1px solid var(--accent-violet-border)',
@@ -232,11 +263,11 @@ export const Header: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '0.75rem',
+              fontSize: '0.82rem',
               fontWeight: 700,
             }}
           >
-            {user?.email ? user.email.slice(0, 2).toUpperCase() : <User size={14} />}
+            {user?.email ? user.email.slice(0, 2).toUpperCase() : <User size={16} />}
           </div>
         </button>
 
@@ -244,9 +275,9 @@ export const Header: React.FC = () => {
         <button
           onClick={() => setIsAddTransactionOpen(true)}
           className="btn btn-gradient desktop-only"
-          style={{ padding: '7px 18px', fontSize: '0.84rem', minHeight: '38px', borderRadius: 'var(--radius-md)' }}
+          style={{ padding: '8px 20px', fontSize: '0.88rem', minHeight: '40px', borderRadius: 'var(--radius-md)' }}
         >
-          <Plus size={16} strokeWidth={2.8} />
+          <Plus size={20} strokeWidth={2.8} />
           <span>Add transaction</span>
         </button>
       </div>

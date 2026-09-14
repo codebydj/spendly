@@ -11,7 +11,6 @@ import {
   Repeat,
   Calendar as CalendarIcon,
   MapPin,
-  Bell,
   Settings,
   Plus,
   Wifi,
@@ -33,7 +32,6 @@ export const DesktopSidebar: React.FC = () => {
     setCurrentView,
     setIsAddTransactionOpen,
     isOffline,
-    unreadNotificationCount,
     setIsPinLocked,
     settings,
     user,
@@ -41,20 +39,14 @@ export const DesktopSidebar: React.FC = () => {
   } = useApp();
 
   const mainNavItems: NavItem[] = [
-    { id: 'dashboard', label: 'Overview', icon: <LayoutDashboard size={18} /> },
-    { id: 'transactions', label: 'Transactions', icon: <Receipt size={18} /> },
-    { id: 'accounts', label: 'Accounts', icon: <Wallet size={18} /> },
-    { id: 'budgets', label: 'Budgets', icon: <PiggyBank size={18} /> },
-    { id: 'analytics', label: 'Analytics', icon: <PieChart size={18} /> },
-    { id: 'recurring', label: 'Recurring', icon: <Repeat size={18} /> },
-    { id: 'calendar', label: 'Calendar', icon: <CalendarIcon size={18} /> },
-    { id: 'maps', label: 'Maps', icon: <MapPin size={18} /> },
-    {
-      id: 'notifications',
-      label: 'Notifications',
-      icon: <Bell size={18} />,
-      badge: unreadNotificationCount > 0 ? unreadNotificationCount : undefined,
-    },
+    { id: 'dashboard', label: 'Overview', icon: <LayoutDashboard size={22} /> },
+    { id: 'transactions', label: 'Transactions', icon: <Receipt size={22} /> },
+    { id: 'accounts', label: 'Accounts', icon: <Wallet size={22} /> },
+    { id: 'budgets', label: 'Budgets', icon: <PiggyBank size={22} /> },
+    { id: 'analytics', label: 'Analytics', icon: <PieChart size={22} /> },
+    { id: 'recurring', label: 'Recurring', icon: <Repeat size={22} /> },
+    { id: 'calendar', label: 'Calendar', icon: <CalendarIcon size={22} /> },
+    { id: 'maps', label: 'Maps', icon: <MapPin size={22} /> },
   ];
 
   const userInitial = user?.email ? user.email.charAt(0).toUpperCase() : 'U';
@@ -82,21 +74,21 @@ export const DesktopSidebar: React.FC = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Brand Header */}
         <div style={{ padding: '4px 8px' }}>
-          <SpendlyLogo type="full" height={32} />
+          <SpendlyLogo type="full" height={44} />
         </div>
 
         {/* Primary Action Button */}
         <button
           onClick={() => setIsAddTransactionOpen(true)}
           className="btn btn-gradient"
-          style={{ width: '100%', justifyContent: 'center', padding: '11px' }}
+          style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '0.94rem' }}
         >
-          <Plus size={18} strokeWidth={2.6} />
+          <Plus size={22} strokeWidth={2.8} />
           <span>Add Transaction</span>
         </button>
 
         {/* Main Navigation Links */}
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {mainNavItems.map((item) => {
             const isActive = currentView === item.id;
             return (
@@ -107,29 +99,29 @@ export const DesktopSidebar: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '10px 14px',
+                  padding: '11px 16px',
                   borderRadius: 'var(--radius-md)',
-                  backgroundColor: isActive ? 'rgba(139, 92, 246, 0.16)' : 'transparent',
+                  backgroundColor: isActive ? 'rgba(139, 92, 246, 0.18)' : 'transparent',
                   color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-                  border: isActive ? '1px solid rgba(139, 92, 246, 0.35)' : '1px solid transparent',
+                  border: isActive ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid transparent',
                   fontWeight: isActive ? 700 : 500,
-                  fontSize: '0.9rem',
+                  fontSize: '0.95rem',
                   transition: 'all 0.15s ease',
                   textAlign: 'left',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                   {item.icon}
                   <span>{item.label}</span>
                 </div>
                 {item.badge !== undefined && (
                   <span
                     style={{
-                      backgroundColor: 'rgba(139, 92, 246, 0.25)',
+                      backgroundColor: 'rgba(139, 92, 246, 0.28)',
                       color: 'var(--accent-lavender)',
-                      fontSize: '0.72rem',
+                      fontSize: '0.74rem',
                       fontWeight: 800,
-                      padding: '2px 7px',
+                      padding: '2px 8px',
                       borderRadius: 'var(--radius-sm)',
                     }}
                     className="tabular-nums"
@@ -158,16 +150,16 @@ export const DesktopSidebar: React.FC = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
-            padding: '9px 12px',
+            gap: '14px',
+            padding: '10px 14px',
             borderRadius: 'var(--radius-md)',
             backgroundColor: currentView === 'settings' ? 'var(--bg-surface-elevated)' : 'transparent',
             color: currentView === 'settings' ? 'var(--accent-emerald)' : 'var(--text-secondary)',
-            fontSize: '0.9rem',
+            fontSize: '0.95rem',
             textAlign: 'left',
           }}
         >
-          <Settings size={18} />
+          <Settings size={22} />
           <span>Settings</span>
         </button>
 
@@ -176,16 +168,16 @@ export const DesktopSidebar: React.FC = () => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            padding: '8px 12px',
-            fontSize: '0.78rem',
+            gap: '10px',
+            padding: '9px 14px',
+            fontSize: '0.82rem',
             color: isOffline ? 'var(--status-warning)' : 'var(--text-muted)',
             backgroundColor: 'var(--bg-surface)',
             borderRadius: 'var(--radius-md)',
             border: '1px solid var(--border-color)',
           }}
         >
-          {isOffline ? <WifiOff size={14} color="var(--status-warning)" /> : <Wifi size={14} color="var(--accent-emerald)" />}
+          {isOffline ? <WifiOff size={18} color="var(--status-warning)" /> : <Wifi size={18} color="var(--accent-emerald)" />}
           <span>{isOffline ? 'Offline mode' : 'Cloud synchronized'}</span>
         </div>
 
@@ -195,24 +187,24 @@ export const DesktopSidebar: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '8px 12px',
+            padding: '9px 14px',
             backgroundColor: 'var(--bg-surface)',
             borderRadius: 'var(--radius-md)',
             border: '1px solid var(--border-color)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
             <div
               style={{
-                width: '26px',
-                height: '26px',
-                borderRadius: '4px',
+                width: '30px',
+                height: '30px',
+                borderRadius: '6px',
                 backgroundColor: 'var(--accent-emerald-subtle)',
                 color: 'var(--accent-emerald)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '0.75rem',
+                fontSize: '0.82rem',
                 fontWeight: 700,
                 flexShrink: 0,
               }}
@@ -221,7 +213,7 @@ export const DesktopSidebar: React.FC = () => {
             </div>
             <span
               style={{
-                fontSize: '0.78rem',
+                fontSize: '0.82rem',
                 fontWeight: 500,
                 color: 'var(--text-primary)',
                 whiteSpace: 'nowrap',
@@ -235,24 +227,24 @@ export const DesktopSidebar: React.FC = () => {
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {settings.pinEnabled && (
               <button
                 onClick={() => setIsPinLocked(true)}
                 className="btn-icon"
                 title="Lock Spendly"
-                style={{ padding: '4px', color: 'var(--text-muted)' }}
+                style={{ padding: '6px', color: 'var(--text-muted)' }}
               >
-                <Lock size={14} />
+                <Lock size={16} />
               </button>
             )}
             <button
               onClick={logout}
               className="btn-icon"
               title="Sign Out"
-              style={{ padding: '4px', color: 'var(--status-danger)' }}
+              style={{ padding: '6px', color: 'var(--status-danger)' }}
             >
-              <LogOut size={14} />
+              <LogOut size={16} />
             </button>
           </div>
         </div>

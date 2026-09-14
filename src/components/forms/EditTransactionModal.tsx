@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Modal } from '../ui/Modal';
 import type { Transaction, TransactionType } from '../../types/finance';
-import { Trash2, MapPin, Navigation, Loader2 } from 'lucide-react';
+import { Trash2, MapPin, Navigation, Loader2, Plus } from 'lucide-react';
 import { LocationService, type LocationResult } from '../../services/locationService';
 
 interface EditTransactionModalProps {
@@ -19,6 +19,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const {
     accounts,
     categories,
+    transactions,
     editTransaction,
     deleteTransaction,
     showToast,
@@ -42,6 +43,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const [locationPlaceId, setLocationPlaceId] = useState<string | undefined>(undefined);
   const [locationQuery, setLocationQuery] = useState<string>('');
   const [locationSuggestions, setLocationSuggestions] = useState<LocationResult[]>([]);
+  const [isSearchingLocations, setIsSearchingLocations] = useState<boolean>(false);
   const [isGettingGPS, setIsGettingGPS] = useState<boolean>(false);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
 
@@ -68,21 +70,33 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
     }
   }, [transaction, accounts]);
 
-  // Debounced Place Search
+  // Debounced Place Search with Loading & Abort Control
   useEffect(() => {
     if (!locationQuery || locationQuery.trim().length < 2) {
       setLocationSuggestions([]);
+      setIsSearchingLocations(false);
+      setShowSuggestions(false);
       return;
     }
 
-    const timer = setTimeout(async () => {
-      const results = await LocationService.searchPlaces(locationQuery);
-      setLocationSuggestions(results);
-      setShowSuggestions(true);
-    }, 400);
+    setIsSearchingLocations(true);
+    setShowSuggestions(true);
 
-    return () => clearTimeout(timer);
-  }, [locationQuery]);
+    let active = true;
+
+    const timer = setTimeout(async () => {
+      const results = await LocationService.searchPlaces(locationQuery, transactions);
+      if (active) {
+        setLocationSuggestions(results);
+        setIsSearchingLocations(false);
+      }
+    }, 350);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [locationQuery, transactions]);
 
   const handleUseCurrentLocation = async () => {
     setIsGettingGPS(true);
@@ -386,7 +400,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           </div>
 
           {/* Suggestions Dropdown */}
-          {showSuggestions && locationSuggestions.length > 0 && (
+          {showSuggestions && locationQuery.trim().length >= 2 && (
             <div
               style={{
                 position: 'absolute',
@@ -399,41 +413,129 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                 border: '1px solid var(--border-strong)',
                 borderRadius: 'var(--radius-md)',
                 boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-                maxHeight: '200px',
+                maxHeight: '240px',
                 overflowY: 'auto',
               }}
             >
-              {locationSuggestions.map((item, idx) => (
-                <button
-                  key={item.placeId || idx}
-                  type="button"
-                  onClick={() => handleSelectSuggestion(item)}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '10px 14px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    borderBottom: idx < locationSuggestions.length - 1 ? '1px solid var(--border-color)' : 'none',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.84rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '8px',
-                  }}
-                >
-                  <MapPin size={15} color="var(--accent-lavender)" style={{ marginTop: '2px', flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{item.name}</div>
-                    {item.address && (
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '1px' }}>
-                        {item.address}
-                      </div>
-                    )}
+              {/* 1. Loading State */}
+              {isSearchingLocations ? (
+                <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                  <Loader2 size={15} style={{ animation: 'spin 1.5s linear infinite' }} />
+                  <span>Searching places for "{locationQuery.trim()}"...</span>
+                </div>
+              ) : locationSuggestions.length > 0 ? (
+                /* 2. Real Results Found */
+                <>
+                  <div style={{ padding: '6px 12px', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Places & Landmarks ({locationSuggestions.length})
                   </div>
-                </button>
-              ))}
+                  {locationSuggestions.map((item, idx) => (
+                    <button
+                      key={item.placeId || idx}
+                      type="button"
+                      onClick={() => handleSelectSuggestion(item)}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '10px 14px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        borderBottom: '1px solid var(--border-color)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.84rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                      }}
+                    >
+                      <MapPin size={16} color={item.isSaved ? 'var(--accent-cyan)' : 'var(--accent-lavender)'} style={{ marginTop: '2px', flexShrink: 0 }} />
+                      <div style={{ flexGrow: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</span>
+                          {item.isSaved && (
+                            <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', backgroundColor: 'rgba(34, 211, 238, 0.15)', color: 'var(--accent-cyan)', fontWeight: 700 }}>
+                              Saved
+                            </span>
+                          )}
+                        </div>
+                        {item.address && (
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {item.address}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+
+                  {/* Secondary Manual Fallback */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocationName(locationQuery.trim());
+                      setLocationAddress('');
+                      setLatitude(undefined);
+                      setLongitude(undefined);
+                      setLocationPlaceId(undefined);
+                      setShowSuggestions(false);
+                      showToast(`Set custom location: "${locationQuery.trim()}"`, 'info');
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '8px 14px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <Plus size={13} />
+                    <span>Can't find exact place? Use "{locationQuery.trim()}" as custom location</span>
+                  </button>
+                </>
+              ) : (
+                /* 3. Search Finished & 0 Results */
+                <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    Couldn't find an exact place matching "{locationQuery.trim()}".
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocationName(locationQuery.trim());
+                      setLocationAddress('');
+                      setLatitude(undefined);
+                      setLongitude(undefined);
+                      setLocationPlaceId(undefined);
+                      setShowSuggestions(false);
+                      showToast(`Set custom location: "${locationQuery.trim()}"`, 'info');
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '8px 12px',
+                      backgroundColor: 'rgba(34, 211, 238, 0.08)',
+                      border: '1px solid rgba(34, 211, 238, 0.25)',
+                      borderRadius: 'var(--radius-sm)',
+                      color: 'var(--accent-cyan)',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <Plus size={14} />
+                    <span>Add "{locationQuery.trim()}" as custom location</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

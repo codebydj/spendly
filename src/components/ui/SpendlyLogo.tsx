@@ -10,8 +10,8 @@ interface SpendlyLogoProps {
 
 export const SpendlyLogo: React.FC<SpendlyLogoProps> = ({
   type = 'full',
-  size = 36,
-  height = 36,
+  size = 44,
+  height = 44,
   className,
   style,
 }) => {
@@ -29,6 +29,7 @@ export const SpendlyLogo: React.FC<SpendlyLogoProps> = ({
         display: 'inline-block',
         verticalAlign: 'middle',
         flexShrink: 0,
+        filter: 'drop-shadow(0 4px 10px rgba(139, 92, 246, 0.4))',
       }}
     />
   );
@@ -48,7 +49,7 @@ export const SpendlyLogo: React.FC<SpendlyLogoProps> = ({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: `${Math.max(8, height * 0.28)}px`,
+        gap: `${Math.max(10, height * 0.28)}px`,
         verticalAlign: 'middle',
         ...style,
       }}
@@ -56,9 +57,9 @@ export const SpendlyLogo: React.FC<SpendlyLogoProps> = ({
       {iconElement}
       <span
         style={{
-          fontSize: `${height * 0.58}px`,
+          fontSize: `${height * 0.62}px`,
           fontWeight: 800,
-          letterSpacing: '-0.02em',
+          letterSpacing: '-0.025em',
           color: 'var(--text-primary)',
           fontFamily: "'Manrope', 'Inter', sans-serif",
           lineHeight: 1,

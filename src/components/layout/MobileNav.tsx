@@ -51,10 +51,10 @@ export const MobileNav: React.FC = () => {
   };
 
   const navItems = [
-    { id: 'dashboard' as ViewType, label: 'Home', icon: <LayoutDashboard size={20} /> },
-    { id: 'transactions' as ViewType, label: 'Txns', icon: <ArrowLeftRight size={20} /> },
-    { id: 'accounts' as ViewType, label: 'Accounts', icon: <WalletCards size={20} /> },
-    { id: 'budgets' as ViewType, label: 'Budgets', icon: <Target size={20} /> },
+    { id: 'dashboard' as ViewType, label: 'Home', icon: <LayoutDashboard size={24} /> },
+    { id: 'transactions' as ViewType, label: 'Txns', icon: <ArrowLeftRight size={24} /> },
+    { id: 'accounts' as ViewType, label: 'Accounts', icon: <WalletCards size={24} /> },
+    { id: 'budgets' as ViewType, label: 'Budgets', icon: <Target size={24} /> },
   ];
 
   const secondaryMenu = [
@@ -62,38 +62,38 @@ export const MobileNav: React.FC = () => {
       id: 'analytics' as ViewType,
       title: 'Analytics',
       description: 'Spending trends & overview',
-      icon: <PieChart size={20} color="var(--accent-cyan)" />,
+      icon: <PieChart size={24} color="var(--accent-cyan)" />,
     },
     {
       id: 'maps' as ViewType,
       title: 'Maps',
       description: 'Transaction locations & spend map',
-      icon: <MapPin size={20} color="var(--accent-cyan)" />,
+      icon: <MapPin size={24} color="var(--accent-cyan)" />,
     },
     {
       id: 'recurring' as ViewType,
       title: 'Recurring',
       description: 'Manage recurring bills',
-      icon: <Repeat size={20} color="var(--accent-blue)" />,
+      icon: <Repeat size={24} color="var(--accent-blue)" />,
     },
     {
       id: 'calendar' as ViewType,
       title: 'Calendar',
       description: 'View transactions by date',
-      icon: <Calendar size={20} color="var(--accent-purple)" />,
+      icon: <Calendar size={24} color="var(--accent-purple)" />,
     },
     {
       id: 'notifications' as ViewType,
       title: 'Notifications',
       description: 'Budget alerts and reminders',
-      icon: <Bell size={20} color="var(--accent-violet)" />,
+      icon: <Bell size={24} color="var(--accent-violet)" />,
       badge: unreadNotificationCount > 0 ? unreadNotificationCount : null,
     },
     {
       id: 'settings' as ViewType,
       title: 'Settings',
       description: 'Account, sync & app options',
-      icon: <Settings size={20} color="var(--text-secondary)" />,
+      icon: <Settings size={24} color="var(--text-secondary)" />,
     },
   ];
 
@@ -105,7 +105,7 @@ export const MobileNav: React.FC = () => {
       <div
         style={{
           position: 'fixed',
-          bottom: 'calc(var(--mobile-nav-height) + var(--mobile-safe-bottom) + 12px)',
+          bottom: 'calc(var(--mobile-nav-height) + var(--mobile-safe-bottom) + 14px)',
           right: '20px',
           zIndex: 920,
         }}
@@ -114,21 +114,21 @@ export const MobileNav: React.FC = () => {
           onClick={handleOpenAddTransaction}
           aria-label="Add transaction"
           style={{
-            width: '54px',
-            height: '54px',
-            borderRadius: '18px',
+            width: '60px',
+            height: '60px',
+            borderRadius: '20px',
             background: 'linear-gradient(135deg, #8B5CF6 0%, #3B82F6 50%, #22D3EE 100%)',
             color: '#FFFFFF',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 10px 28px rgba(139, 92, 246, 0.45), 0 2px 8px rgba(0, 0, 0, 0.5)',
-            border: '1px solid rgba(255, 255, 255, 0.25)',
+            boxShadow: '0 12px 32px rgba(139, 92, 246, 0.5), 0 2px 10px rgba(0, 0, 0, 0.6)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
             transition: 'transform 0.15s ease, box-shadow 0.15s ease',
           }}
           className="btn-floating-gradient"
         >
-          <Plus size={28} strokeWidth={2.8} />
+          <Plus size={32} strokeWidth={2.8} />
         </button>
       </div>
 
@@ -140,7 +140,7 @@ export const MobileNav: React.FC = () => {
           left: 0,
           right: 0,
           zIndex: 900,
-          backgroundColor: 'rgba(17, 21, 46, 0.94)',
+          backgroundColor: 'rgba(17, 21, 46, 0.95)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
           borderTop: '1px solid rgba(255, 255, 255, 0.12)',
@@ -166,13 +166,13 @@ export const MobileNav: React.FC = () => {
                 justifyContent: 'center',
                 gap: '3px',
                 color: isActive ? 'var(--accent-cyan)' : 'var(--text-muted)',
-                backgroundColor: isActive ? 'rgba(139, 92, 246, 0.16)' : 'transparent',
+                backgroundColor: isActive ? 'rgba(139, 92, 246, 0.18)' : 'transparent',
                 borderRadius: '12px',
-                fontSize: '0.74rem',
+                fontSize: '0.8rem',
                 fontWeight: isActive ? 700 : 500,
                 padding: '6px 0',
-                minHeight: '48px',
-                border: isActive ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid transparent',
+                minHeight: '50px',
+                border: isActive ? '1px solid rgba(139, 92, 246, 0.35)' : '1px solid transparent',
                 transition: 'all 0.15s ease',
               }}
             >
@@ -196,17 +196,17 @@ export const MobileNav: React.FC = () => {
             justifyContent: 'center',
             gap: '3px',
             color: isMoreOpen || isSecondaryActive ? 'var(--accent-cyan)' : 'var(--text-muted)',
-            backgroundColor: isMoreOpen || isSecondaryActive ? 'rgba(139, 92, 246, 0.16)' : 'transparent',
+            backgroundColor: isMoreOpen || isSecondaryActive ? 'rgba(139, 92, 246, 0.18)' : 'transparent',
             borderRadius: '12px',
-            fontSize: '0.74rem',
+            fontSize: '0.8rem',
             fontWeight: isMoreOpen || isSecondaryActive ? 700 : 500,
             padding: '6px 0',
-            minHeight: '48px',
-            border: isMoreOpen || isSecondaryActive ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid transparent',
+            minHeight: '50px',
+            border: isMoreOpen || isSecondaryActive ? '1px solid rgba(139, 92, 246, 0.35)' : '1px solid transparent',
             transition: 'all 0.15s ease',
           }}
         >
-          <MoreHorizontal size={20} />
+          <MoreHorizontal size={24} />
           <span>More</span>
         </button>
       </nav>

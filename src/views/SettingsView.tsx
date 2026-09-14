@@ -23,6 +23,9 @@ import {
   Volume2,
   VolumeX,
   CloudSync,
+  ChevronDown,
+  ChevronRight,
+  Trash2,
 } from 'lucide-react';
 
 import { ChangePasswordModal } from '../components/forms/ChangePasswordModal';
@@ -36,6 +39,7 @@ export const SettingsView: React.FC = () => {
     toggleHideBalances,
     setPinCode,
     importBackupData,
+    resetLocalData,
     resetAllData,
     loadDemoData,
     isOffline,
@@ -52,6 +56,7 @@ export const SettingsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'profile' | 'appearance' | 'notifications' | 'data' | 'security' | 'info'>('all');
   const [isSyncingManual, setIsSyncingManual] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const userEmail = userProfile?.email || user?.email || 'user@spendly.app';
@@ -449,19 +454,38 @@ export const SettingsView: React.FC = () => {
                 <button onClick={() => fileInputRef.current?.click()} className="btn btn-secondary" style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}>
                   <Upload size={15} /> Restore Backup File
                 </button>
-                <button onClick={loadDemoData} className="btn btn-secondary" style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}>
+                <button
+                  onClick={() => {
+                    if (confirm('Load sample data?\nThis will add demo accounts, transactions, budgets and example content to your current workspace.')) {
+                      loadDemoData();
+                    }
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}
+                >
                   <Sparkles size={15} color="var(--accent-cyan)" /> Load Sample Data
                 </button>
                 <button
                   onClick={() => {
-                    if (confirm('Are you sure you want to clear your local dataset? Cloud data is preserved.')) {
+                    if (confirm('Clear local device dataset?\nYour local cached data will be cleared, but cloud data in Supabase will be preserved.')) {
+                      resetLocalData();
+                    }
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem', color: 'var(--status-warning)' }}
+                >
+                  <RefreshCw size={15} /> Reset Local Data
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm('DANGER: Permanently delete ALL financial records from cloud and local device?\nThis will clear your accounts, transactions, budgets, recurring bills, and notifications. This cannot be undone.')) {
                       resetAllData();
                     }
                   }}
                   className="btn btn-danger"
                   style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}
                 >
-                  <RefreshCw size={15} /> Reset Local Data
+                  <Trash2 size={15} /> Reset All Data
                 </button>
               </div>
             </div>
@@ -519,44 +543,152 @@ export const SettingsView: React.FC = () => {
         )}
 
         {/* 5. APP INFORMATION */}
+        {/* 5. APP INFORMATION */}
         {(activeTab === 'all' || activeTab === 'info') && (
           <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Info size={18} color="var(--text-muted)" />
+              <Info size={18} color="var(--accent-cyan)" />
               <h3 style={{ fontSize: '0.98rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)' }}>
                 Application Information
               </h3>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '14px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>App Version</span>
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>1.0.1 (Build 2026.09)</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Architecture</span>
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Local-First PWA + Supabase Cloud Sync</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Storage Engine</span>
-                <span style={{ fontWeight: 600, color: 'var(--accent-cyan)' }}>IndexedDB + Supabase PostgreSQL</span>
+                <span style={{ color: 'var(--text-muted)' }}>Application</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Spendly Personal Finance</span>
               </div>
 
-              {/* Developer Attribution */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border-color)', paddingTop: '14px', marginTop: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Code2 size={16} color="var(--accent-cyan)" />
-                  <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>Developer Attribution</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Version</span>
+                <span style={{ fontWeight: 600, color: 'var(--accent-cyan)' }}>3.0.0</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Build</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>3.0.0</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Platform</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Web / Android</span>
+              </div>
+
+              {/* Accordion: Version History */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsVersionHistoryOpen(!isVersionHistoryOpen)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-primary)',
+                    fontWeight: 600,
+                    fontSize: '0.86rem',
+                    cursor: 'pointer',
+                    padding: '6px 0',
+                  }}
+                >
+                  <span>Version History</span>
+                  {isVersionHistoryOpen ? <ChevronDown size={16} color="var(--accent-cyan)" /> : <ChevronRight size={16} color="var(--text-muted)" />}
+                </button>
+
+                {isVersionHistoryOpen && (
+                  <div
+                    style={{
+                      marginTop: '8px',
+                      padding: '12px',
+                      backgroundColor: 'rgba(10, 14, 26, 0.6)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-color)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      fontSize: '0.8rem',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>V3.0.0 — Final V3 Refinement</div>
+                      <ul style={{ margin: '4px 0 0 16px', padding: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                        <li>Deep indigo & cyan visual identity with glassmorphism</li>
+                        <li>Header top-right notification bell with unread count badge</li>
+                        <li>Top-right modern compact toast popups</li>
+                        <li>Enhanced Leaflet location place search (colleges, banks, hospitals, custom manual place add)</li>
+                        <li>Clustered map pins, Map/List view toggle & location search</li>
+                        <li>Auto-updating transaction date/time & custom Other category inputs</li>
+                        <li>Persistent Supabase session authentication & Remember Me support</li>
+                        <li>Native Capacitor Android push notifications integration</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <div style={{ fontWeight: 700, color: 'var(--accent-lavender)' }}>V2.0.0 — Major UI and Architecture Update</div>
+                      <ul style={{ margin: '4px 0 0 16px', padding: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                        <li>Modern fintech interface with offline-first architecture</li>
+                        <li>Supabase PostgreSQL persistence & hydration</li>
+                        <li>Capacitor Android foundation</li>
+                        <li>Improved dashboard, accounts & transaction tracking</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <div style={{ fontWeight: 700, color: 'var(--text-muted)' }}>V1.0.0 — Initial Spendly Release</div>
+                      <ul style={{ margin: '4px 0 0 16px', padding: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                        <li>Authentication & profile setup</li>
+                        <li>Accounts, transactions, budgets & basic analytics</li>
+                        <li>PWA offline support</li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Compact Developer Attribution */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-strong)',
+                  marginTop: '6px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                    Developer
+                  </div>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                    Dhanunjaya <span style={{ fontSize: '0.78rem', color: 'var(--accent-cyan)', fontWeight: 500 }}>@codebydj</span>
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    © 2026 Dhanunjaya. All rights reserved.
+                  </div>
                 </div>
-                <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', margin: 0 }}>
-                  Developed by <strong style={{ color: 'var(--text-primary)' }}>Dhanunjaya</strong>
-                </p>
-                <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', margin: 0 }}>
-                  GitHub: <a href="https://github.com/codebydj" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-cyan)', textDecoration: 'none', fontWeight: 600 }}>github.com/codebydj</a>
-                </p>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  © 2026 Dhanunjaya. All rights reserved.
-                </p>
+
+                <a
+                  href="https://github.com/codebydj"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-secondary"
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '0.78rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <Code2 size={14} color="var(--accent-cyan)" />
+                  <span>GitHub</span>
+                </a>
               </div>
             </div>
           </div>

@@ -503,6 +503,28 @@ export class SyncService {
     }
   }
 
+  // 17. Delete All User Cloud Data (Reset Cloud Account Data)
+  public static async deleteAllUserData(userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const [txRes, accRes, bRes, rRes, nRes] = await Promise.all([
+        supabase.from('transactions').delete().eq('user_id', userId),
+        supabase.from('accounts').delete().eq('user_id', userId),
+        supabase.from('budgets').delete().eq('user_id', userId),
+        supabase.from('recurring_payments').delete().eq('user_id', userId),
+        supabase.from('notifications').delete().eq('user_id', userId),
+      ]);
+
+      const err = txRes.error || accRes.error || bRes.error || rRes.error || nRes.error;
+      if (err) {
+        console.error('SUPABASE ERROR [deleteAllUserData]:', err);
+        return { success: false, error: err.message };
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to delete cloud records' };
+    }
+  }
+
   // Data Mappers (DB row <-> App domain model)
   public static mapAccountFromDb(row: any): Account {
     return {

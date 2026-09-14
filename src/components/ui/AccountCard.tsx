@@ -16,18 +16,18 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   const getAccountIcon = (type: string, name: string) => {
     const text = name.toLowerCase();
     if (text.includes('sbi') || text.includes('bank')) {
-      return <Landmark size={18} color="var(--accent-blue)" />;
+      return <Landmark size={22} color="var(--accent-blue)" />;
     }
     if (text.includes('hdfc') || type === 'CREDIT_CARD') {
-      return <CreditCard size={18} color="var(--status-expense)" />;
+      return <CreditCard size={22} color="var(--status-expense)" />;
     }
     if (type === 'CASH') {
-      return <Banknote size={18} color="#F59E0B" />;
+      return <Banknote size={22} color="#F59E0B" />;
     }
     if (type === 'WALLET' || text.includes('upi') || text.includes('paytm')) {
-      return <Wallet size={18} color="var(--accent-cyan)" />;
+      return <Wallet size={22} color="var(--accent-cyan)" />;
     }
-    return <Landmark size={18} color="var(--accent-violet)" />;
+    return <Landmark size={22} color="var(--accent-violet)" />;
   };
 
   const getAccountTintClass = (type: string, name: string) => {
@@ -58,19 +58,19 @@ export const AccountCard: React.FC<AccountCardProps> = ({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div
             style={{
-              width: '40px',
-              height: '40px',
+              width: '44px',
+              height: '44px',
               borderRadius: 'var(--radius-md)',
-              backgroundColor: 'rgba(255, 255, 255, 0.06)',
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
               backdropFilter: 'blur(12px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.2)',
+              border: '1px solid rgba(255, 255, 255, 0.14)',
+              boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.25)',
             }}
           >
             {getAccountIcon(account.type, account.name)}

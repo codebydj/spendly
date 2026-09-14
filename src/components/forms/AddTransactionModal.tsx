@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Modal } from '../ui/Modal';
 import type { TransactionType } from '../../types/finance';
-import { ArrowLeftRight, Check, Sparkles, CheckCircle2, MapPin, Navigation, X, Loader2 } from 'lucide-react';
+import { ArrowLeftRight, Check, Sparkles, CheckCircle2, MapPin, Navigation, X, Loader2, Plus } from 'lucide-react';
 import { LocationService, type LocationResult } from '../../services/locationService';
 
 export const AddTransactionModal: React.FC = () => {
@@ -11,6 +11,7 @@ export const AddTransactionModal: React.FC = () => {
     setIsAddTransactionOpen,
     accounts,
     categories,
+    transactions,
     addTransaction,
     showToast,
   } = useApp();
@@ -20,10 +21,12 @@ export const AddTransactionModal: React.FC = () => {
   const [accountId, setAccountId] = useState<string>('');
   const [toAccountId, setToAccountId] = useState<string>('');
   const [categoryId, setCategoryId] = useState<string>('');
+  const [customCategoryName, setCustomCategoryName] = useState<string>('');
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState<string>(new Date().toTimeString().slice(0, 5));
   const [note, setNote] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('UPI');
+  const [customPaymentMethod, setCustomPaymentMethod] = useState<string>('');
   const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
 
@@ -35,37 +38,79 @@ export const AddTransactionModal: React.FC = () => {
   const [locationPlaceId, setLocationPlaceId] = useState<string | undefined>(undefined);
   const [locationQuery, setLocationQuery] = useState<string>('');
   const [locationSuggestions, setLocationSuggestions] = useState<LocationResult[]>([]);
+  const [isSearchingLocations, setIsSearchingLocations] = useState<boolean>(false);
   const [isGettingGPS, setIsGettingGPS] = useState<boolean>(false);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
 
-  // Set initial default account & category
-  useEffect(() => {
-    if (accounts.length > 0 && !accountId) {
+  // Form Reset Function: Reset all fields for new transaction
+  const resetFormState = () => {
+    const now = new Date();
+    setType('EXPENSE');
+    setAmount('');
+    setNote('');
+    setCustomCategoryName('');
+    setCustomPaymentMethod('');
+    setPaymentMethod('UPI');
+    setDate(now.toISOString().slice(0, 10));
+    setTime(now.toTimeString().slice(0, 5));
+    setLocationName('');
+    setLocationAddress('');
+    setLatitude(undefined);
+    setLongitude(undefined);
+    setLocationPlaceId(undefined);
+    setLocationQuery('');
+    setLocationSuggestions([]);
+    setIsSearchingLocations(false);
+    setShowSuggestions(false);
+    setSuggestedCatId(null);
+    setIsSuccess(false);
+
+    if (accounts.length > 0) {
       setAccountId(accounts[0].id);
       if (accounts.length > 1) {
         setToAccountId(accounts[1].id);
       }
     }
-    if (categories.length > 0 && !categoryId) {
-      setCategoryId(categories[0].id);
+    if (categories.length > 0) {
+      const defaultExpCat = categories.find((c) => c.type === 'EXPENSE');
+      setCategoryId(defaultExpCat ? defaultExpCat.id : categories[0].id);
     }
-  }, [accounts, categories, accountId, categoryId]);
+  };
 
-  // Debounced Place Search
+  // Reset form completely whenever modal opens
+  useEffect(() => {
+    if (isAddTransactionOpen) {
+      resetFormState();
+    }
+  }, [isAddTransactionOpen]);
+
+  // Debounced Place Search with Loading & Abort Control
   useEffect(() => {
     if (!locationQuery || locationQuery.trim().length < 2) {
       setLocationSuggestions([]);
+      setIsSearchingLocations(false);
+      setShowSuggestions(false);
       return;
     }
 
-    const timer = setTimeout(async () => {
-      const results = await LocationService.searchPlaces(locationQuery);
-      setLocationSuggestions(results);
-      setShowSuggestions(true);
-    }, 400);
+    setIsSearchingLocations(true);
+    setShowSuggestions(true);
 
-    return () => clearTimeout(timer);
-  }, [locationQuery]);
+    let active = true;
+
+    const timer = setTimeout(async () => {
+      const results = await LocationService.searchPlaces(locationQuery, transactions);
+      if (active) {
+        setLocationSuggestions(results);
+        setIsSearchingLocations(false);
+      }
+    }, 350);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [locationQuery, transactions]);
 
   const handleUseCurrentLocation = async () => {
     setIsGettingGPS(true);
@@ -156,6 +201,15 @@ export const AddTransactionModal: React.FC = () => {
       finalCategoryId = transferCat ? transferCat.id : categories[0].id;
     }
 
+    const selectedCatObj = categories.find((c) => c.id === categoryId);
+    const isOtherCat = selectedCatObj?.name.toLowerCase() === 'other';
+
+    let userNote = note.trim();
+    if (isOtherCat && customCategoryName.trim()) {
+      userNote = userNote ? `${customCategoryName.trim()} • ${userNote}` : customCategoryName.trim();
+    }
+
+    const finalPaymentMethod = paymentMethod === 'Other' && customPaymentMethod.trim() ? customPaymentMethod.trim() : paymentMethod;
     const finalLocName = locationName.trim() || locationQuery.trim() || undefined;
 
     addTransaction({
@@ -166,8 +220,8 @@ export const AddTransactionModal: React.FC = () => {
       categoryId: finalCategoryId,
       date,
       time,
-      note: note.trim() || (type === 'TRANSFER' ? 'Internal Account Transfer' : 'Quick Entry'),
-      paymentMethod,
+      note: userNote || (type === 'TRANSFER' ? 'Internal Account Transfer' : 'Quick Entry'),
+      paymentMethod: finalPaymentMethod,
       locationName: finalLocName,
       locationAddress: locationAddress.trim() || undefined,
       latitude,
@@ -186,12 +240,17 @@ export const AddTransactionModal: React.FC = () => {
     }, 450);
   };
 
+  const handleCloseModal = () => {
+    resetFormState();
+    setIsAddTransactionOpen(false);
+  };
+
   const suggestedCategoryObj = categories.find((c) => c.id === suggestedCatId);
 
   return (
     <Modal
       isOpen={isAddTransactionOpen}
-      onClose={() => setIsAddTransactionOpen(false)}
+      onClose={handleCloseModal}
       title="Add Transaction"
       subtitle="Fast transaction entry for your accounts."
     >
@@ -408,6 +467,17 @@ export const AddTransactionModal: React.FC = () => {
                       </option>
                     ))}
                 </select>
+                {categories.find((c) => c.id === categoryId)?.name.toLowerCase() === 'other' && (
+                  <div style={{ marginTop: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="e.g. College fees, Gift, Repair"
+                      value={customCategoryName}
+                      onChange={(e) => setCustomCategoryName(e.target.value)}
+                      style={{ width: '100%', fontSize: '0.82rem', padding: '6px 10px' }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -438,6 +508,17 @@ export const AddTransactionModal: React.FC = () => {
                 <option value="Cash">Cash</option>
                 <option value="Other">Other</option>
               </select>
+              {paymentMethod === 'Other' && (
+                <div style={{ marginTop: '6px' }}>
+                  <input
+                    type="text"
+                    placeholder="Custom method..."
+                    value={customPaymentMethod}
+                    onChange={(e) => setCustomPaymentMethod(e.target.value)}
+                    style={{ width: '100%', fontSize: '0.78rem', padding: '4px 8px' }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -509,7 +590,7 @@ export const AddTransactionModal: React.FC = () => {
             </div>
 
             {/* Suggestions Dropdown */}
-            {showSuggestions && locationSuggestions.length > 0 && (
+            {showSuggestions && locationQuery.trim().length >= 2 && (
               <div
                 style={{
                   position: 'absolute',
@@ -522,41 +603,129 @@ export const AddTransactionModal: React.FC = () => {
                   border: '1px solid var(--border-strong)',
                   borderRadius: 'var(--radius-md)',
                   boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-                  maxHeight: '200px',
+                  maxHeight: '240px',
                   overflowY: 'auto',
                 }}
               >
-                {locationSuggestions.map((item, idx) => (
-                  <button
-                    key={item.placeId || idx}
-                    type="button"
-                    onClick={() => handleSelectSuggestion(item)}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '10px 14px',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      borderBottom: idx < locationSuggestions.length - 1 ? '1px solid var(--border-color)' : 'none',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.84rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px',
-                    }}
-                  >
-                    <MapPin size={15} color="var(--accent-lavender)" style={{ marginTop: '2px', flexShrink: 0 }} />
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{item.name}</div>
-                      {item.address && (
-                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '1px' }}>
-                          {item.address}
-                        </div>
-                      )}
+                {/* 1. Loading State */}
+                {isSearchingLocations ? (
+                  <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                    <Loader2 size={15} style={{ animation: 'spin 1.5s linear infinite' }} />
+                    <span>Searching places for "{locationQuery.trim()}"...</span>
+                  </div>
+                ) : locationSuggestions.length > 0 ? (
+                  /* 2. Real Results Found */
+                  <>
+                    <div style={{ padding: '6px 12px', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Places & Landmarks ({locationSuggestions.length})
                     </div>
-                  </button>
-                ))}
+                    {locationSuggestions.map((item, idx) => (
+                      <button
+                        key={item.placeId || idx}
+                        type="button"
+                        onClick={() => handleSelectSuggestion(item)}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '10px 14px',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          borderBottom: '1px solid var(--border-color)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.84rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '10px',
+                        }}
+                      >
+                        <MapPin size={16} color={item.isSaved ? 'var(--accent-cyan)' : 'var(--accent-lavender)'} style={{ marginTop: '2px', flexShrink: 0 }} />
+                        <div style={{ flexGrow: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</span>
+                            {item.isSaved && (
+                              <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', backgroundColor: 'rgba(34, 211, 238, 0.15)', color: 'var(--accent-cyan)', fontWeight: 700 }}>
+                                Saved
+                              </span>
+                            )}
+                          </div>
+                          {item.address && (
+                            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {item.address}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+
+                    {/* Secondary Manual Fallback */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocationName(locationQuery.trim());
+                        setLocationAddress('');
+                        setLatitude(undefined);
+                        setLongitude(undefined);
+                        setLocationPlaceId(undefined);
+                        setShowSuggestions(false);
+                        showToast(`Set custom location: "${locationQuery.trim()}"`, 'info');
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '8px 14px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <Plus size={13} />
+                      <span>Can't find exact place? Use "{locationQuery.trim()}" as custom location</span>
+                    </button>
+                  </>
+                ) : (
+                  /* 3. Search Finished & 0 Results */
+                  <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                      Couldn't find an exact place matching "{locationQuery.trim()}".
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocationName(locationQuery.trim());
+                        setLocationAddress('');
+                        setLatitude(undefined);
+                        setLongitude(undefined);
+                        setLocationPlaceId(undefined);
+                        setShowSuggestions(false);
+                        showToast(`Set custom location: "${locationQuery.trim()}"`, 'info');
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '8px 12px',
+                        backgroundColor: 'rgba(34, 211, 238, 0.08)',
+                        border: '1px solid rgba(34, 211, 238, 0.25)',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--accent-cyan)',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <Plus size={14} />
+                      <span>Add "{locationQuery.trim()}" as custom location</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -565,7 +734,7 @@ export const AddTransactionModal: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
             <button
               type="button"
-              onClick={() => setIsAddTransactionOpen(false)}
+              onClick={handleCloseModal}
               className="btn btn-secondary"
             >
               Cancel

@@ -104,8 +104,9 @@ interface AppContextType {
   updateProfileName: (fullName: string) => Promise<boolean>;
   updateUserPassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
   importBackupData: (data: BackupData) => boolean;
-  resetAllData: () => void;
-  loadDemoData: () => void;
+  resetLocalData: () => void;
+  resetAllData: () => Promise<void>;
+  loadDemoData: () => Promise<void>;
 
   // Toasts
   toasts: ToastMessage[];
@@ -882,38 +883,78 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return false;
   };
 
-  const loadDemoData = () => {
-    StorageEngine.loadDemoData(user?.id);
-    if (user?.id) {
-      loadUserData(user.id);
-      triggerCloudSync();
-    } else {
-      setAccounts(StorageEngine.loadAccounts());
-      setCategories(StorageEngine.loadCategories());
-      setTransactions(StorageEngine.loadTransactions());
-      setBudgets(StorageEngine.loadBudgets());
-      setRecurringPayments(StorageEngine.loadRecurring());
-      setNotifications(StorageEngine.loadNotifications());
-      setSettings(StorageEngine.loadSettings());
+  const loadDemoData = async () => {
+    // Check duplicate sample load
+    const isAlreadyLoaded = accounts.some((a) => a.id === 'acc-sbi') || transactions.some((t) => t.id === 'tx-1');
+    if (isAlreadyLoaded) {
+      showToast('Sample dataset is already loaded in your workspace', 'info');
+      return;
     }
-    showToast('Loaded demo dataset', 'info');
+
+    StorageEngine.loadDemoData(user?.id);
+    const demoAccs = StorageEngine.loadAccounts(user?.id);
+    const demoTxs = StorageEngine.loadTransactions(user?.id);
+    const demoBudgets = StorageEngine.loadBudgets(user?.id);
+    const demoRec = StorageEngine.loadRecurring(user?.id);
+    const demoNotifs = StorageEngine.loadNotifications(user?.id);
+    const demoSettings = StorageEngine.loadSettings(user?.id);
+
+    setAccounts(demoAccs);
+    setTransactions(demoTxs);
+    setBudgets(demoBudgets);
+    setRecurringPayments(demoRec);
+    setNotifications(demoNotifs);
+    setSettings(demoSettings);
+
+    if (user?.id && navigator.onLine) {
+      setSyncStatus('SYNCING');
+      const backupData: BackupData = {
+        version: '2.0.0',
+        exportedAt: new Date().toISOString(),
+        accounts: demoAccs,
+        categories: categories,
+        transactions: demoTxs,
+        budgets: demoBudgets,
+        recurringPayments: demoRec,
+        notifications: demoNotifs,
+        settings: demoSettings,
+      };
+      await SyncService.uploadLocalDataToCloud(backupData, user.id);
+      setSyncStatus('SYNCED');
+    }
+
+    showToast('Loaded sample dataset successfully!', 'success');
   };
 
-  const resetAllData = () => {
+  const resetLocalData = () => {
     StorageEngine.resetToEmptyProduction(user?.id);
-    if (user?.id) {
-      loadUserData(user.id);
-      triggerCloudSync();
-    } else {
-      setAccounts([]);
-      setCategories(StorageEngine.loadCategories());
-      setTransactions([]);
-      setBudgets([]);
-      setRecurringPayments([]);
-      setNotifications([]);
-      setSettings(StorageEngine.loadSettings());
+    setAccounts([]);
+    setTransactions([]);
+    setBudgets([]);
+    setRecurringPayments([]);
+    setNotifications([]);
+    showToast('Local device data cleared. Cloud data remains intact.', 'info');
+  };
+
+  const resetAllData = async () => {
+    if (user?.id && navigator.onLine) {
+      setSyncStatus('SYNCING');
+      const res = await SyncService.deleteAllUserData(user.id);
+      if (!res.success) {
+        setSyncStatus('SYNC_FAILED');
+        showToast(`Could not reset cloud data: ${res.error}`, 'danger');
+        return;
+      }
+      setSyncStatus('SYNCED');
     }
-    showToast('Reset to empty production state', 'info');
+
+    StorageEngine.resetToEmptyProduction(user?.id);
+    setAccounts([]);
+    setTransactions([]);
+    setBudgets([]);
+    setRecurringPayments([]);
+    setNotifications([]);
+    showToast('All cloud and local financial data reset successfully.', 'success');
   };
 
   // Derived Financial Calculations
@@ -981,6 +1022,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateProfileName,
         updateUserPassword,
         importBackupData,
+        resetLocalData,
         resetAllData,
         loadDemoData,
         toasts,

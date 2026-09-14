@@ -11,6 +11,7 @@ import {
   DEMO_TRANSACTIONS,
   DEMO_BUDGETS,
   DEMO_RECURRING,
+  DEMO_NOTIFICATIONS,
 } from './initialData';
 
 const BASE_KEYS = {
@@ -172,6 +173,7 @@ export class StorageEngine {
     this.saveTransactions(DEMO_TRANSACTIONS, userId);
     this.saveBudgets(DEMO_BUDGETS, userId);
     this.saveRecurring(DEMO_RECURRING, userId);
+    this.saveNotifications(DEMO_NOTIFICATIONS, userId);
     const settings = this.loadSettings(userId);
     this.saveSettings({ ...settings, demoModeLoaded: true }, userId);
   }
@@ -205,12 +207,12 @@ export class StorageEngine {
   }
 
   public static resetToEmptyProduction(userId?: string): void {
-    this.saveAccounts(PRODUCTION_ACCOUNTS, userId);
+    this.saveAccounts([], userId);
     this.saveCategories(INITIAL_CATEGORIES, userId);
-    this.saveTransactions(PRODUCTION_TRANSACTIONS, userId);
-    this.saveBudgets(PRODUCTION_BUDGETS, userId);
-    this.saveRecurring(PRODUCTION_RECURRING, userId);
-    this.saveNotifications(PRODUCTION_NOTIFICATIONS, userId);
+    this.saveTransactions([], userId);
+    this.saveBudgets([], userId);
+    this.saveRecurring([], userId);
+    this.saveNotifications([], userId);
     this.saveSettings(INITIAL_SETTINGS, userId);
   }
 }
