@@ -820,11 +820,9 @@ export const SettingsView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  if (ANDROID_APK_DOWNLOAD_URL === 'PASTE_GOOGLE_DRIVE_LINK_HERE') {
-                    showToast('APK download link will be available soon!', 'info');
-                  } else {
-                    window.open(ANDROID_APK_DOWNLOAD_URL, '_blank');
-                  }
+
+                  window.open(ANDROID_APK_DOWNLOAD_URL, '_blank');
+
                 }}
                 className="btn btn-primary"
                 style={{ padding: '10px 20px', minHeight: '42px', fontSize: '0.86rem' }}
