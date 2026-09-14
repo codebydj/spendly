@@ -15,39 +15,57 @@ export const SpendlyLogo: React.FC<SpendlyLogoProps> = ({
   className,
   style,
 }) => {
-  if (type === 'full') {
-    return (
-      <img
-        src="/spendly-logo.png"
-        alt="Spendly"
-        className={className}
-        style={{
-          height: `${height}px`,
-          width: 'auto',
-          maxHeight: '100%',
-          objectFit: 'contain',
-          display: 'inline-block',
-          verticalAlign: 'middle',
-          ...style,
-        }}
-      />
-    );
-  }
+  const iconSize = type === 'full' ? height : size;
 
-  return (
+  const iconElement = (
     <img
       src="/spendly-icon.png"
       alt="Spendly"
-      className={className}
       style={{
-        width: `${size}px`,
-        height: `${size}px`,
+        width: `${iconSize}px`,
+        height: `${iconSize}px`,
         objectFit: 'contain',
         borderRadius: '22%',
         display: 'inline-block',
         verticalAlign: 'middle',
-        ...style,
+        flexShrink: 0,
       }}
     />
+  );
+
+  if (type === 'icon' || type === 'symbol') {
+    return (
+      <div className={className} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', ...style }}>
+        {iconElement}
+      </div>
+    );
+  }
+
+  // Full brand logo: Icon + SPENDLY name
+  return (
+    <div
+      className={className}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: `${Math.max(8, height * 0.28)}px`,
+        verticalAlign: 'middle',
+        ...style,
+      }}
+    >
+      {iconElement}
+      <span
+        style={{
+          fontSize: `${height * 0.58}px`,
+          fontWeight: 800,
+          letterSpacing: '-0.02em',
+          color: 'var(--text-primary)',
+          fontFamily: "'Manrope', 'Inter', sans-serif",
+          lineHeight: 1,
+        }}
+      >
+        spendly
+      </span>
+    </div>
   );
 };

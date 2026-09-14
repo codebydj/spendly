@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { StorageEngine } from '../db/storage';
 import type { BackupData } from '../types/finance';
@@ -30,6 +30,7 @@ import { ChangePasswordModal } from '../components/forms/ChangePasswordModal';
 export const SettingsView: React.FC = () => {
   const {
     user,
+    userProfile,
     logout,
     settings,
     toggleHideBalances,
@@ -53,14 +54,21 @@ export const SettingsView: React.FC = () => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const userEmail = user?.email || 'user@spendly.app';
-  const existingName = user?.user_metadata?.full_name || userNameFromEmail(userEmail);
+  const userEmail = userProfile?.email || user?.email || 'user@spendly.app';
+  const existingName = userProfile?.fullName || user?.user_metadata?.full_name || userNameFromEmail(userEmail);
   const [fullNameInput, setFullNameInput] = useState(existingName);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
   function userNameFromEmail(email: string) {
     return email.split('@')[0];
   }
+
+  useEffect(() => {
+    const currentName = userProfile?.fullName || user?.user_metadata?.full_name || userNameFromEmail(userEmail);
+    if (currentName) {
+      setFullNameInput(currentName);
+    }
+  }, [userProfile?.fullName, user?.user_metadata?.full_name, userEmail]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();

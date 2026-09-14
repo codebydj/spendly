@@ -789,12 +789,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return await verifyPin(pin, settings.hashedPin);
   };
 
-  // User Profile & Password Actions
   const updateProfileName = async (fullName: string): Promise<boolean> => {
     if (!user?.id || !user?.email) return false;
     const success = await SyncService.updateUserProfile(user.id, user.email, fullName);
     if (success) {
       setUserProfile((prev) => ({ ...prev, fullName, email: user.email }));
+      setUser((prevUser: any) => {
+        if (!prevUser) return prevUser;
+        return {
+          ...prevUser,
+          user_metadata: {
+            ...prevUser.user_metadata,
+            full_name: fullName,
+          },
+        };
+      });
       showToast('Profile name updated successfully', 'success');
       return true;
     }

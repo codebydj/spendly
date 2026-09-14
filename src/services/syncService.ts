@@ -277,19 +277,36 @@ export class SyncService {
 
   public static async updateUserProfile(userId: string, email: string, fullName: string): Promise<boolean> {
     try {
-      const { error } = await supabase.from('profiles').upsert({
-        id: userId,
-        email,
-        full_name: fullName,
-        updated_at: new Date().toISOString(),
+      // 1. Upsert into public.profiles table
+      const { error: dbError } = await supabase.from('profiles').upsert(
+        {
+          id: userId,
+          email,
+          full_name: fullName,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      );
+
+      if (dbError) {
+        console.error('Profile update failed:', dbError);
+      }
+
+      // 2. Update Supabase Auth User Metadata for consistency across sessions
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { full_name: fullName },
       });
-      if (error) {
-        console.error('Supabase updateUserProfile error:', error);
+
+      if (authError) {
+        console.error('Profile update failed:', authError);
+      }
+
+      if (dbError && authError) {
         return false;
       }
       return true;
     } catch (err) {
-      console.error('updateUserProfile exception:', err);
+      console.error('Profile update failed:', err);
       return false;
     }
   }
