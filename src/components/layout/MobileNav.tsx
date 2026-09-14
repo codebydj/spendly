@@ -34,7 +34,7 @@ export const MobileNav: React.FC = () => {
     try {
       await Haptics.impact({ style: ImpactStyle.Light });
     } catch {
-      // Ignore on non-native environments
+      // Ignore on non-native web
     }
   };
 
@@ -61,7 +61,7 @@ export const MobileNav: React.FC = () => {
       id: 'analytics' as ViewType,
       title: 'Analytics',
       description: 'Spending trends & overview',
-      icon: <PieChart size={20} color="var(--accent-emerald)" />,
+      icon: <PieChart size={20} color="var(--accent-cyan)" />,
     },
     {
       id: 'recurring' as ViewType,
@@ -73,19 +73,19 @@ export const MobileNav: React.FC = () => {
       id: 'calendar' as ViewType,
       title: 'Calendar',
       description: 'View transactions by date',
-      icon: <Calendar size={20} color="var(--status-warning)" />,
+      icon: <Calendar size={20} color="var(--accent-purple)" />,
     },
     {
       id: 'notifications' as ViewType,
       title: 'Notifications',
       description: 'Budget alerts and reminders',
-      icon: <Bell size={20} color="var(--accent-emerald)" />,
+      icon: <Bell size={20} color="var(--accent-violet)" />,
       badge: unreadNotificationCount > 0 ? unreadNotificationCount : null,
     },
     {
       id: 'settings' as ViewType,
       title: 'Settings',
-      description: 'Account and app preferences',
+      description: 'Account, sync & app options',
       icon: <Settings size={20} color="var(--text-secondary)" />,
     },
   ];
@@ -107,21 +107,21 @@ export const MobileNav: React.FC = () => {
           onClick={handleOpenAddTransaction}
           aria-label="Add transaction"
           style={{
-            width: '52px',
-            height: '52px',
-            borderRadius: '16px',
-            backgroundColor: 'var(--accent-emerald)',
-            color: '#042f2e',
+            width: '54px',
+            height: '54px',
+            borderRadius: '18px',
+            background: 'linear-gradient(135deg, #8B5CF6 0%, #3B82F6 50%, #22D3EE 100%)',
+            color: '#FFFFFF',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 8px 24px rgba(16, 185, 129, 0.42), 0 2px 8px rgba(0, 0, 0, 0.5)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            transition: 'transform 0.15s ease, background-color 0.15s ease',
+            boxShadow: '0 10px 28px rgba(139, 92, 246, 0.45), 0 2px 8px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.25)',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease',
           }}
-          className="btn-floating-action"
+          className="btn-floating-gradient"
         >
-          <Plus size={26} strokeWidth={2.8} />
+          <Plus size={28} strokeWidth={2.8} />
         </button>
       </div>
 
@@ -133,10 +133,10 @@ export const MobileNav: React.FC = () => {
           left: 0,
           right: 0,
           zIndex: 900,
-          backgroundColor: 'rgba(12, 16, 24, 0.88)',
+          backgroundColor: 'rgba(17, 21, 46, 0.92)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderTop: '1px solid var(--border-color)',
+          borderTop: '1px solid var(--border-strong)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-around',
@@ -157,7 +157,7 @@ export const MobileNav: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '3px',
-                color: isActive ? 'var(--accent-emerald)' : 'var(--text-muted)',
+                color: isActive ? 'var(--accent-cyan)' : 'var(--text-muted)',
                 fontSize: '0.72rem',
                 fontWeight: isActive ? 700 : 500,
                 padding: '6px 0',
@@ -184,7 +184,7 @@ export const MobileNav: React.FC = () => {
             alignItems: 'center',
             justifyContent: 'center',
             gap: '3px',
-            color: isMoreOpen || isSecondaryActive ? 'var(--accent-emerald)' : 'var(--text-muted)',
+            color: isMoreOpen || isSecondaryActive ? 'var(--accent-cyan)' : 'var(--text-muted)',
             fontSize: '0.72rem',
             fontWeight: isMoreOpen || isSecondaryActive ? 700 : 500,
             padding: '6px 0',
@@ -204,7 +204,7 @@ export const MobileNav: React.FC = () => {
             position: 'fixed',
             inset: 0,
             zIndex: 950,
-            backgroundColor: 'rgba(6, 8, 13, 0.82)',
+            backgroundColor: 'rgba(8, 10, 24, 0.85)',
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
             display: 'flex',
@@ -215,10 +215,10 @@ export const MobileNav: React.FC = () => {
         >
           <div
             style={{
-              backgroundColor: 'rgba(22, 29, 42, 0.95)',
-              backdropFilter: 'blur(24px)',
-              WebkitBackdropFilter: 'blur(24px)',
-              borderTop: '1px solid var(--border-strong)',
+              backgroundColor: 'rgba(27, 32, 66, 0.96)',
+              backdropFilter: 'blur(28px)',
+              WebkitBackdropFilter: 'blur(28px)',
+              borderTop: '1px solid var(--border-light)',
               borderTopLeftRadius: 'var(--radius-xl)',
               borderTopRightRadius: 'var(--radius-xl)',
               padding: '20px 16px calc(var(--mobile-nav-height) + var(--mobile-safe-bottom) + 20px) 16px',
@@ -240,7 +240,7 @@ export const MobileNav: React.FC = () => {
               }}
             >
               <div>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Spendly Features</h3>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Spendly Navigation</h3>
                 {user?.email && (
                   <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{user.email}</p>
                 )}
@@ -262,8 +262,8 @@ export const MobileNav: React.FC = () => {
                     justifyContent: 'space-between',
                     padding: '12px 14px',
                     borderRadius: 'var(--radius-md)',
-                    backgroundColor: currentView === menu.id ? 'var(--accent-emerald-subtle)' : 'rgba(18, 23, 34, 0.7)',
-                    border: `1px solid ${currentView === menu.id ? 'var(--accent-emerald-border)' : 'var(--border-color)'}`,
+                    backgroundColor: currentView === menu.id ? 'var(--accent-violet-subtle)' : 'rgba(17, 21, 46, 0.7)',
+                    border: `1px solid ${currentView === menu.id ? 'var(--accent-violet-border)' : 'var(--border-color)'}`,
                     textAlign: 'left',
                     minHeight: '52px',
                   }}
@@ -291,8 +291,8 @@ export const MobileNav: React.FC = () => {
                         {menu.badge && (
                           <span
                             style={{
-                              backgroundColor: 'var(--accent-emerald)',
-                              color: '#042f2e',
+                              backgroundColor: 'var(--accent-violet)',
+                              color: '#FFFFFF',
                               fontSize: '0.68rem',
                               fontWeight: 800,
                               borderRadius: '4px',
@@ -326,7 +326,7 @@ export const MobileNav: React.FC = () => {
                   padding: '12px 14px',
                   borderRadius: 'var(--radius-md)',
                   backgroundColor: 'var(--status-danger-subtle)',
-                  border: '1px solid rgba(240, 68, 68, 0.25)',
+                  border: '1px solid rgba(244, 63, 94, 0.25)',
                   color: 'var(--status-danger)',
                   marginTop: '8px',
                   fontWeight: 600,

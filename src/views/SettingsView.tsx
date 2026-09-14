@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { StorageEngine } from '../db/storage';
 import type { BackupData } from '../types/finance';
-import { GlassCard } from '../components/ui/GlassCard';
 import {
   Shield,
   Eye,
@@ -12,8 +11,6 @@ import {
   Upload,
   RefreshCw,
   Smartphone,
-  Wifi,
-  WifiOff,
   Sparkles,
   LogOut,
   Bell,
@@ -23,6 +20,9 @@ import {
   User,
   Key,
   Code2,
+  Volume2,
+  VolumeX,
+  CloudSync,
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
@@ -37,6 +37,9 @@ export const SettingsView: React.FC = () => {
     loadDemoData,
     isOffline,
     syncStatus,
+    triggerManualSync,
+    soundEnabled,
+    toggleSoundEnabled,
     showToast,
     updateProfileName,
     updateUserPassword,
@@ -45,6 +48,7 @@ export const SettingsView: React.FC = () => {
   const [pinInput, setPinInput] = useState('');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'profile' | 'appearance' | 'notifications' | 'data' | 'security' | 'info'>('all');
+  const [isSyncingManual, setIsSyncingManual] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const userEmail = user?.email || 'user@spendly.app';
@@ -85,6 +89,12 @@ export const SettingsView: React.FC = () => {
       setNewPasswordInput('');
       setConfirmPasswordInput('');
     }
+  };
+
+  const handleManualSyncClick = async () => {
+    setIsSyncingManual(true);
+    await triggerManualSync();
+    setIsSyncingManual(false);
   };
 
   // JSON Export Backup
@@ -134,22 +144,22 @@ export const SettingsView: React.FC = () => {
       />
 
       {/* Profile Card Header */}
-      <GlassCard elevated style={{ padding: '20px 24px' }}>
+      <div className="card-level-3 hero-emerald-glow" style={{ padding: '22px 26px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div
               style={{
-                width: '52px',
-                height: '52px',
+                width: '54px',
+                height: '54px',
                 borderRadius: '50%',
-                backgroundColor: 'var(--accent-emerald-subtle)',
-                border: '2px solid var(--accent-emerald-border)',
-                color: 'var(--accent-emerald)',
+                backgroundColor: 'var(--accent-violet-subtle)',
+                border: '2px solid var(--accent-violet-border)',
+                color: 'var(--accent-lavender)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontWeight: 800,
-                fontSize: '1.2rem',
+                fontSize: '1.3rem',
               }}
             >
               {(existingName || userEmail).slice(0, 2).toUpperCase()}
@@ -163,13 +173,13 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span className="badge badge-emerald">Verified Account</span>
+            <span className="badge badge-violet">Verified Account</span>
             <button onClick={logout} className="btn btn-danger" style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}>
               <LogOut size={16} /> Sign Out
             </button>
           </div>
         </div>
-      </GlassCard>
+      </div>
 
       {/* Desktop Section Navigation Filter Pills */}
       <div className="desktop-only" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
@@ -191,8 +201,8 @@ export const SettingsView: React.FC = () => {
               minHeight: '36px',
               fontSize: '0.82rem',
               borderRadius: 'var(--radius-md)',
-              backgroundColor: activeTab === tab.id ? 'var(--accent-emerald)' : 'var(--bg-surface)',
-              color: activeTab === tab.id ? '#042f2e' : 'var(--text-secondary)',
+              backgroundColor: activeTab === tab.id ? 'var(--accent-violet)' : 'var(--bg-surface)',
+              color: activeTab === tab.id ? '#FFFFFF' : 'var(--text-secondary)',
               border: `1px solid ${activeTab === tab.id ? 'transparent' : 'var(--border-color)'}`,
             }}
           >
@@ -205,9 +215,9 @@ export const SettingsView: React.FC = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {/* 0. PROFILE EDIT & PASSWORD CHANGE */}
         {(activeTab === 'all' || activeTab === 'profile') && (
-          <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+          <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <User size={18} color="var(--accent-emerald)" />
+              <User size={18} color="var(--accent-violet)" />
               <h3 style={{ fontSize: '0.98rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)' }}>
                 User Profile & Credentials
               </h3>
@@ -240,7 +250,7 @@ export const SettingsView: React.FC = () => {
               {/* Change Password Form */}
               <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Key size={16} color="var(--accent-blue)" />
+                  <Key size={16} color="var(--accent-cyan)" />
                   <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Change Account Password</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '500px' }}>
@@ -273,16 +283,16 @@ export const SettingsView: React.FC = () => {
                 </div>
               </form>
             </div>
-          </GlassCard>
+          </div>
         )}
 
-        {/* 1. APPEARANCE & PRIVACY */}
+        {/* 1. APPEARANCE & AUDIO */}
         {(activeTab === 'all' || activeTab === 'appearance') && (
-          <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+          <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Moon size={18} color="var(--accent-emerald)" />
+              <Moon size={18} color="var(--accent-violet)" />
               <h3 style={{ fontSize: '0.98rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)' }}>
-                Appearance & Privacy
+                Appearance & Audio Controls
               </h3>
             </div>
 
@@ -298,13 +308,29 @@ export const SettingsView: React.FC = () => {
                   className="btn btn-secondary"
                   style={{ padding: '6px 14px', minHeight: '36px', fontSize: '0.82rem' }}
                 >
-                  {settings.hideBalances ? <EyeOff size={15} color="var(--accent-emerald)" /> : <Eye size={15} />}
+                  {settings.hideBalances ? <EyeOff size={15} color="var(--accent-cyan)" /> : <Eye size={15} />}
                   <span>{settings.hideBalances ? 'Masked' : 'Visible'}</span>
                 </button>
               </div>
 
+              {/* Transaction Sound Effects Toggle */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '14px' }}>
+                <div>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Transaction Sound Effects</span>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>Synthesized digital chime on saving transactions & syncing.</p>
+                </div>
+                <button
+                  onClick={toggleSoundEnabled}
+                  className="btn btn-secondary"
+                  style={{ padding: '6px 14px', minHeight: '36px', fontSize: '0.82rem' }}
+                >
+                  {soundEnabled ? <Volume2 size={15} color="var(--accent-cyan)" /> : <VolumeX size={15} color="var(--text-muted)" />}
+                  <span>{soundEnabled ? 'Enabled' : 'Muted'}</span>
+                </button>
+              </div>
+
               {/* Currency Selector */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '14px' }}>
                 <div>
                   <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Primary Currency</span>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>Default financial symbol throughout the app.</p>
@@ -314,12 +340,12 @@ export const SettingsView: React.FC = () => {
                 </span>
               </div>
             </div>
-          </GlassCard>
+          </div>
         )}
 
         {/* 2. NOTIFICATIONS */}
         {(activeTab === 'all' || activeTab === 'notifications') && (
-          <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+          <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Bell size={18} color="var(--accent-blue)" />
               <h3 style={{ fontSize: '0.98rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)' }}>
@@ -341,51 +367,62 @@ export const SettingsView: React.FC = () => {
                   className="btn btn-secondary"
                   style={{ padding: '6px 14px', minHeight: '36px', fontSize: '0.82rem' }}
                 >
-                  {notificationsEnabled ? <CheckCircle2 size={15} color="var(--accent-emerald)" /> : <Bell size={15} />}
+                  {notificationsEnabled ? <CheckCircle2 size={15} color="var(--accent-cyan)" /> : <Bell size={15} />}
                   <span>{notificationsEnabled ? 'Enabled' : 'Disabled'}</span>
                 </button>
               </div>
             </div>
-          </GlassCard>
+          </div>
         )}
 
-        {/* 3. DATA AND SYNC */}
+        {/* 3. DATA AND MANUAL SUPABASE SYNC */}
         {(activeTab === 'all' || activeTab === 'data') && (
-          <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+          <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Smartphone size={18} color="var(--status-warning)" />
+              <Smartphone size={18} color="var(--accent-cyan)" />
               <h3 style={{ fontSize: '0.98rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)' }}>
-                Data & Storage
+                Data & Cloud Synchronization
               </h3>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '14px' }}>
-              {/* Sync Status Row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              {/* Interactive Manual Sync Row */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', padding: '14px', backgroundColor: 'var(--bg-surface-elevated)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)' }}>
                 <div>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Cloud Sync & Offline State</span>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    {isOffline ? 'Working offline using IndexedDB local storage.' : `Sync status: ${syncStatus}`}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CloudSync size={18} color="var(--accent-cyan)" />
+                    <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>Supabase Cloud Synchronization</span>
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    {isOffline
+                      ? 'Working offline using IndexedDB storage.'
+                      : `Sync status: ${syncStatus}. ${settings.lastSyncedAt ? 'Last synced: ' + new Date(settings.lastSyncedAt).toLocaleTimeString() : ''}`}
                   </p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600 }}>
-                  {isOffline ? <WifiOff size={15} color="var(--status-warning)" /> : <Wifi size={15} color="var(--accent-emerald)" />}
-                  <span style={{ color: isOffline ? 'var(--status-warning)' : 'var(--accent-emerald)' }}>
-                    {isOffline ? 'Offline' : 'Synchronized'}
-                  </span>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button
+                    onClick={handleManualSyncClick}
+                    disabled={isSyncingManual || isOffline}
+                    className="btn btn-primary"
+                    style={{ padding: '8px 18px', minHeight: '40px', fontSize: '0.84rem' }}
+                  >
+                    <RefreshCw size={15} style={{ animation: isSyncingManual ? 'spin 1.5s linear infinite' : 'none' }} />
+                    <span>{isSyncingManual ? 'Syncing...' : 'Sync now'}</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Action Buttons */}
+              {/* Backup & Import Action Buttons */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', paddingTop: '8px' }}>
-                <button onClick={handleExportJSON} className="btn btn-primary" style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}>
+                <button onClick={handleExportJSON} className="btn btn-secondary" style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}>
                   <Download size={15} /> Export JSON Backup
                 </button>
                 <button onClick={() => fileInputRef.current?.click()} className="btn btn-secondary" style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}>
                   <Upload size={15} /> Restore Backup File
                 </button>
                 <button onClick={loadDemoData} className="btn btn-secondary" style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}>
-                  <Sparkles size={15} color="var(--accent-emerald)" /> Load Sample Data
+                  <Sparkles size={15} color="var(--accent-cyan)" /> Load Sample Data
                 </button>
                 <button
                   onClick={() => {
@@ -400,14 +437,14 @@ export const SettingsView: React.FC = () => {
                 </button>
               </div>
             </div>
-          </GlassCard>
+          </div>
         )}
 
         {/* 4. SECURITY */}
         {(activeTab === 'all' || activeTab === 'security') && (
-          <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+          <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Shield size={18} color="var(--accent-emerald)" />
+              <Shield size={18} color="var(--accent-violet)" />
               <h3 style={{ fontSize: '0.98rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)' }}>
                 Security & App Lock
               </h3>
@@ -450,12 +487,12 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
             </div>
-          </GlassCard>
+          </div>
         )}
 
         {/* 5. APP INFORMATION */}
         {(activeTab === 'all' || activeTab === 'info') && (
-          <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+          <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Info size={18} color="var(--text-muted)" />
               <h3 style={{ fontSize: '0.98rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)' }}>
@@ -474,30 +511,29 @@ export const SettingsView: React.FC = () => {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Storage Engine</span>
-                <span style={{ fontWeight: 600, color: 'var(--accent-emerald)' }}>IndexedDB + Supabase PostgreSQL</span>
+                <span style={{ fontWeight: 600, color: 'var(--accent-cyan)' }}>IndexedDB + Supabase PostgreSQL</span>
               </div>
 
               {/* Developer Attribution */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border-color)', paddingTop: '14px', marginTop: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Code2 size={16} color="var(--accent-emerald)" />
+                  <Code2 size={16} color="var(--accent-cyan)" />
                   <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>Developer Attribution</span>
                 </div>
                 <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', margin: 0 }}>
                   Developed by <strong style={{ color: 'var(--text-primary)' }}>Dhanunjaya</strong>
                 </p>
                 <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', margin: 0 }}>
-                  GitHub: <a href="https://github.com/codebydj" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-emerald)', textDecoration: 'none', fontWeight: 600 }}>github.com/codebydj</a>
+                  GitHub: <a href="https://github.com/codebydj" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-cyan)', textDecoration: 'none', fontWeight: 600 }}>github.com/codebydj</a>
                 </p>
                 <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                   © 2026 Dhanunjaya. All rights reserved.
                 </p>
               </div>
             </div>
-          </GlassCard>
+          </div>
         )}
       </div>
     </div>
   );
 };
-

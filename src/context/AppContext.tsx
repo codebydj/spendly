@@ -4,6 +4,7 @@ import type { Account, Transaction, Budget, RecurringPayment, NotificationItem, 
 import { StorageEngine } from '../db/storage';
 import { supabase } from '../services/supabase';
 import { SyncService } from '../services/syncService';
+import { soundService } from '../services/soundService';
 import { hashPin, verifyPin } from '../utils/crypto';
 import {
   calculateAccountBalance,
@@ -46,8 +47,11 @@ interface AppContextType {
   userProfile: { fullName?: string; email?: string } | null;
   authLoading: boolean;
   syncStatus: SyncStatus;
+  soundEnabled: boolean;
+  toggleSoundEnabled: () => void;
   logout: () => Promise<void>;
   triggerCloudSync: () => Promise<void>;
+  triggerManualSync: () => Promise<boolean>;
 
   // Data
   accounts: Account[];
@@ -122,8 +126,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<{ fullName?: string; email?: string } | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
-  const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(navigator.onLine ? 'SYNCED' : 'OFFLINE');
+  const [soundEnabled, setSoundEnabledState] = useState<boolean>(soundService.getSoundEnabled());
+
+  const toggleSoundEnabled = () => {
+    const next = !soundEnabled;
+    soundService.setSoundEnabled(next);
+    setSoundEnabledState(next);
+    showToast(next ? 'Sound effects enabled' : 'Sound effects muted', 'info');
+  };
 
   // Memory Financial Data
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -329,6 +341,68 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [user?.id, accounts, categories, transactions, budgets, recurringPayments, notifications, settings]);
 
+  // Explicit Manual Supabase Cloud Synchronization Control
+  const triggerManualSync = async (): Promise<boolean> => {
+    if (!user?.id) {
+      showToast('Please sign in to synchronize cloud data', 'warning');
+      return false;
+    }
+    if (!navigator.onLine) {
+      setSyncStatus('OFFLINE');
+      showToast('Working offline. Local changes will sync when connected', 'warning');
+      return false;
+    }
+
+    setSyncStatus('SYNCING');
+    try {
+      // 1. Fetch latest cloud records from Supabase
+      const cloudData = await SyncService.fetchUserData(user.id);
+
+      // 2. Upload any local changes to cloud
+      const localAccs = StorageEngine.loadAccounts(user.id);
+      const localTxs = StorageEngine.loadTransactions(user.id);
+      const localBudgets = StorageEngine.loadBudgets(user.id);
+      const localRec = StorageEngine.loadRecurring(user.id);
+      const localNotifs = StorageEngine.loadNotifications(user.id);
+      const localSettings = StorageEngine.loadSettings(user.id);
+
+      const backup: BackupData = {
+        version: '2.0.0',
+        exportedAt: new Date().toISOString(),
+        accounts: localAccs.length > 0 ? localAccs : accounts,
+        categories,
+        transactions: localTxs.length > 0 ? localTxs : transactions,
+        budgets: localBudgets.length > 0 ? localBudgets : budgets,
+        recurringPayments: localRec.length > 0 ? localRec : recurringPayments,
+        notifications: localNotifs.length > 0 ? localNotifs : notifications,
+        settings: localSettings || settings,
+      };
+
+      await SyncService.uploadLocalDataToCloud(backup, user.id);
+
+      // 3. Hydrate state
+      if (cloudData.hasCloudData) {
+        const recalculated = updateAccountBalances(cloudData.accounts, cloudData.transactions);
+        setAccounts(recalculated);
+        setTransactions(cloudData.transactions);
+        setBudgets(cloudData.budgets);
+        setRecurringPayments(cloudData.recurringPayments);
+        setNotifications(cloudData.notifications);
+        if (cloudData.settings) setSettings(cloudData.settings);
+        if (cloudData.profile) setUserProfile(cloudData.profile);
+      }
+
+      setSyncStatus('SYNCED');
+      soundService.playSyncChime();
+      showToast('Data synchronized with Supabase cloud', 'success');
+      return true;
+    } catch {
+      setSyncStatus('SYNC_FAILED');
+      showToast('Cloud synchronization failed. Retrying in background', 'danger');
+      return false;
+    }
+  };
+
   // Handle Auth Session Lifecycle
   useEffect(() => {
     let isMounted = true;
@@ -426,6 +500,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Add Transaction
   const addTransaction = async (txData: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
+    soundService.playTransactionChime();
     const newTx: Transaction = {
       ...txData,
       id: 'tx-' + Date.now(),
@@ -804,8 +879,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         userProfile,
         authLoading,
         syncStatus,
+        soundEnabled,
+        toggleSoundEnabled,
         logout,
         triggerCloudSync,
+        triggerManualSync,
         accounts,
         categories,
         transactions,

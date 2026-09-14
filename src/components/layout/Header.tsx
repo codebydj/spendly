@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Eye, EyeOff, Search, Plus, Wifi, WifiOff, RefreshCw, AlertTriangle, User } from 'lucide-react';
+import { Eye, EyeOff, Search, Plus, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const {
@@ -12,6 +12,7 @@ export const Header: React.FC = () => {
     setIsAddTransactionOpen,
     isOffline,
     syncStatus,
+    triggerManualSync,
     setCurrentView,
     user,
   } = useApp();
@@ -35,7 +36,7 @@ export const Header: React.FC = () => {
       case 'notifications':
         return { title: 'Notifications', subtitle: 'Alerts, payment reminders, and summaries.' };
       case 'settings':
-        return { title: 'Settings', subtitle: 'Privacy controls, export CSV, and offline data backup.' };
+        return { title: 'Settings', subtitle: 'Cloud synchronization, export CSV, and security.' };
       case 'login':
         return { title: 'Sign In', subtitle: 'Access your Spendly synchronized financial account.' };
       case 'signup':
@@ -50,23 +51,25 @@ export const Header: React.FC = () => {
   const renderSyncBadge = () => {
     if (isOffline || syncStatus === 'OFFLINE') {
       return (
-        <div
+        <button
+          onClick={triggerManualSync}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            padding: '3px 8px',
+            padding: '4px 10px',
             borderRadius: 'var(--radius-sm)',
             backgroundColor: 'var(--status-warning-subtle)',
             color: 'var(--status-warning)',
-            fontSize: '0.72rem',
-            fontWeight: 600,
+            fontSize: '0.74rem',
+            fontWeight: 700,
+            border: '1px solid rgba(245, 158, 11, 0.25)',
           }}
-          title="Working offline using local storage"
+          title="Working offline - tap to try syncing"
         >
           <WifiOff size={13} />
           <span>Offline</span>
-        </div>
+        </button>
       );
     }
 
@@ -77,12 +80,13 @@ export const Header: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            padding: '3px 8px',
+            padding: '4px 10px',
             borderRadius: 'var(--radius-sm)',
-            backgroundColor: 'rgba(59, 130, 246, 0.15)',
+            backgroundColor: 'rgba(96, 165, 250, 0.15)',
             color: 'var(--accent-blue)',
-            fontSize: '0.72rem',
-            fontWeight: 600,
+            fontSize: '0.74rem',
+            fontWeight: 700,
+            border: '1px solid rgba(96, 165, 250, 0.3)',
           }}
         >
           <RefreshCw size={13} style={{ animation: 'spin 1.5s linear infinite' }} />
@@ -93,44 +97,48 @@ export const Header: React.FC = () => {
 
     if (syncStatus === 'SYNC_FAILED') {
       return (
-        <div
+        <button
+          onClick={triggerManualSync}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            padding: '3px 8px',
+            padding: '4px 10px',
             borderRadius: 'var(--radius-sm)',
             backgroundColor: 'var(--status-danger-subtle)',
             color: 'var(--status-danger)',
-            fontSize: '0.72rem',
-            fontWeight: 600,
+            fontSize: '0.74rem',
+            fontWeight: 700,
+            border: '1px solid rgba(244, 63, 94, 0.25)',
           }}
-          title="Sync temporary issue - local changes saved"
+          title="Sync issue - tap Sync Now to retry"
         >
           <AlertTriangle size={13} />
-          <span>Sync issue</span>
-        </div>
+          <span>Sync Issue</span>
+        </button>
       );
     }
 
     return (
-      <div
+      <button
+        onClick={triggerManualSync}
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: '5px',
-          padding: '3px 8px',
+          padding: '4px 10px',
           borderRadius: 'var(--radius-sm)',
-          backgroundColor: 'var(--accent-emerald-subtle)',
-          color: 'var(--accent-emerald)',
-          fontSize: '0.72rem',
-          fontWeight: 600,
+          backgroundColor: 'var(--accent-cyan-subtle)',
+          color: 'var(--accent-cyan)',
+          fontSize: '0.74rem',
+          fontWeight: 700,
+          border: '1px solid var(--accent-cyan-border)',
         }}
-        title={`Synced at ${settings.lastSyncedAt ? new Date(settings.lastSyncedAt).toLocaleTimeString() : 'now'}`}
+        title={`Synced at ${settings.lastSyncedAt ? new Date(settings.lastSyncedAt).toLocaleTimeString() : 'now'}. Tap to Sync Now`}
       >
-        <Wifi size={13} />
+        <CloudCheck size={13} />
         <span>Synced</span>
-      </div>
+      </button>
     );
   };
 
@@ -139,9 +147,9 @@ export const Header: React.FC = () => {
       style={{
         height: 'var(--header-height)',
         borderBottom: '1px solid var(--border-color)',
-        backgroundColor: 'rgba(9, 12, 18, 0.82)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
+        backgroundColor: 'rgba(13, 16, 36, 0.85)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -164,7 +172,7 @@ export const Header: React.FC = () => {
 
       {/* Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-        {/* Sync Status Badge */}
+        {/* Manual Sync Status Badge */}
         {renderSyncBadge()}
 
         {/* Global Search (Desktop Only) */}
@@ -190,7 +198,7 @@ export const Header: React.FC = () => {
               paddingTop: '6px',
               paddingBottom: '6px',
               fontSize: '0.82rem',
-              backgroundColor: 'rgba(18, 23, 34, 0.8)',
+              backgroundColor: 'rgba(17, 21, 46, 0.8)',
             }}
           />
         </div>
@@ -203,7 +211,7 @@ export const Header: React.FC = () => {
           aria-label="Toggle hide balance privacy"
           style={{ padding: '6px 8px', minHeight: '36px', minWidth: '36px' }}
         >
-          {settings.hideBalances ? <EyeOff size={16} color="var(--accent-emerald)" /> : <Eye size={16} />}
+          {settings.hideBalances ? <EyeOff size={16} color="var(--accent-cyan)" /> : <Eye size={16} />}
         </button>
 
         {/* User Profile Avatar Link (Mobile Quick Settings Access) */}
@@ -218,9 +226,9 @@ export const Header: React.FC = () => {
               width: '28px',
               height: '28px',
               borderRadius: '50%',
-              backgroundColor: 'var(--accent-emerald-subtle)',
-              border: '1px solid var(--accent-emerald-border)',
-              color: 'var(--accent-emerald)',
+              backgroundColor: 'var(--accent-violet-subtle)',
+              border: '1px solid var(--accent-violet-border)',
+              color: 'var(--accent-lavender)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -235,10 +243,10 @@ export const Header: React.FC = () => {
         {/* Top Desktop Add Transaction Button */}
         <button
           onClick={() => setIsAddTransactionOpen(true)}
-          className="btn btn-primary desktop-only"
-          style={{ padding: '7px 16px', fontSize: '0.84rem', minHeight: '38px', borderRadius: 'var(--radius-md)' }}
+          className="btn btn-gradient desktop-only"
+          style={{ padding: '7px 18px', fontSize: '0.84rem', minHeight: '38px', borderRadius: 'var(--radius-md)' }}
         >
-          <Plus size={16} strokeWidth={2.5} />
+          <Plus size={16} strokeWidth={2.8} />
           <span>Add transaction</span>
         </button>
       </div>
