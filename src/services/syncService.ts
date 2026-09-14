@@ -26,6 +26,63 @@ export class SyncService {
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       ]);
 
+      if (accRes.error) {
+        console.error('SUPABASE ERROR [accounts.select]:', {
+          message: accRes.error.message,
+          details: accRes.error.details,
+          hint: accRes.error.hint,
+          code: accRes.error.code,
+        });
+      }
+      if (txRes.error) {
+        console.error('SUPABASE ERROR [transactions.select]:', {
+          message: txRes.error.message,
+          details: txRes.error.details,
+          hint: txRes.error.hint,
+          code: txRes.error.code,
+        });
+      }
+      if (bRes.error) {
+        console.error('SUPABASE ERROR [budgets.select]:', {
+          message: bRes.error.message,
+          details: bRes.error.details,
+          hint: bRes.error.hint,
+          code: bRes.error.code,
+        });
+      }
+      if (rRes.error) {
+        console.error('SUPABASE ERROR [recurring_payments.select]:', {
+          message: rRes.error.message,
+          details: rRes.error.details,
+          hint: rRes.error.hint,
+          code: rRes.error.code,
+        });
+      }
+      if (nRes.error) {
+        console.error('SUPABASE ERROR [notifications.select]:', {
+          message: nRes.error.message,
+          details: nRes.error.details,
+          hint: nRes.error.hint,
+          code: nRes.error.code,
+        });
+      }
+      if (sRes.error) {
+        console.error('SUPABASE ERROR [user_settings.select]:', {
+          message: sRes.error.message,
+          details: sRes.error.details,
+          hint: sRes.error.hint,
+          code: sRes.error.code,
+        });
+      }
+      if (pRes.error) {
+        console.error('SUPABASE ERROR [profiles.select]:', {
+          message: pRes.error.message,
+          details: pRes.error.details,
+          hint: pRes.error.hint,
+          code: pRes.error.code,
+        });
+      }
+
       const accounts = (accRes.data || []).map(this.mapAccountFromDb);
       const transactions = (txRes.data || []).map(this.mapTransactionFromDb);
       const budgets = (bRes.data || []).map(this.mapBudgetFromDb);
@@ -71,37 +128,160 @@ export class SyncService {
     try {
       if (data.accounts.length > 0) {
         const accRows = data.accounts.map((a) => this.mapAccountToDb(a, userId));
-        await supabase.from('accounts').upsert(accRows);
+        const { error } = await supabase.from('accounts').upsert(accRows);
+        if (error) {
+          console.error('SUPABASE ERROR [accounts.upsert]:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          });
+          throw new Error(`Accounts upload failed: ${error.message} (${error.code})`);
+        }
       }
 
       if (data.transactions.length > 0) {
         const txRows = data.transactions.map((t) => this.mapTransactionToDb(t, userId));
-        await supabase.from('transactions').upsert(txRows);
+        const { error } = await supabase.from('transactions').upsert(txRows);
+        if (error) {
+          console.error('SUPABASE ERROR [transactions.upsert]:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          });
+          throw new Error(`Transactions upload failed: ${error.message} (${error.code})`);
+        }
       }
 
       if (data.budgets.length > 0) {
         const bRows = data.budgets.map((b) => this.mapBudgetToDb(b, userId));
-        await supabase.from('budgets').upsert(bRows);
+        const { error } = await supabase.from('budgets').upsert(bRows);
+        if (error) {
+          console.error('SUPABASE ERROR [budgets.upsert]:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          });
+          throw new Error(`Budgets upload failed: ${error.message} (${error.code})`);
+        }
       }
 
       if (data.recurringPayments.length > 0) {
         const rRows = data.recurringPayments.map((r) => this.mapRecurringToDb(r, userId));
-        await supabase.from('recurring_payments').upsert(rRows);
+        const { error } = await supabase.from('recurring_payments').upsert(rRows);
+        if (error) {
+          console.error('SUPABASE ERROR [recurring_payments.upsert]:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          });
+          throw new Error(`Recurring payments upload failed: ${error.message} (${error.code})`);
+        }
       }
 
       if (data.notifications.length > 0) {
         const nRows = data.notifications.map((n) => this.mapNotificationToDb(n, userId));
-        await supabase.from('notifications').upsert(nRows);
+        const { error } = await supabase.from('notifications').upsert(nRows);
+        if (error) {
+          console.error('SUPABASE ERROR [notifications.upsert]:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          });
+          throw new Error(`Notifications upload failed: ${error.message} (${error.code})`);
+        }
       }
 
       if (data.settings) {
-        await supabase.from('user_settings').upsert(this.mapSettingsToDb(data.settings, userId));
+        const { error } = await supabase.from('user_settings').upsert(this.mapSettingsToDb(data.settings, userId));
+        if (error) {
+          console.error('SUPABASE ERROR [user_settings.upsert]:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          });
+          throw new Error(`Settings upload failed: ${error.message} (${error.code})`);
+        }
       }
 
       return true;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to upload local data to Supabase:', err);
-      return false;
+      throw err;
+    }
+  }
+
+  // Diagnostic Test Method for Single Entity & Auth
+  public static async runSyncDiagnostic(_userId?: string): Promise<{ success: boolean; message: string; details?: any }> {
+    console.group('SPENDLY SYNC DIAGNOSTIC');
+    try {
+      // Step A: Auth user
+      const { data: { user }, error: authErr } = await supabase.auth.getUser();
+      console.log('A. Auth user ID:', user?.id, 'Error:', authErr);
+      if (authErr || !user) {
+        console.groupEnd();
+        return { success: false, message: `Auth error: ${authErr?.message || 'No active user session'}` };
+      }
+
+      // Step B: Insert single test account into public.accounts
+      const testId = `acc_diag_${Date.now()}`;
+      const testRow = {
+        id: testId,
+        user_id: user.id,
+        name: 'Sync Test Bank',
+        type: 'BANK',
+        opening_balance: 10000,
+        credit_limit: 0,
+        currency: '₹',
+        is_archived: false,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log('B. Inserting test account:', testRow);
+      const { data: insData, error: insErr } = await supabase.from('accounts').insert(testRow).select();
+      console.log('ACCOUNT INSERT RESULT:', insData);
+      if (insErr) {
+        console.error('ACCOUNT INSERT ERROR:', {
+          message: insErr.message,
+          details: insErr.details,
+          hint: insErr.hint,
+          code: insErr.code,
+        });
+        console.groupEnd();
+        return { success: false, message: `Accounts INSERT failed: ${insErr.message} (Code: ${insErr.code})`, details: insErr };
+      }
+
+      // Step C: Select test account immediately
+      console.log('C. Querying accounts for user:', user.id);
+      const { data: selData, error: selErr } = await supabase.from('accounts').select('*').eq('user_id', user.id);
+      console.log('ACCOUNT SELECT RESULT:', selData);
+      if (selErr) {
+        console.error('ACCOUNT SELECT ERROR:', {
+          message: selErr.message,
+          details: selErr.details,
+          hint: selErr.hint,
+          code: selErr.code,
+        });
+        console.groupEnd();
+        return { success: false, message: `Accounts SELECT failed: ${selErr.message} (Code: ${selErr.code})`, details: selErr };
+      }
+
+      // Step D: Clean up test account
+      await supabase.from('accounts').delete().eq('id', testId).eq('user_id', user.id);
+      console.log('D. Cleaned up diagnostic test account.');
+      console.groupEnd();
+
+      const foundCount = selData ? selData.length : 0;
+      return { success: true, message: `Accounts INSERT & SELECT passed! Total cloud accounts: ${foundCount}` };
+    } catch (err: any) {
+      console.error('SPENDLY SYNC DIAGNOSTIC EXCEPTION:', err);
+      console.groupEnd();
+      return { success: false, message: `Diagnostic exception: ${err.message || String(err)}` };
     }
   }
 

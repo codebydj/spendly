@@ -33,13 +33,14 @@ export class StorageEngine {
     const key = this.getKey(BASE_KEYS.ACCOUNTS, userId);
     const raw = localStorage.getItem(key);
     if (!raw) {
+      if (userId) return [];
       this.saveAccounts(PRODUCTION_ACCOUNTS, userId);
       return PRODUCTION_ACCOUNTS;
     }
     try {
       return JSON.parse(raw);
     } catch {
-      return PRODUCTION_ACCOUNTS;
+      return userId ? [] : PRODUCTION_ACCOUNTS;
     }
   }
 
@@ -71,13 +72,14 @@ export class StorageEngine {
     const key = this.getKey(BASE_KEYS.TRANSACTIONS, userId);
     const raw = localStorage.getItem(key);
     if (!raw) {
+      if (userId) return [];
       this.saveTransactions(PRODUCTION_TRANSACTIONS, userId);
       return PRODUCTION_TRANSACTIONS;
     }
     try {
       return JSON.parse(raw);
     } catch {
-      return PRODUCTION_TRANSACTIONS;
+      return userId ? [] : PRODUCTION_TRANSACTIONS;
     }
   }
 
@@ -90,13 +92,14 @@ export class StorageEngine {
     const key = this.getKey(BASE_KEYS.BUDGETS, userId);
     const raw = localStorage.getItem(key);
     if (!raw) {
+      if (userId) return [];
       this.saveBudgets(PRODUCTION_BUDGETS, userId);
       return PRODUCTION_BUDGETS;
     }
     try {
       return JSON.parse(raw);
     } catch {
-      return PRODUCTION_BUDGETS;
+      return userId ? [] : PRODUCTION_BUDGETS;
     }
   }
 
@@ -109,13 +112,14 @@ export class StorageEngine {
     const key = this.getKey(BASE_KEYS.RECURRING, userId);
     const raw = localStorage.getItem(key);
     if (!raw) {
+      if (userId) return [];
       this.saveRecurring(PRODUCTION_RECURRING, userId);
       return PRODUCTION_RECURRING;
     }
     try {
       return JSON.parse(raw);
     } catch {
-      return PRODUCTION_RECURRING;
+      return userId ? [] : PRODUCTION_RECURRING;
     }
   }
 
@@ -128,13 +132,14 @@ export class StorageEngine {
     const key = this.getKey(BASE_KEYS.NOTIFICATIONS, userId);
     const raw = localStorage.getItem(key);
     if (!raw) {
+      if (userId) return [];
       this.saveNotifications(PRODUCTION_NOTIFICATIONS, userId);
       return PRODUCTION_NOTIFICATIONS;
     }
     try {
       return JSON.parse(raw);
     } catch {
-      return PRODUCTION_NOTIFICATIONS;
+      return userId ? [] : PRODUCTION_NOTIFICATIONS;
     }
   }
 

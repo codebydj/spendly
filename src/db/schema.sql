@@ -1,6 +1,6 @@
--- Spendly Database Schema & Row Level Security Policies
+-- Spendly Complete Supabase Database Schema & Row Level Security Policies
+-- Run this script in the Supabase SQL Editor for project https://seerpislmkozvislqwaz.supabase.co
 
--- Enable UUID extension if needed
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. Profiles Table
@@ -14,17 +14,24 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 CREATE POLICY "Users can view their own profile"
   ON public.profiles FOR SELECT
-  USING (auth.uid() = id);
+  TO authenticated
+  USING ((select auth.uid()) = id);
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
   ON public.profiles FOR UPDATE
-  USING (auth.uid() = id);
+  TO authenticated
+  USING ((select auth.uid()) = id)
+  WITH CHECK ((select auth.uid()) = id);
 
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile"
   ON public.profiles FOR INSERT
-  WITH CHECK (auth.uid() = id);
+  TO authenticated
+  WITH CHECK ((select auth.uid()) = id);
 
 -- 2. Accounts Table
 CREATE TABLE IF NOT EXISTS public.accounts (
@@ -43,10 +50,12 @@ CREATE TABLE IF NOT EXISTS public.accounts (
 
 ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own accounts" ON public.accounts;
 CREATE POLICY "Users can manage their own accounts"
   ON public.accounts FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
 
 -- 3. Categories Table
 CREATE TABLE IF NOT EXISTS public.categories (
@@ -60,21 +69,30 @@ CREATE TABLE IF NOT EXISTS public.categories (
 
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view default or own categories" ON public.categories;
 CREATE POLICY "Users can view default or own categories"
   ON public.categories FOR SELECT
-  USING (user_id IS NULL OR auth.uid() = user_id);
+  TO authenticated
+  USING (user_id IS NULL OR (select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own categories" ON public.categories;
 CREATE POLICY "Users can insert own categories"
   ON public.categories FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  TO authenticated
+  WITH CHECK ((select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "Users can update own categories" ON public.categories;
 CREATE POLICY "Users can update own categories"
   ON public.categories FOR UPDATE
-  USING (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own categories" ON public.categories;
 CREATE POLICY "Users can delete own categories"
   ON public.categories FOR DELETE
-  USING (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id);
 
 -- 4. Transactions Table
 CREATE TABLE IF NOT EXISTS public.transactions (
@@ -97,10 +115,12 @@ CREATE TABLE IF NOT EXISTS public.transactions (
 
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own transactions" ON public.transactions;
 CREATE POLICY "Users can manage their own transactions"
   ON public.transactions FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
 
 -- 5. Budgets Table
 CREATE TABLE IF NOT EXISTS public.budgets (
@@ -112,10 +132,12 @@ CREATE TABLE IF NOT EXISTS public.budgets (
 
 ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own budgets" ON public.budgets;
 CREATE POLICY "Users can manage their own budgets"
   ON public.budgets FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
 
 -- 6. Recurring Payments Table
 CREATE TABLE IF NOT EXISTS public.recurring_payments (
@@ -134,10 +156,12 @@ CREATE TABLE IF NOT EXISTS public.recurring_payments (
 
 ALTER TABLE public.recurring_payments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own recurring payments" ON public.recurring_payments;
 CREATE POLICY "Users can manage their own recurring payments"
   ON public.recurring_payments FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
 
 -- 7. Notifications Table
 CREATE TABLE IF NOT EXISTS public.notifications (
@@ -152,10 +176,12 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own notifications" ON public.notifications;
 CREATE POLICY "Users can manage their own notifications"
   ON public.notifications FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
 
 -- 8. User Settings Table
 CREATE TABLE IF NOT EXISTS public.user_settings (
@@ -170,7 +196,12 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
 
 ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own settings" ON public.user_settings;
 CREATE POLICY "Users can manage their own settings"
   ON public.user_settings FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
+
+-- Notify PostgREST to reload schema cache
+NOTIFY pgrst, 'reload schema';

@@ -47,6 +47,9 @@ interface AppContextType {
   userProfile: { fullName?: string; email?: string } | null;
   authLoading: boolean;
   syncStatus: SyncStatus;
+  lastSyncError: string | null;
+  lastSyncTime: string | null;
+  runSyncDiagnostic: () => Promise<{ success: boolean; message: string; details?: any }>;
   soundEnabled: boolean;
   toggleSoundEnabled: () => void;
   logout: () => Promise<void>;
@@ -128,6 +131,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(navigator.onLine ? 'SYNCED' : 'OFFLINE');
+  const [lastSyncError, setLastSyncError] = useState<string | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabledState] = useState<boolean>(soundService.getSoundEnabled());
 
   const toggleSoundEnabled = () => {
@@ -181,88 +186,104 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     async (userId: string) => {
       setSyncStatus('SYNCING');
 
-      // 1. Fetch Cloud Records from Supabase
-      const cloudData = await SyncService.fetchUserData(userId);
-
+      // 1. Immediately hydrate local storage cache for userId if present
+      const cachedAccs = StorageEngine.loadAccounts(userId);
+      const cachedTxs = StorageEngine.loadTransactions(userId);
+      const cachedBudgets = StorageEngine.loadBudgets(userId);
+      const cachedRec = StorageEngine.loadRecurring(userId);
+      const cachedNotifs = StorageEngine.loadNotifications(userId);
+      const cachedSettings = StorageEngine.loadSettings(userId);
       const localCats = StorageEngine.loadCategories(userId);
 
-      if (cloudData.hasCloudData) {
-        // Cloud records exist! Hydrate local database and state from Supabase (Cloud Source of Truth)
-        const recalculatedAccounts = updateAccountBalances(cloudData.accounts, cloudData.transactions);
-
-        // Update local storage cache
-        StorageEngine.saveAccounts(recalculatedAccounts, userId);
-        StorageEngine.saveTransactions(cloudData.transactions, userId);
-        StorageEngine.saveBudgets(cloudData.budgets, userId);
-        StorageEngine.saveRecurring(cloudData.recurringPayments, userId);
-        StorageEngine.saveNotifications(cloudData.notifications, userId);
-        if (cloudData.settings) {
-          StorageEngine.saveSettings(cloudData.settings, userId);
-        }
-
-        // Set React State
-        setAccounts(recalculatedAccounts);
+      if (cachedAccs.length > 0 || cachedTxs.length > 0) {
+        const recalculated = updateAccountBalances(cachedAccs, cachedTxs);
+        setAccounts(recalculated);
+        setTransactions(cachedTxs);
+        setBudgets(cachedBudgets);
+        setRecurringPayments(cachedRec);
+        setNotifications(cachedNotifs);
+        setSettings(cachedSettings);
         setCategories(localCats);
-        setTransactions(cloudData.transactions);
-        setBudgets(cloudData.budgets);
-        setRecurringPayments(cloudData.recurringPayments);
-        setNotifications(cloudData.notifications);
-        if (cloudData.settings) {
-          setSettings(cloudData.settings);
-          setIsPinLocked(cloudData.settings.pinEnabled);
-        }
-        if (cloudData.profile) {
-          setUserProfile(cloudData.profile);
-        }
-        setSyncStatus('SYNCED');
-      } else {
-        // No cloud records returned. Check if local storage contains existing dataset (Migration path)
-        const localAccs = StorageEngine.loadAccounts(userId);
-        const localTxs = StorageEngine.loadTransactions(userId);
-        const localBudgets = StorageEngine.loadBudgets(userId);
-        const localRec = StorageEngine.loadRecurring(userId);
-        const localNotifs = StorageEngine.loadNotifications(userId);
-        const localSettings = StorageEngine.loadSettings(userId);
+      }
 
-        const hasLocalRecords = localAccs.length > 0 || localTxs.length > 0 || localBudgets.length > 0 || localRec.length > 0;
+      // 2. Fetch Cloud Records from Supabase (Cloud Source of Truth)
+      try {
+        const cloudData = await SyncService.fetchUserData(userId);
 
-        if (hasLocalRecords && navigator.onLine) {
-          // Upload local dataset to Supabase for newly linked user
-          const backup: BackupData = {
-            version: '2.0.0',
-            exportedAt: new Date().toISOString(),
-            accounts: localAccs,
-            categories: localCats,
-            transactions: localTxs,
-            budgets: localBudgets,
-            recurringPayments: localRec,
-            notifications: localNotifs,
-            settings: localSettings,
-          };
-          await SyncService.uploadLocalDataToCloud(backup, userId);
+        if (cloudData.hasCloudData) {
+          // Cloud records exist! Hydrate state & local cache from Supabase
+          const recalculatedAccounts = updateAccountBalances(cloudData.accounts, cloudData.transactions);
 
-          const recalculatedAccounts = updateAccountBalances(localAccs, localTxs);
+          // Update local storage cache
+          StorageEngine.saveAccounts(recalculatedAccounts, userId);
+          StorageEngine.saveTransactions(cloudData.transactions, userId);
+          StorageEngine.saveBudgets(cloudData.budgets, userId);
+          StorageEngine.saveRecurring(cloudData.recurringPayments, userId);
+          StorageEngine.saveNotifications(cloudData.notifications, userId);
+          if (cloudData.settings) {
+            StorageEngine.saveSettings(cloudData.settings, userId);
+          }
+
+          // Update React State
           setAccounts(recalculatedAccounts);
           setCategories(localCats);
-          setTransactions(localTxs);
-          setBudgets(localBudgets);
-          setRecurringPayments(localRec);
-          setNotifications(localNotifs);
-          setSettings(localSettings);
-          setIsPinLocked(localSettings.pinEnabled);
+          setTransactions(cloudData.transactions);
+          setBudgets(cloudData.budgets);
+          setRecurringPayments(cloudData.recurringPayments);
+          setNotifications(cloudData.notifications);
+          if (cloudData.settings) {
+            setSettings(cloudData.settings);
+            setIsPinLocked(cloudData.settings.pinEnabled);
+          }
+          if (cloudData.profile) {
+            setUserProfile(cloudData.profile);
+          }
           setSyncStatus('SYNCED');
         } else {
-          // Clean New User: Start with empty state
-          setAccounts([]);
-          setCategories(localCats);
-          setTransactions([]);
-          setBudgets([]);
-          setRecurringPayments([]);
-          setNotifications([]);
-          setSettings(localSettings);
-          setIsPinLocked(false);
-          setSyncStatus(navigator.onLine ? 'SYNCED' : 'OFFLINE');
+          // No cloud records returned. Check if local storage contains an existing offline dataset
+          const hasLocalRecords = cachedAccs.length > 0 || cachedTxs.length > 0 || cachedBudgets.length > 0 || cachedRec.length > 0;
+
+          if (hasLocalRecords && navigator.onLine) {
+            // Upload local dataset to Supabase for newly linked user
+            const backup: BackupData = {
+              version: '2.0.0',
+              exportedAt: new Date().toISOString(),
+              accounts: cachedAccs,
+              categories: localCats,
+              transactions: cachedTxs,
+              budgets: cachedBudgets,
+              recurringPayments: cachedRec,
+              notifications: cachedNotifs,
+              settings: cachedSettings,
+            };
+            await SyncService.uploadLocalDataToCloud(backup, userId);
+
+            const recalculatedAccounts = updateAccountBalances(cachedAccs, cachedTxs);
+            setAccounts(recalculatedAccounts);
+            setCategories(localCats);
+            setTransactions(cachedTxs);
+            setBudgets(cachedBudgets);
+            setRecurringPayments(cachedRec);
+            setNotifications(cachedNotifs);
+            setSettings(cachedSettings);
+            setIsPinLocked(cachedSettings.pinEnabled);
+            setSyncStatus('SYNCED');
+          } else {
+            // Clean New User with zero data anywhere
+            setAccounts([]);
+            setCategories(localCats);
+            setTransactions([]);
+            setBudgets([]);
+            setRecurringPayments([]);
+            setNotifications([]);
+            setSettings(cachedSettings);
+            setIsPinLocked(false);
+            setSyncStatus(navigator.onLine ? 'SYNCED' : 'OFFLINE');
+          }
         }
+      } catch (err) {
+        console.error('loadUserData exception:', err);
+        setSyncStatus(navigator.onLine ? 'SYNC_FAILED' : 'OFFLINE');
       }
     },
     [updateAccountBalances]
@@ -354,31 +375,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     setSyncStatus('SYNCING');
+    setLastSyncError(null);
+
+    console.group('SPENDLY MANUAL SYNC');
+    console.log('Authenticated user:', user);
+    console.log('User ID:', user?.id);
+    console.log('Local accounts:', accounts);
+    console.log('Local transactions:', transactions);
+    console.log('Local budgets:', budgets);
+    console.log('Local recurring payments:', recurringPayments);
+    console.log('Local notifications:', notifications);
+    console.groupEnd();
+
     try {
-      // 1. Fetch latest cloud records from Supabase
-      const cloudData = await SyncService.fetchUserData(user.id);
-
-      // 2. Upload any local changes to cloud
-      const localAccs = StorageEngine.loadAccounts(user.id);
-      const localTxs = StorageEngine.loadTransactions(user.id);
-      const localBudgets = StorageEngine.loadBudgets(user.id);
-      const localRec = StorageEngine.loadRecurring(user.id);
-      const localNotifs = StorageEngine.loadNotifications(user.id);
-      const localSettings = StorageEngine.loadSettings(user.id);
-
+      // 1. Upload local dataset to cloud FIRST
       const backup: BackupData = {
         version: '2.0.0',
         exportedAt: new Date().toISOString(),
-        accounts: localAccs.length > 0 ? localAccs : accounts,
+        accounts,
         categories,
-        transactions: localTxs.length > 0 ? localTxs : transactions,
-        budgets: localBudgets.length > 0 ? localBudgets : budgets,
-        recurringPayments: localRec.length > 0 ? localRec : recurringPayments,
-        notifications: localNotifs.length > 0 ? localNotifs : notifications,
-        settings: localSettings || settings,
+        transactions,
+        budgets,
+        recurringPayments,
+        notifications,
+        settings,
       };
 
       await SyncService.uploadLocalDataToCloud(backup, user.id);
+
+      // 2. Fetch latest cloud records from Supabase
+      const cloudData = await SyncService.fetchUserData(user.id);
 
       // 3. Hydrate state
       if (cloudData.hasCloudData) {
@@ -390,17 +416,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setNotifications(cloudData.notifications);
         if (cloudData.settings) setSettings(cloudData.settings);
         if (cloudData.profile) setUserProfile(cloudData.profile);
+
+        // Update local storage cache
+        StorageEngine.saveAccounts(recalculated, user.id);
+        StorageEngine.saveTransactions(cloudData.transactions, user.id);
+        StorageEngine.saveBudgets(cloudData.budgets, user.id);
+        StorageEngine.saveRecurring(cloudData.recurringPayments, user.id);
+        StorageEngine.saveNotifications(cloudData.notifications, user.id);
+        if (cloudData.settings) StorageEngine.saveSettings(cloudData.settings, user.id);
       }
 
       setSyncStatus('SYNCED');
+      setLastSyncTime(new Date().toLocaleTimeString());
+      setLastSyncError(null);
       soundService.playSyncChime();
       showToast('Data synchronized with Supabase cloud', 'success');
       return true;
-    } catch {
+    } catch (err: any) {
+      console.error('SPENDLY MANUAL SYNC ERROR:', err);
+      const msg = err?.message || err?.details || String(err);
+      setLastSyncError(msg);
       setSyncStatus('SYNC_FAILED');
-      showToast('Cloud synchronization failed. Retrying in background', 'danger');
+      showToast(`Sync issue: ${msg}`, 'danger');
       return false;
     }
+  };
+
+  const runSyncDiagnostic = async () => {
+    if (!user?.id) {
+      return { success: false, message: 'User is not authenticated' };
+    }
+    return await SyncService.runSyncDiagnostic(user.id);
   };
 
   // Handle Auth Session Lifecycle
@@ -888,6 +934,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         userProfile,
         authLoading,
         syncStatus,
+        lastSyncError,
+        lastSyncTime,
+        runSyncDiagnostic,
         soundEnabled,
         toggleSoundEnabled,
         logout,

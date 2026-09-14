@@ -467,7 +467,7 @@ input:focus, select:focus, textarea:focus {
   }
 }
 
-/* Responsive Visibility Rules */
+/* Responsive Visibility Rules & Small Mobile Screen Styles */
 @media (min-width: 769px) {
   .mobile-only {
     display: none !important;
@@ -491,5 +491,39 @@ input:focus, select:focus, textarea:focus {
   header {
     padding: 0 16px !important;
     height: var(--header-height) !important;
+  }
+}
+
+/* Small Mobile Screen Responsiveness (<= 480px) */
+@media (max-width: 480px) {
+  .page-container {
+    padding: 12px 12px calc(var(--mobile-nav-height) + var(--mobile-safe-bottom) + var(--mobile-action-space) + 20px) 12px !important;
+  }
+
+  .card-level-1, .card-level-2, .card-level-3, .card-level-4, .glass-surface, .glass-surface-elevated {
+    padding: 14px 12px !important;
+  }
+
+  header {
+    padding: 0 12px !important;
+  }
+}
+
+/* Ultra Small Mobile Screens (<= 375px & 320px) */
+@media (max-width: 375px) {
+  .page-container {
+    padding: 10px 10px calc(var(--mobile-nav-height) + var(--mobile-safe-bottom) + var(--mobile-action-space) + 16px) 10px !important;
+  }
+
+  .card-level-1, .card-level-2, .card-level-3, .card-level-4, .glass-surface, .glass-surface-elevated {
+    padding: 12px 10px !important;
+  }
+
+  h1 {
+    font-size: 1.1rem !important;
+  }
+
+  h2 {
+    font-size: 1.05rem !important;
   }
 }

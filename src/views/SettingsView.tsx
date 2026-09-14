@@ -45,7 +45,15 @@ export const SettingsView: React.FC = () => {
     toggleSoundEnabled,
     showToast,
     updateProfileName,
+    lastSyncError,
+    lastSyncTime,
+    runSyncDiagnostic,
+    accounts,
+    transactions,
   } = useApp();
+
+  const [diagnosticResult, setDiagnosticResult] = useState<{ success: boolean; message: string; details?: any } | null>(null);
+  const [isRunningDiagnostic, setIsRunningDiagnostic] = useState(false);
 
   const [pinInput, setPinInput] = useState('');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -412,6 +420,100 @@ export const SettingsView: React.FC = () => {
                 >
                   <RefreshCw size={15} /> Reset Local Data
                 </button>
+              </div>
+
+              {/* SYNC DEBUG PANEL */}
+              <div
+                style={{
+                  marginTop: '16px',
+                  padding: '16px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px dashed var(--accent-violet-border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-lavender)', letterSpacing: '0.05em' }}>
+                    SYNC DEBUG
+                  </span>
+                  <button
+                    type="button"
+                    disabled={isRunningDiagnostic || !user?.id}
+                    onClick={async () => {
+                      setIsRunningDiagnostic(true);
+                      const res = await runSyncDiagnostic();
+                      setDiagnosticResult(res);
+                      setIsRunningDiagnostic(false);
+                    }}
+                    className="btn btn-secondary"
+                    style={{ padding: '4px 10px', minHeight: '30px', fontSize: '0.76rem' }}
+                  >
+                    {isRunningDiagnostic ? 'Testing...' : 'Run Accounts Test'}
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', fontSize: '0.8rem' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>User ID:</span>
+                    <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
+                      {user?.id || 'Not authenticated'}
+                    </div>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Cloud/Local Accounts:</span>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{accounts.length}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Cloud/Local Transactions:</span>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{transactions.length}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Last Sync:</span>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {lastSyncTime || (settings.lastSyncedAt ? new Date(settings.lastSyncedAt).toLocaleTimeString() : 'Never')}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.8rem' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Last Sync Error:</span>
+                  <div
+                    style={{
+                      fontFamily: 'monospace',
+                      color: lastSyncError ? '#FF5555' : 'var(--accent-cyan)',
+                      marginTop: '2px',
+                      padding: '6px 10px',
+                      backgroundColor: 'rgba(0,0,0,0.4)',
+                      borderRadius: '4px',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {lastSyncError || 'None (Clean)'}
+                  </div>
+                </div>
+
+                {diagnosticResult && (
+                  <div
+                    style={{
+                      fontSize: '0.78rem',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      backgroundColor: diagnosticResult.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      border: `1px solid ${diagnosticResult.success ? '#10B981' : '#EF4444'}`,
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    <strong>Diagnostic Result:</strong> {diagnosticResult.message}
+                    {diagnosticResult.details && (
+                      <pre style={{ margin: '6px 0 0 0', fontSize: '0.72rem', overflowX: 'auto' }}>
+                        {JSON.stringify(diagnosticResult.details, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
