@@ -24,15 +24,21 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
   const isTransfer = transaction.type === 'TRANSFER';
 
   let icon = <ArrowUpRight size={16} color="var(--status-expense)" />;
+  let iconBg = 'rgba(244, 63, 94, 0.12)';
+  let iconBorder = 'rgba(244, 63, 94, 0.25)';
   let amountColor = 'var(--text-primary)';
   let sign = '-';
 
   if (isIncome) {
-    icon = <ArrowDownLeft size={16} color="var(--accent-emerald)" />;
-    amountColor = 'var(--accent-emerald)';
+    icon = <ArrowDownLeft size={16} color="var(--accent-cyan)" />;
+    iconBg = 'rgba(34, 211, 238, 0.12)';
+    iconBorder = 'rgba(34, 211, 238, 0.25)';
+    amountColor = 'var(--accent-cyan)';
     sign = '+';
   } else if (isTransfer) {
     icon = <ArrowLeftRight size={16} color="var(--accent-blue)" />;
+    iconBg = 'rgba(96, 165, 250, 0.12)';
+    iconBorder = 'rgba(96, 165, 250, 0.25)';
     amountColor = 'var(--accent-blue)';
     sign = '';
   }
@@ -49,26 +55,29 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '12px 14px',
-        backgroundColor: 'rgba(15, 20, 30, 0.75)',
-        border: '1px solid var(--border-color)',
+        padding: '12px 16px',
+        backgroundColor: 'rgba(22, 27, 58, 0.55)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.12)',
         borderRadius: 'var(--radius-md)',
         cursor: onEdit ? 'pointer' : 'default',
-        transition: 'background-color 0.15s ease, border-color 0.15s ease',
+        transition: 'all 0.15s ease',
       }}
       className="glass-surface-interactive"
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
         <div
           style={{
-            width: '36px',
-            height: '36px',
+            width: '38px',
+            height: '38px',
             borderRadius: 'var(--radius-md)',
-            backgroundColor: 'rgba(10, 14, 22, 0.8)',
+            backgroundColor: iconBg,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: '1px solid var(--border-strong)',
+            border: `1px solid ${iconBorder}`,
             flexShrink: 0,
           }}
         >

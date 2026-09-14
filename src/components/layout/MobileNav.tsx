@@ -133,15 +133,16 @@ export const MobileNav: React.FC = () => {
           left: 0,
           right: 0,
           zIndex: 900,
-          backgroundColor: 'rgba(17, 21, 46, 0.92)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderTop: '1px solid var(--border-strong)',
+          backgroundColor: 'rgba(17, 21, 46, 0.94)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+          boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.45)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-around',
           height: 'calc(var(--mobile-nav-height) + var(--mobile-safe-bottom))',
-          padding: '0 4px var(--mobile-safe-bottom) 4px',
+          padding: '4px 6px var(--mobile-safe-bottom) 6px',
         }}
       >
         {navItems.map((item) => {
@@ -158,11 +159,14 @@ export const MobileNav: React.FC = () => {
                 justifyContent: 'center',
                 gap: '3px',
                 color: isActive ? 'var(--accent-cyan)' : 'var(--text-muted)',
-                fontSize: '0.72rem',
+                backgroundColor: isActive ? 'rgba(139, 92, 246, 0.16)' : 'transparent',
+                borderRadius: '12px',
+                fontSize: '0.74rem',
                 fontWeight: isActive ? 700 : 500,
                 padding: '6px 0',
                 minHeight: '48px',
-                transition: 'color 0.15s ease',
+                border: isActive ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid transparent',
+                transition: 'all 0.15s ease',
               }}
             >
               {item.icon}
@@ -185,11 +189,14 @@ export const MobileNav: React.FC = () => {
             justifyContent: 'center',
             gap: '3px',
             color: isMoreOpen || isSecondaryActive ? 'var(--accent-cyan)' : 'var(--text-muted)',
-            fontSize: '0.72rem',
+            backgroundColor: isMoreOpen || isSecondaryActive ? 'rgba(139, 92, 246, 0.16)' : 'transparent',
+            borderRadius: '12px',
+            fontSize: '0.74rem',
             fontWeight: isMoreOpen || isSecondaryActive ? 700 : 500,
             padding: '6px 0',
             minHeight: '48px',
-            transition: 'color 0.15s ease',
+            border: isMoreOpen || isSecondaryActive ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid transparent',
+            transition: 'all 0.15s ease',
           }}
         >
           <MoreHorizontal size={20} />

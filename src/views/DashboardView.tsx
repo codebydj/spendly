@@ -64,15 +64,18 @@ export const DashboardView: React.FC = () => {
     totalExpenseMonth += tx.amount;
   });
 
-  const donutData: CategoryData[] = Object.keys(categoryTotals).map((catId) => {
+  const richPalette = ['#8B5CF6', '#22D3EE', '#60A5FA', '#F472B6', '#C4B5FD', '#F59E0B'];
+
+  const donutData: CategoryData[] = Object.keys(categoryTotals).map((catId, index) => {
     const cat = categories.find((c) => c.id === catId);
     const amount = categoryTotals[catId];
     const percentage = totalExpenseMonth > 0 ? Math.round((amount / totalExpenseMonth) * 100) : 0;
+    const fallbackColor = richPalette[index % richPalette.length];
     return {
       categoryId: catId,
       name: cat?.name || 'Other',
       amount,
-      color: cat?.color || '#6B7280',
+      color: cat?.color || fallbackColor,
       percentage,
     };
   });
@@ -223,15 +226,15 @@ export const DashboardView: React.FC = () => {
   // 2. Mobile & Desktop Authenticated Dashboard
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* NET WORTH HERO CARD */}
-      <div className="card-level-3 hero-emerald-glow" style={{ position: 'relative', overflow: 'hidden', padding: '22px 26px' }}>
+      {/* NET WORTH HERO CENTERPIECE CARD */}
+      <div className="card-level-4 ambient-violet-glow ambient-cyan-glow" style={{ position: 'relative', overflow: 'hidden', padding: '24px 28px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '0.02em' }}>
               {greeting}, financial summary
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+              <span style={{ fontSize: '0.74rem', color: 'var(--accent-lavender)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
                 NET WORTH
               </span>
               <button
@@ -240,71 +243,63 @@ export const DashboardView: React.FC = () => {
                 title={settings.hideBalances ? 'Show Balances' : 'Hide Balances'}
                 style={{ padding: '2px 4px', minHeight: '24px', minWidth: '24px' }}
               >
-                {settings.hideBalances ? <EyeOff size={14} color="var(--accent-emerald)" /> : <Eye size={14} />}
+                {settings.hideBalances ? <EyeOff size={14} color="var(--accent-cyan)" /> : <Eye size={14} color="var(--text-secondary)" />}
               </button>
             </div>
 
             <div
               style={{
-                fontSize: '2.4rem',
+                fontSize: '2.6rem',
                 fontWeight: 800,
                 color: 'var(--text-primary)',
-                marginTop: '4px',
+                marginTop: '6px',
                 lineHeight: 1.1,
+                letterSpacing: '-0.03em',
               }}
               className="tabular-nums"
             >
               {settings.hideBalances ? '₹•••••' : `₹${totalBalance.toLocaleString()}`}
             </div>
           </div>
-
-          <button
-            onClick={() => setIsAddTransactionOpen(true)}
-            className="btn btn-primary"
-            style={{ padding: '8px 16px', minHeight: '40px', fontSize: '0.86rem', borderRadius: 'var(--radius-md)' }}
-          >
-            <Plus size={16} strokeWidth={2.5} />
-            <span>Add transaction</span>
-          </button>
         </div>
 
-        {/* Compact Summary Strip */}
+        {/* Compact Supporting Financial Summary Strip */}
         <div
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '12px',
-            marginTop: '20px',
-            paddingTop: '16px',
-            borderTop: '1px solid var(--border-color)',
+            marginTop: '22px',
+            paddingTop: '18px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.12)',
           }}
         >
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600 }}>
-              <ArrowDownLeft size={14} color="var(--accent-emerald)" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 600 }}>
+              <ArrowDownLeft size={14} color="var(--accent-cyan)" />
               <span>Income</span>
             </div>
-            <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px', display: 'block' }} className="tabular-nums">
+            <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '3px', display: 'block' }} className="tabular-nums">
               {settings.hideBalances ? '₹••••' : `₹${monthlyIncome.toLocaleString()}`}
             </span>
           </div>
 
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 600 }}>
               <ArrowUpRight size={14} color="var(--status-expense)" />
               <span>Expenses</span>
             </div>
-            <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px', display: 'block' }} className="tabular-nums">
+            <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '3px', display: 'block' }} className="tabular-nums">
               {settings.hideBalances ? '₹••••' : `₹${monthlyExpenses.toLocaleString()}`}
             </span>
           </div>
 
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600 }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent-emerald)' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 600 }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent-violet)' }} />
               <span>Savings</span>
             </div>
-            <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-emerald)', marginTop: '2px', display: 'block' }} className="tabular-nums">
+            <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--accent-cyan)', marginTop: '3px', display: 'block' }} className="tabular-nums">
               {settings.hideBalances ? '₹••••' : `₹${monthlySavings.toLocaleString()}`}
             </span>
           </div>

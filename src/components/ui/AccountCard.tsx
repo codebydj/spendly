@@ -13,19 +13,29 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   hideBalances = false,
   onClick,
 }) => {
-  const getAccountIcon = (type: string) => {
-    switch (type) {
-      case 'CREDIT_CARD':
-        return <CreditCard size={18} color="var(--status-warning)" />;
-      case 'BANK':
-        return <Landmark size={18} color="var(--accent-emerald)" />;
-      case 'WALLET':
-        return <Wallet size={18} color="var(--accent-blue)" />;
-      case 'CASH':
-        return <Banknote size={18} color="#F59E0B" />;
-      default:
-        return <Landmark size={18} color="var(--text-secondary)" />;
+  const getAccountIcon = (type: string, name: string) => {
+    const text = name.toLowerCase();
+    if (text.includes('sbi') || text.includes('bank')) {
+      return <Landmark size={18} color="var(--accent-blue)" />;
     }
+    if (text.includes('hdfc') || type === 'CREDIT_CARD') {
+      return <CreditCard size={18} color="var(--status-expense)" />;
+    }
+    if (type === 'CASH') {
+      return <Banknote size={18} color="#F59E0B" />;
+    }
+    if (type === 'WALLET' || text.includes('upi') || text.includes('paytm')) {
+      return <Wallet size={18} color="var(--accent-cyan)" />;
+    }
+    return <Landmark size={18} color="var(--accent-violet)" />;
+  };
+
+  const getAccountTintClass = (type: string, name: string) => {
+    const text = name.toLowerCase();
+    if (text.includes('sbi')) return 'account-tint-sbi';
+    if (text.includes('hdfc') || type === 'CREDIT_CARD') return 'account-tint-hdfc';
+    if (type === 'CASH') return 'account-tint-cash';
+    return 'account-tint-upi';
   };
 
   const isCreditCard = account.type === 'CREDIT_CARD';
@@ -33,11 +43,12 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   const creditLimit = account.creditLimit || 0;
   const availableCredit = Math.max(0, creditLimit - outstanding);
   const usedPercentage = creditLimit > 0 ? Math.min(100, Math.round((outstanding / creditLimit) * 100)) : 0;
+  const tintClass = getAccountTintClass(account.type, account.name);
 
   return (
     <div
       onClick={onClick}
-      className="card-level-2"
+      className={`card-level-2 ${tintClass}`}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -50,17 +61,19 @@ export const AccountCard: React.FC<AccountCardProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div
             style={{
-              width: '38px',
-              height: '38px',
+              width: '40px',
+              height: '40px',
               borderRadius: 'var(--radius-md)',
-              backgroundColor: 'rgba(10, 14, 22, 0.6)',
+              backgroundColor: 'rgba(255, 255, 255, 0.06)',
+              backdropFilter: 'blur(12px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid var(--border-strong)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.2)',
             }}
           >
-            {getAccountIcon(account.type)}
+            {getAccountIcon(account.type, account.name)}
           </div>
           <div>
             <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>{account.name}</h4>
@@ -75,7 +88,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
         </span>
       </div>
 
-      <div style={{ paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
+      <div style={{ paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
         {isCreditCard ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -87,7 +100,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
               </div>
               <div>
                 <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Available</span>
-                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-emerald)', marginTop: '2px' }} className="tabular-nums">
+                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-cyan)', marginTop: '2px' }} className="tabular-nums">
                   {hideBalances ? '₹•••••' : `₹${availableCredit.toLocaleString()}`}
                 </div>
               </div>

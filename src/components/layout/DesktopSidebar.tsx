@@ -81,18 +81,19 @@ export const DesktopSidebar: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 8px' }}>
           <div
             style={{
-              width: '28px',
-              height: '28px',
-              backgroundColor: 'var(--accent-emerald)',
+              width: '32px',
+              height: '32px',
+              background: 'linear-gradient(135deg, #8B5CF6 0%, #22D3EE 100%)',
               borderRadius: 'var(--radius-md)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(139, 92, 246, 0.35)',
             }}
           >
-            <span style={{ color: '#042f2e', fontWeight: 800, fontSize: '0.9rem', lineHeight: 1 }}>₹</span>
+            <span style={{ color: '#FFFFFF', fontWeight: 800, fontSize: '1rem', lineHeight: 1 }}>₹</span>
           </div>
-          <span style={{ fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+          <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
             spendly
           </span>
         </div>
@@ -100,10 +101,10 @@ export const DesktopSidebar: React.FC = () => {
         {/* Primary Action Button */}
         <button
           onClick={() => setIsAddTransactionOpen(true)}
-          className="btn btn-primary"
+          className="btn btn-gradient"
           style={{ width: '100%', justifyContent: 'center', padding: '11px' }}
         >
-          <Plus size={18} />
+          <Plus size={18} strokeWidth={2.6} />
           <span>Add Transaction</span>
         </button>
 
@@ -119,14 +120,14 @@ export const DesktopSidebar: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '9px 12px',
+                  padding: '10px 14px',
                   borderRadius: 'var(--radius-md)',
-                  backgroundColor: isActive ? 'var(--bg-surface-elevated)' : 'transparent',
-                  color: isActive ? 'var(--accent-emerald)' : 'var(--text-secondary)',
-                  border: isActive ? '1px solid var(--border-color)' : '1px solid transparent',
-                  fontWeight: isActive ? 600 : 400,
+                  backgroundColor: isActive ? 'rgba(139, 92, 246, 0.16)' : 'transparent',
+                  color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                  border: isActive ? '1px solid rgba(139, 92, 246, 0.35)' : '1px solid transparent',
+                  fontWeight: isActive ? 700 : 500,
                   fontSize: '0.9rem',
-                  transition: 'background-color 0.15s ease, color 0.15s ease',
+                  transition: 'all 0.15s ease',
                   textAlign: 'left',
                 }}
               >
@@ -137,11 +138,11 @@ export const DesktopSidebar: React.FC = () => {
                 {item.badge !== undefined && (
                   <span
                     style={{
-                      backgroundColor: 'var(--accent-emerald-subtle)',
-                      color: 'var(--accent-emerald)',
+                      backgroundColor: 'rgba(139, 92, 246, 0.25)',
+                      color: 'var(--accent-lavender)',
                       fontSize: '0.72rem',
-                      fontWeight: 700,
-                      padding: '2px 6px',
+                      fontWeight: 800,
+                      padding: '2px 7px',
                       borderRadius: 'var(--radius-sm)',
                     }}
                     className="tabular-nums"

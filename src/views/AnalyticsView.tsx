@@ -40,15 +40,18 @@ export const AnalyticsView: React.FC = () => {
       categoryTotals[t.categoryId] = (categoryTotals[t.categoryId] || 0) + t.amount;
     });
 
-  const donutData: CategoryData[] = Object.keys(categoryTotals).map((catId) => {
+  const richPalette = ['#8B5CF6', '#22D3EE', '#60A5FA', '#F472B6', '#C4B5FD', '#F59E0B'];
+
+  const donutData: CategoryData[] = Object.keys(categoryTotals).map((catId, index) => {
     const cat = categories.find((c) => c.id === catId);
     const amount = categoryTotals[catId];
     const percentage = totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0;
+    const fallbackColor = richPalette[index % richPalette.length];
     return {
       categoryId: catId,
       name: cat?.name || 'Other',
       amount,
-      color: cat?.color || '#6B7280',
+      color: cat?.color || fallbackColor,
       percentage,
     };
   });
