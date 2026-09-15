@@ -5,7 +5,7 @@
   "releaseDate": "2026-09-16",
   "title": "Spendly V3.1.4 Available",
   "message": "Spendly V3.1.4 is now available with critical update detection fixes.",
-  "downloadUrl": "https://drive.google.com/file/d/1KkB6VGJV_Z2kpXa2_bi3X6oUZRSEShh0/view?usp=sharing",
+  "downloadUrl": "https://drive.google.com/file/d/1_jG2HVHJpI5ciwJlXHbQ0NWhawC3evl4/view?usp=sharing",
   "minimumSupportedVersion": "1.0.0",
   "releaseNotes": [
     "Critical update notification fix enforcing production manifest fetching over HTTPS",
