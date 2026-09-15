@@ -29,8 +29,8 @@ The Spendly web application runs directly in any modern browser without requirin
 Spendly is available as a native Android application powered by Capacitor.
 
 - **Package ID**: `com.spendly.finance`
-- **Current Version**: `V3.0.8`
-- **Build Date**: `14 September 2026`
+- **Current Version**: `V3.1.1`
+- **Build Date**: `15 September 2026`
 - **Distribution**: Direct APK download (No Google Play Store required).
 
 Features native mobile integration including local notification scheduling for bill reminders, haptic feedback, safe-area navigation, and native GPS permission handling.
@@ -124,6 +124,16 @@ Manage recurring bill commitments:
 - Custom notification lead time (e.g. 1 day before due date at specified due time).
 - Direct **Mark as Paid** action with duplicate transaction protection per due cycle.
 - Local notification scheduling on Android devices using deterministic notification hash IDs.
+
+---
+
+## 12. App Updates
+
+Spendly checks for newer application versions and can notify users when a new release is available:
+- **Public Version Config**: Checks `/app-version.json` endpoint to determine if a newer version exists using semantic version comparison (`compareSemVer`).
+- **Web & PWA**: Friendly toast notification and header badge with optional "View Update" modal and release notes.
+- **Android APK**: Native local notifications using Capacitor (`@capacitor/local-notifications`).
+- **Duplicate & Delay Handling**: Prevents notification spam by storing the last notified version and respecting user postponement ("Later").
 
 ---
 
@@ -274,7 +284,19 @@ npx cap open android
 
 ## 22. Version History
 
-### V3.0.8 (14 September 2026) — CURRENT
+### V3.1.1 (15 September 2026) — CURRENT
+- Fixed localhost performance lag with instant parallel IndexedDB hydration
+- Added in-memory version check throttling to prevent redundant network fetches
+- Critical offline-first data loss fix with transactional queueing
+- Updated application version to V3.1.1
+
+### V3.1.0 (15 September 2026)
+- Added notifications when a new Spendly app version is available
+- Improved offline data reliability and synchronization with native IndexedDB
+- Improved application stability and update handling
+- Added clearer version and release information
+
+### V3.0.8 (14 September 2026)
 - Added a proper Pick on Map option when editing transaction locations
 - Improved map location search, pin selection and location editing
 - Improved the Maps tab and removed unnecessary place counters

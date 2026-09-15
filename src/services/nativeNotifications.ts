@@ -1,4 +1,5 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
+import type { AppVersionManifest } from '../types/finance';
 
 export const setupNotificationChannels = async () => {
   try {
@@ -23,6 +24,14 @@ export const setupNotificationChannels = async () => {
       name: 'Spendly Summaries',
       description: 'Weekly and monthly spending summaries',
       importance: 3,
+      visibility: 1,
+    });
+
+    await LocalNotifications.createChannel({
+      id: 'spendly-updates',
+      name: 'Spendly App Updates',
+      description: 'New Spendly application version alerts',
+      importance: 4,
       visibility: 1,
     });
   } catch (err) {
@@ -127,6 +136,36 @@ export const scheduleReminderNotification = async (reminder: {
     return true;
   } catch (err) {
     console.warn('scheduleReminderNotification error:', err);
+    return false;
+  }
+};
+
+// Android Native App Update Notification
+export const scheduleUpdateNotification = async (manifest: AppVersionManifest): Promise<boolean> => {
+  try {
+    const hasPermission = await requestNativeNotificationPermission();
+    if (!hasPermission) return false;
+
+    const notifId = 30001;
+    const title = 'Spendly update available';
+    const body = `${manifest.title || `Spendly V${manifest.version}`} is now available. Tap to see what's new.`;
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: notifId,
+          title,
+          body,
+          schedule: { at: new Date(Date.now() + 1500) },
+          channelId: 'spendly-updates',
+          extra: { type: 'APP_UPDATE', version: manifest.version },
+        },
+      ],
+    });
+
+    return true;
+  } catch (err) {
+    console.warn('scheduleUpdateNotification warning:', err);
     return false;
   }
 };

@@ -2,10 +2,10 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/ui/GlassCard';
 import { EmptyState } from '../components/ui/EmptyState';
-import { AlertTriangle, Calendar, Info, Check, Trash2, Bell } from 'lucide-react';
+import { AlertTriangle, Calendar, Info, Check, Trash2, Bell, Sparkles } from 'lucide-react';
 
 export const NotificationsView: React.FC = () => {
-  const { notifications, markNotificationRead, clearNotifications } = useApp();
+  const { notifications, markNotificationRead, clearNotifications, setIsUpdateModalOpen } = useApp();
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -19,7 +19,7 @@ export const NotificationsView: React.FC = () => {
             {unreadCount > 0 && <span className="badge badge-emerald">{unreadCount} UNREAD</span>}
           </div>
           <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
-            System messages, budget threshold warnings, and recurring bill payment reminders.
+            System messages, app updates, budget threshold warnings, and recurring bill payment reminders.
           </span>
         </div>
 
@@ -35,7 +35,7 @@ export const NotificationsView: React.FC = () => {
         <EmptyState
           icon={<Bell size={24} />}
           title="You're All Caught Up"
-          description="There are no active notifications or warnings right now. Alerts for budget limits and bill payments will appear here."
+          description="There are no active notifications or warnings right now. Alerts for budget limits, updates, and bill payments will appear here."
         />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -43,6 +43,7 @@ export const NotificationsView: React.FC = () => {
             let icon = <Info size={18} color="var(--accent-blue)" />;
             if (n.type === 'BUDGET_ALERT') icon = <AlertTriangle size={18} color="var(--status-danger)" />;
             if (n.type === 'RECURRING_REMINDER') icon = <Calendar size={18} color="var(--status-warning)" />;
+            if (n.type === 'APP_UPDATE') icon = <Sparkles size={18} color="var(--accent-cyan)" />;
 
             return (
               <GlassCard
@@ -84,15 +85,30 @@ export const NotificationsView: React.FC = () => {
                   </div>
                 </div>
 
-                {!n.isRead && (
-                  <button
-                    onClick={() => markNotificationRead(n.id)}
-                    className="btn btn-secondary"
-                    style={{ padding: '6px 12px', fontSize: '0.78rem' }}
-                  >
-                    <Check size={14} /> Mark Read
-                  </button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  {n.type === 'APP_UPDATE' && (
+                    <button
+                      onClick={() => {
+                        markNotificationRead(n.id);
+                        setIsUpdateModalOpen(true);
+                      }}
+                      className="btn btn-primary"
+                      style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                    >
+                      View Update
+                    </button>
+                  )}
+
+                  {!n.isRead && (
+                    <button
+                      onClick={() => markNotificationRead(n.id)}
+                      className="btn btn-secondary"
+                      style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                    >
+                      <Check size={14} /> Mark Read
+                    </button>
+                  )}
+                </div>
               </GlassCard>
             );
           })}

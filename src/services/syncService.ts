@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { Account, Transaction, Budget, RecurringPayment, NotificationItem, AppSettings, BackupData } from '../types/finance';
+import { IndexedDBService } from '../db/indexedDB';
 
 export interface UserCloudData {
   accounts: Account[];
@@ -123,7 +124,78 @@ export class SyncService {
     }
   }
 
-  // 2. Upload Local Data to Supabase (Migration Helper)
+  // 2. Flush Pending Sync Queue to Supabase Cloud
+  public static async flushPendingOperations(
+    userId: string
+  ): Promise<{ success: boolean; processedCount: number; errors: string[] }> {
+    const ops = await IndexedDBService.getPendingOperations(userId);
+    if (ops.length === 0) {
+      return { success: true, processedCount: 0, errors: [] };
+    }
+
+    console.log(`[Spendly Sync Engine] Flushing ${ops.length} pending operations for user ${userId}...`);
+    let processedCount = 0;
+    const errors: string[] = [];
+
+    for (const op of ops) {
+      try {
+        let opSuccess = false;
+
+        if (op.operation === 'upsert') {
+          if (op.entity === 'transactions' && op.payload) {
+            opSuccess = await this.upsertTransaction(op.payload, userId);
+          } else if (op.entity === 'accounts' && op.payload) {
+            opSuccess = await this.upsertAccount(op.payload, userId);
+          } else if (op.entity === 'budgets' && op.payload) {
+            opSuccess = await this.upsertBudget(op.payload, userId);
+          } else if (op.entity === 'recurring_payments' && op.payload) {
+            opSuccess = await this.upsertRecurring(op.payload, userId);
+          } else if (op.entity === 'notifications' && op.payload) {
+            opSuccess = await this.upsertNotification(op.payload, userId);
+          } else if (op.entity === 'user_settings' && op.payload) {
+            opSuccess = await this.upsertSettings(op.payload, userId);
+          }
+        } else if (op.operation === 'delete') {
+          if (op.entity === 'transactions') {
+            opSuccess = await this.deleteTransaction(op.entity_id, userId);
+          } else if (op.entity === 'accounts') {
+            opSuccess = await this.deleteAccount(op.entity_id, userId);
+          } else if (op.entity === 'budgets') {
+            opSuccess = await this.deleteBudget(op.entity_id, userId);
+          } else if (op.entity === 'recurring_payments') {
+            opSuccess = await this.deleteRecurring(op.entity_id, userId);
+          }
+        }
+
+        if (opSuccess) {
+          await IndexedDBService.removePendingOperation(op.id);
+          processedCount++;
+        } else {
+          op.retry_count = (op.retry_count || 0) + 1;
+          op.status = 'failed';
+          op.error = 'Cloud sync operation failed';
+          await IndexedDBService.updatePendingOperation(op);
+          errors.push(`Failed operation ${op.operation} on ${op.entity}:${op.entity_id}`);
+          break; // Preserve exact operational sequence
+        }
+      } catch (err: any) {
+        op.retry_count = (op.retry_count || 0) + 1;
+        op.status = 'failed';
+        op.error = err?.message || String(err);
+        await IndexedDBService.updatePendingOperation(op);
+        errors.push(`Exception in ${op.operation} on ${op.entity}:${op.entity_id}: ${err.message}`);
+        break;
+      }
+    }
+
+    return {
+      success: errors.length === 0,
+      processedCount,
+      errors,
+    };
+  }
+
+  // 3. Upload Local Data to Supabase (Migration Helper)
   public static async uploadLocalDataToCloud(data: BackupData, userId: string): Promise<boolean> {
     try {
       if (data.accounts.length > 0) {
@@ -172,7 +244,7 @@ export class SyncService {
         const rRows = data.recurringPayments.map((r) => this.mapRecurringToDb(r, userId));
         let { error } = await supabase.from('recurring_payments').upsert(rRows);
         if (error && (error.code === 'PGRST204' || error.message?.includes('due_time'))) {
-          // Safe fallback for legacy Supabase schema cache before migration script execution
+          // Safe fallback for legacy Supabase schema cache
           const fallbackRows = rRows.map(({ due_time, ...rest }: any) => rest);
           const fallbackRes = await supabase.from('recurring_payments').upsert(fallbackRows);
           error = fallbackRes.error;
@@ -222,19 +294,16 @@ export class SyncService {
     }
   }
 
-  // Diagnostic Test Method for Single Entity & Auth
+  // Diagnostic Test Method
   public static async runSyncDiagnostic(_userId?: string): Promise<{ success: boolean; message: string; details?: any }> {
     console.group('SPENDLY SYNC DIAGNOSTIC');
     try {
-      // Step A: Auth user
       const { data: { user }, error: authErr } = await supabase.auth.getUser();
-      console.log('A. Auth user ID:', user?.id, 'Error:', authErr);
       if (authErr || !user) {
         console.groupEnd();
         return { success: false, message: `Auth error: ${authErr?.message || 'No active user session'}` };
       }
 
-      // Step B: Insert single test account into public.accounts
       const testId = `acc_diag_${Date.now()}`;
       const testRow = {
         id: testId,
@@ -248,50 +317,30 @@ export class SyncService {
         updated_at: new Date().toISOString(),
       };
 
-      console.log('B. Inserting test account:', testRow);
-      const { data: insData, error: insErr } = await supabase.from('accounts').insert(testRow).select();
-      console.log('ACCOUNT INSERT RESULT:', insData);
+      const { error: insErr } = await supabase.from('accounts').insert(testRow).select();
       if (insErr) {
-        console.error('ACCOUNT INSERT ERROR:', {
-          message: insErr.message,
-          details: insErr.details,
-          hint: insErr.hint,
-          code: insErr.code,
-        });
         console.groupEnd();
         return { success: false, message: `Accounts INSERT failed: ${insErr.message} (Code: ${insErr.code})`, details: insErr };
       }
 
-      // Step C: Select test account immediately
-      console.log('C. Querying accounts for user:', user.id);
       const { data: selData, error: selErr } = await supabase.from('accounts').select('*').eq('user_id', user.id);
-      console.log('ACCOUNT SELECT RESULT:', selData);
       if (selErr) {
-        console.error('ACCOUNT SELECT ERROR:', {
-          message: selErr.message,
-          details: selErr.details,
-          hint: selErr.hint,
-          code: selErr.code,
-        });
         console.groupEnd();
         return { success: false, message: `Accounts SELECT failed: ${selErr.message} (Code: ${selErr.code})`, details: selErr };
       }
 
-      // Step D: Clean up test account
       await supabase.from('accounts').delete().eq('id', testId).eq('user_id', user.id);
-      console.log('D. Cleaned up diagnostic test account.');
       console.groupEnd();
 
       const foundCount = selData ? selData.length : 0;
       return { success: true, message: `Accounts INSERT & SELECT passed! Total cloud accounts: ${foundCount}` };
     } catch (err: any) {
-      console.error('SPENDLY SYNC DIAGNOSTIC EXCEPTION:', err);
       console.groupEnd();
       return { success: false, message: `Diagnostic exception: ${err.message || String(err)}` };
     }
   }
 
-  // 3. Account Cloud Operations
+  // 4. Account Cloud Operations
   public static async upsertAccount(account: Account, userId: string): Promise<boolean> {
     try {
       const row = this.mapAccountToDb(account, userId);
@@ -321,7 +370,7 @@ export class SyncService {
     }
   }
 
-  // 4. Transaction Cloud Operations
+  // 5. Transaction Cloud Operations
   public static async upsertTransaction(tx: Transaction, userId: string): Promise<boolean> {
     try {
       const row = this.mapTransactionToDb(tx, userId);
@@ -351,7 +400,7 @@ export class SyncService {
     }
   }
 
-  // 5. Budget Cloud Operations
+  // 6. Budget Cloud Operations
   public static async upsertBudget(budget: Budget, userId: string): Promise<boolean> {
     try {
       const row = this.mapBudgetToDb(budget, userId);
@@ -381,7 +430,7 @@ export class SyncService {
     }
   }
 
-  // 6. Recurring Payment Cloud Operations
+  // 7. Recurring Payment Cloud Operations
   public static async upsertRecurring(recurring: RecurringPayment, userId: string): Promise<boolean> {
     try {
       const row = this.mapRecurringToDb(recurring, userId);
@@ -415,7 +464,7 @@ export class SyncService {
     }
   }
 
-  // 7. Notification Cloud Operations
+  // 8. Notification Cloud Operations
   public static async upsertNotification(notification: NotificationItem, userId: string): Promise<boolean> {
     try {
       const row = this.mapNotificationToDb(notification, userId);
@@ -445,7 +494,7 @@ export class SyncService {
     }
   }
 
-  // 8. User Settings & Profile Cloud Operations
+  // 9. User Settings & Profile Cloud Operations
   public static async upsertSettings(settings: AppSettings, userId: string): Promise<boolean> {
     try {
       const row = this.mapSettingsToDb(settings, userId);
@@ -463,7 +512,6 @@ export class SyncService {
 
   public static async updateUserProfile(userId: string, email: string, fullName: string): Promise<boolean> {
     try {
-      // 1. Upsert into public.profiles table
       const { error: dbError } = await supabase.from('profiles').upsert(
         {
           id: userId,
@@ -478,7 +526,6 @@ export class SyncService {
         console.error('Profile update failed:', dbError);
       }
 
-      // 2. Update Supabase Auth User Metadata for consistency across sessions
       const { error: authError } = await supabase.auth.updateUser({
         data: { full_name: fullName },
       });
@@ -509,7 +556,7 @@ export class SyncService {
     }
   }
 
-  // 17. Delete All User Cloud Data (Reset Cloud Account Data)
+  // 10. Delete All User Cloud Data
   public static async deleteAllUserData(userId: string): Promise<{ success: boolean; error?: string }> {
     try {
       const [txRes, accRes, bRes, rRes, nRes] = await Promise.all([
@@ -531,7 +578,7 @@ export class SyncService {
     }
   }
 
-  // Data Mappers (DB row <-> App domain model)
+  // Data Mappers
   public static mapAccountFromDb(row: any): Account {
     return {
       id: row.id,

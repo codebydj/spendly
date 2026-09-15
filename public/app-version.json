@@ -1,0 +1,13 @@
+{
+  "version": "3.1.1",
+  "releaseDate": "2026-09-15",
+  "title": "Spendly V3.1.1",
+  "message": "Spendly V3.1.1 is now available with localhost performance optimizations, instant offline hydration, and stability improvements.",
+  "downloadUrl": "https://github.com/codebydj/spendly/releases/download/v3.1.1/spendly-v3.1.1.apk",
+  "releaseNotes": [
+    "Fixed localhost performance lag with instant parallel IndexedDB hydration",
+    "Added in-memory version check throttling to prevent redundant network fetches",
+    "Critical offline-first data loss fix with transactional queueing",
+    "Updated app version to V3.1.1"
+  ]
+}

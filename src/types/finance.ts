@@ -70,11 +70,12 @@ export interface RecurringPayment {
 
 export interface NotificationItem {
   id: string;
-  type: 'BUDGET_ALERT' | 'RECURRING_REMINDER' | 'DAILY_REMINDER' | 'SUMMARY';
+  type: 'BUDGET_ALERT' | 'RECURRING_REMINDER' | 'DAILY_REMINDER' | 'SUMMARY' | 'APP_UPDATE';
   title: string;
   message: string;
   date: string;
   isRead: boolean;
+  versionManifest?: AppVersionManifest;
 }
 
 export interface AppSettings {
@@ -84,6 +85,7 @@ export interface AppSettings {
   currency: string;
   lastSyncedAt: string;
   demoModeLoaded?: boolean;
+  notifyAppUpdates?: boolean;
 }
 
 export interface BackupData {
@@ -96,4 +98,27 @@ export interface BackupData {
   categories: Category[];
   notifications: NotificationItem[];
   settings: AppSettings;
+}
+
+export interface PendingSyncOperation {
+  id: string;
+  user_id: string;
+  entity: 'transactions' | 'accounts' | 'budgets' | 'recurring_payments' | 'notifications' | 'categories' | 'user_settings';
+  entity_id: string;
+  operation: 'upsert' | 'delete';
+  payload?: any;
+  created_at: string;
+  retry_count: number;
+  status: 'pending' | 'syncing' | 'failed';
+  error?: string;
+}
+
+export interface AppVersionManifest {
+  version: string;
+  releaseDate: string;
+  title: string;
+  message: string;
+  downloadUrl?: string;
+  releaseNotesUrl?: string;
+  releaseNotes?: string[];
 }

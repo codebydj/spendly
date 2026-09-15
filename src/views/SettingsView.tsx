@@ -57,7 +57,7 @@ const GithubIcon: React.FC<{ size?: number; color?: string }> = ({ size = 16, co
 import { ChangePasswordModal } from '../components/forms/ChangePasswordModal';
 import { Modal } from '../components/ui/Modal';
 
-const ANDROID_APK_DOWNLOAD_URL = 'https://drive.google.com/file/d/1XIdxDHrV5iszCA9Bjol87lK25WRouX0H/view?usp=sharing';
+const ANDROID_APK_DOWNLOAD_URL = 'https://drive.google.com/file/d/1jQ7Zi4f5UEzi8lWWtMt10InJdPpitTu9/view?usp=sharing';
 
 export const SettingsView: React.FC = () => {
   const {
@@ -72,6 +72,8 @@ export const SettingsView: React.FC = () => {
     reorderCategories,
     deleteCategory,
     toggleHideBalances,
+    toggleNotifyAppUpdates,
+    checkAppUpdates,
     setPinCode,
     importBackupData,
     resetLocalData,
@@ -630,6 +632,21 @@ export const SettingsView: React.FC = () => {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '14px' }}>
                 <div>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>App Update Notifications</span>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>Notify me when a new Spendly app version is available.</p>
+                </div>
+                <button
+                  onClick={toggleNotifyAppUpdates}
+                  className="btn btn-secondary"
+                  style={{ padding: '6px 14px', minHeight: '36px', fontSize: '0.82rem' }}
+                >
+                  {settings.notifyAppUpdates ?? true ? <CheckCircle2 size={15} color="var(--accent-cyan)" /> : <Bell size={15} />}
+                  <span>{settings.notifyAppUpdates ?? true ? 'ON' : 'OFF'}</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '14px' }}>
+                <div>
                   <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Budget & Bill Alerts</span>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>Intelligent warnings at 75%, 90%, 100% and bill due alerts.</p>
                 </div>
@@ -809,7 +826,7 @@ export const SettingsView: React.FC = () => {
               <div>
                 <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Spendly for Android</h4>
                 <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Latest Version: <strong style={{ color: 'var(--accent-cyan)' }}>V3.0.8</strong> • Build Date: <strong style={{ color: 'var(--text-primary)' }}>14 September 2026</strong>
+                  Latest Version: <strong style={{ color: 'var(--accent-cyan)' }}>V3.1.1</strong> • Build Date: <strong style={{ color: 'var(--text-primary)' }}>15 September 2026</strong>
                 </p>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                   <span>✓ Direct APK download</span>
@@ -820,9 +837,7 @@ export const SettingsView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-
                   window.open(ANDROID_APK_DOWNLOAD_URL, '_blank');
-
                 }}
                 className="btn btn-primary"
                 style={{ padding: '10px 20px', minHeight: '42px', fontSize: '0.86rem' }}
@@ -851,12 +866,12 @@ export const SettingsView: React.FC = () => {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Version</span>
-                <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>V3.0.8</span>
+                <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>V3.1.1</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Build Date</span>
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>14 September 2026</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>15 September 2026</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
@@ -867,6 +882,21 @@ export const SettingsView: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Package ID</span>
                 <span style={{ fontWeight: 500, fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)' }}>com.spendly.finance</span>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    showToast('Checking for application updates...', 'info');
+                    await checkAppUpdates();
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                >
+                  <Sparkles size={14} color="var(--accent-cyan)" />
+                  <span>Check for Updates</span>
+                </button>
               </div>
             </div>
           </div>
@@ -897,19 +927,48 @@ export const SettingsView: React.FC = () => {
 
             {isVersionHistoryOpen && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', maxHeight: '460px', overflowY: 'auto', paddingRight: '4px' }}>
-                {/* V3.0.8 - CURRENT */}
+                {/* V3.1.1 - CURRENT */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: 'rgba(34, 211, 238, 0.08)', padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-cyan-border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-cyan)' }}>V3.0.8</span>
+                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-cyan)' }}>V3.1.1</span>
                       <span style={{ fontSize: '0.66rem', fontWeight: 800, backgroundColor: 'var(--accent-cyan)', color: '#000000', padding: '1px 6px', borderRadius: '4px', letterSpacing: '0.04em' }}>
                         CURRENT
                       </span>
                     </div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>14 September 2026</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>15 September 2026</span>
                   </div>
-                  <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>Final V3 Update</h4>
+                  <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>Performance & Instant Hydration Release</h4>
                   <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <li>Fixed localhost performance lag with instant parallel IndexedDB hydration</li>
+                    <li>Added in-memory version check throttling to prevent redundant network calls</li>
+                    <li>Critical offline-first data loss fix with transactional queueing</li>
+                    <li>Updated application version to V3.1.1</li>
+                  </ul>
+                </div>
+
+                {/* V3.1.0 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.1.0</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>15 September 2026</span>
+                  </div>
+                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>New Update & Data Reliability Release</h4>
+                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <li>Added notifications when a new Spendly app version is available</li>
+                    <li>Improved offline data reliability and synchronization</li>
+                    <li>Improved application stability and update handling</li>
+                  </ul>
+                </div>
+
+                {/* V3.0.8 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.0.8</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>14 September 2026</span>
+                  </div>
+                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Final V3 Update</h4>
+                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                     <li>Added a proper Pick on Map option when editing transaction locations</li>
                     <li>Improved map location search, pin selection and location editing</li>
                     <li>Improved the Maps tab and removed unnecessary place counters</li>

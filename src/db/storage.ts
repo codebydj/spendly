@@ -1,4 +1,5 @@
 import type { Account, Category, Transaction, Budget, RecurringPayment, NotificationItem, AppSettings, BackupData } from '../types/finance';
+import { IndexedDBService, STORES } from './indexedDB';
 import {
   INITIAL_CATEGORIES,
   PRODUCTION_ACCOUNTS,
@@ -30,6 +31,7 @@ export class StorageEngine {
     return prefix + baseKey;
   }
 
+  // --- ACCOUNTS ---
   public static loadAccounts(userId?: string): Account[] {
     const key = this.getKey(BASE_KEYS.ACCOUNTS, userId);
     const raw = localStorage.getItem(key);
@@ -48,8 +50,12 @@ export class StorageEngine {
   public static saveAccounts(accounts: Account[], userId?: string): void {
     const key = this.getKey(BASE_KEYS.ACCOUNTS, userId);
     localStorage.setItem(key, JSON.stringify(accounts));
+    if (userId) {
+      IndexedDBService.saveStoreItems(STORES.ACCOUNTS, accounts, userId);
+    }
   }
 
+  // --- CATEGORIES ---
   public static loadCategories(userId?: string): Category[] {
     const key = this.getKey(BASE_KEYS.CATEGORIES, userId);
     const raw = localStorage.getItem(key);
@@ -67,8 +73,12 @@ export class StorageEngine {
   public static saveCategories(categories: Category[], userId?: string): void {
     const key = this.getKey(BASE_KEYS.CATEGORIES, userId);
     localStorage.setItem(key, JSON.stringify(categories));
+    if (userId) {
+      IndexedDBService.saveStoreItems(STORES.CATEGORIES, categories, userId);
+    }
   }
 
+  // --- TRANSACTIONS ---
   public static loadTransactions(userId?: string): Transaction[] {
     const key = this.getKey(BASE_KEYS.TRANSACTIONS, userId);
     const raw = localStorage.getItem(key);
@@ -87,8 +97,12 @@ export class StorageEngine {
   public static saveTransactions(transactions: Transaction[], userId?: string): void {
     const key = this.getKey(BASE_KEYS.TRANSACTIONS, userId);
     localStorage.setItem(key, JSON.stringify(transactions));
+    if (userId) {
+      IndexedDBService.saveStoreItems(STORES.TRANSACTIONS, transactions, userId);
+    }
   }
 
+  // --- BUDGETS ---
   public static loadBudgets(userId?: string): Budget[] {
     const key = this.getKey(BASE_KEYS.BUDGETS, userId);
     const raw = localStorage.getItem(key);
@@ -107,8 +121,12 @@ export class StorageEngine {
   public static saveBudgets(budgets: Budget[], userId?: string): void {
     const key = this.getKey(BASE_KEYS.BUDGETS, userId);
     localStorage.setItem(key, JSON.stringify(budgets));
+    if (userId) {
+      IndexedDBService.saveStoreItems(STORES.BUDGETS, budgets, userId);
+    }
   }
 
+  // --- RECURRING PAYMENTS ---
   public static loadRecurring(userId?: string): RecurringPayment[] {
     const key = this.getKey(BASE_KEYS.RECURRING, userId);
     const raw = localStorage.getItem(key);
@@ -127,8 +145,12 @@ export class StorageEngine {
   public static saveRecurring(recurring: RecurringPayment[], userId?: string): void {
     const key = this.getKey(BASE_KEYS.RECURRING, userId);
     localStorage.setItem(key, JSON.stringify(recurring));
+    if (userId) {
+      IndexedDBService.saveStoreItems(STORES.RECURRING, recurring, userId);
+    }
   }
 
+  // --- NOTIFICATIONS ---
   public static loadNotifications(userId?: string): NotificationItem[] {
     const key = this.getKey(BASE_KEYS.NOTIFICATIONS, userId);
     const raw = localStorage.getItem(key);
@@ -147,8 +169,12 @@ export class StorageEngine {
   public static saveNotifications(notifications: NotificationItem[], userId?: string): void {
     const key = this.getKey(BASE_KEYS.NOTIFICATIONS, userId);
     localStorage.setItem(key, JSON.stringify(notifications));
+    if (userId) {
+      IndexedDBService.saveStoreItems(STORES.NOTIFICATIONS, notifications, userId);
+    }
   }
 
+  // --- SETTINGS ---
   public static loadSettings(userId?: string): AppSettings {
     const key = this.getKey(BASE_KEYS.SETTINGS, userId);
     const raw = localStorage.getItem(key);
@@ -166,8 +192,12 @@ export class StorageEngine {
   public static saveSettings(settings: AppSettings, userId?: string): void {
     const key = this.getKey(BASE_KEYS.SETTINGS, userId);
     localStorage.setItem(key, JSON.stringify(settings));
+    if (userId) {
+      IndexedDBService.saveSettings(settings, userId);
+    }
   }
 
+  // --- DEMO DATA ---
   public static loadDemoData(userId?: string): void {
     this.saveAccounts(DEMO_ACCOUNTS, userId);
     this.saveTransactions(DEMO_TRANSACTIONS, userId);
@@ -178,9 +208,10 @@ export class StorageEngine {
     this.saveSettings({ ...settings, demoModeLoaded: true }, userId);
   }
 
+  // --- BACKUP IMPORT / EXPORT ---
   public static exportFullBackup(userId?: string): BackupData {
     return {
-      version: '2.0.0',
+      version: '3.1.1',
       exportedAt: new Date().toISOString(),
       accounts: this.loadAccounts(userId),
       categories: this.loadCategories(userId),
@@ -206,13 +237,26 @@ export class StorageEngine {
     return true;
   }
 
+  // --- RESET LOCAL DATA ---
   public static resetToEmptyProduction(userId?: string): void {
-    this.saveAccounts([], userId);
-    this.saveCategories(INITIAL_CATEGORIES, userId);
-    this.saveTransactions([], userId);
-    this.saveBudgets([], userId);
-    this.saveRecurring([], userId);
-    this.saveNotifications([], userId);
-    this.saveSettings(INITIAL_SETTINGS, userId);
+    const keyAcc = this.getKey(BASE_KEYS.ACCOUNTS, userId);
+    const keyCat = this.getKey(BASE_KEYS.CATEGORIES, userId);
+    const keyTx = this.getKey(BASE_KEYS.TRANSACTIONS, userId);
+    const keyB = this.getKey(BASE_KEYS.BUDGETS, userId);
+    const keyRec = this.getKey(BASE_KEYS.RECURRING, userId);
+    const keyNotif = this.getKey(BASE_KEYS.NOTIFICATIONS, userId);
+    const keySet = this.getKey(BASE_KEYS.SETTINGS, userId);
+
+    localStorage.removeItem(keyAcc);
+    localStorage.removeItem(keyCat);
+    localStorage.removeItem(keyTx);
+    localStorage.removeItem(keyB);
+    localStorage.removeItem(keyRec);
+    localStorage.removeItem(keyNotif);
+    localStorage.removeItem(keySet);
+
+    if (userId) {
+      IndexedDBService.clearUserData(userId);
+    }
   }
 }

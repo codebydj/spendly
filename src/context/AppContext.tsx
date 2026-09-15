@@ -1,12 +1,21 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
-import type { Account, Transaction, Budget, RecurringPayment, NotificationItem, AppSettings, Category, BackupData } from '../types/finance';
+import type { Account, Transaction, Budget, RecurringPayment, NotificationItem, AppSettings, Category, BackupData, AppVersionManifest } from '../types/finance';
 import { StorageEngine } from '../db/storage';
+import { IndexedDBService, STORES } from '../db/indexedDB';
+import { INITIAL_SETTINGS } from '../db/initialData';
 import { supabase } from '../services/supabase';
 import { SyncService } from '../services/syncService';
 import { soundService } from '../services/soundService';
 import { hashPin, verifyPin } from '../utils/crypto';
-import { scheduleReminderNotification, cancelReminderNotification } from '../services/nativeNotifications';
+import { scheduleReminderNotification, cancelReminderNotification, scheduleUpdateNotification } from '../services/nativeNotifications';
+import {
+  fetchLatestAppVersion,
+  shouldShowUpdateNotification,
+  markVersionNotified,
+  postponeUpdateNotification,
+  CURRENT_APP_VERSION,
+} from '../utils/versionCheck';
 import {
   calculateAccountBalance,
   calculateNetWorth,
@@ -35,6 +44,8 @@ interface ToastMessage {
   id: string;
   type: 'success' | 'info' | 'warning' | 'danger';
   message: string;
+  actionText?: string;
+  onAction?: () => void;
 }
 
 interface AppContextType {
@@ -49,6 +60,7 @@ interface AppContextType {
   userProfile: { fullName?: string; email?: string } | null;
   authLoading: boolean;
   syncStatus: SyncStatus;
+  pendingOpsCount: number;
   lastSyncError: string | null;
   lastSyncTime: string | null;
   runSyncDiagnostic: () => Promise<{ success: boolean; message: string; details?: any }>;
@@ -57,6 +69,13 @@ interface AppContextType {
   logout: () => Promise<void>;
   triggerCloudSync: () => Promise<void>;
   triggerManualSync: () => Promise<boolean>;
+
+  // App Update Notification
+  latestManifest: AppVersionManifest | null;
+  isUpdateModalOpen: boolean;
+  setIsUpdateModalOpen: (open: boolean) => void;
+  checkAppUpdates: () => Promise<void>;
+  postponeUpdate: () => void;
 
   // Data
   accounts: Account[];
@@ -105,6 +124,7 @@ interface AppContextType {
 
   // Settings & Profile Actions
   toggleHideBalances: () => void;
+  toggleNotifyAppUpdates: () => void;
   setPinCode: (pin: string) => Promise<void>;
   validatePin: (pin: string) => Promise<boolean>;
   updateProfileName: (fullName: string) => Promise<boolean>;
@@ -116,7 +136,12 @@ interface AppContextType {
 
   // Toasts
   toasts: ToastMessage[];
-  showToast: (message: string, type?: 'success' | 'info' | 'warning' | 'danger') => void;
+  showToast: (
+    message: string,
+    type?: 'success' | 'info' | 'warning' | 'danger',
+    actionText?: string,
+    onAction?: () => void
+  ) => void;
   removeToast: (id: string) => void;
 
   // Derived Calculations
@@ -138,10 +163,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [userProfile, setUserProfile] = useState<{ fullName?: string; email?: string } | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [pendingOpsCount, setPendingOpsCount] = useState<number>(0);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(navigator.onLine ? 'SYNCED' : 'OFFLINE');
   const [lastSyncError, setLastSyncError] = useState<string | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabledState] = useState<boolean>(soundService.getSoundEnabled());
+
+  // App Update Modal State
+  const [latestManifest, setLatestManifest] = useState<AppVersionManifest | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
 
   const toggleSoundEnabled = () => {
     const next = !soundEnabled;
@@ -157,7 +187,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [recurringPayments, setRecurringPayments] = useState<RecurringPayment[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [settings, setSettings] = useState<AppSettings>(StorageEngine.loadSettings());
+  const [settings, setSettings] = useState<AppSettings>({
+    ...StorageEngine.loadSettings(),
+    notifyAppUpdates: true,
+  });
+
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   // Security & App UI
   const [isPinLocked, setIsPinLocked] = useState<boolean>(false);
@@ -168,13 +206,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [searchQuery, setSearchQuery] = useState('');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  const showToast = useCallback((message: string, type: 'success' | 'info' | 'warning' | 'danger' = 'success') => {
-    const id = Date.now().toString() + Math.random().toString().slice(2, 6);
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
-  }, []);
+  const showToast = useCallback(
+    (
+      message: string,
+      type: 'success' | 'info' | 'warning' | 'danger' = 'success',
+      actionText?: string,
+      onAction?: () => void
+    ) => {
+      const id = Date.now().toString() + Math.random().toString().slice(2, 6);
+      setToasts((prev) => [...prev, { id, message, type, actionText, onAction }]);
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 5000);
+    },
+    []
+  );
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -189,53 +235,191 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }));
   }, []);
 
-  // Hydrate User Data from Supabase Cloud on Login / App Startup
+  // Refresh Pending Operations Count
+  const refreshPendingOpsCount = useCallback(async (userId: string) => {
+    if (!userId) return 0;
+    const ops = await IndexedDBService.getPendingOperations(userId);
+    setPendingOpsCount(ops.length);
+    return ops.length;
+  }, []);
+
+  // Check App Updates
+  const checkAppUpdates = useCallback(async () => {
+    if (settingsRef.current.notifyAppUpdates === false) return;
+
+    const manifest = await fetchLatestAppVersion();
+    if (!manifest) return;
+
+    if (shouldShowUpdateNotification(manifest.version)) {
+      setLatestManifest(manifest);
+      scheduleUpdateNotification(manifest);
+
+      // Add to Notification Center if not already present
+      setNotifications((prev) => {
+        const exists = prev.some((n) => n.type === 'APP_UPDATE' && n.title.includes(manifest.version));
+        if (exists) return prev;
+
+        const updateNotif: NotificationItem = {
+          id: `notif-update-${manifest.version}`,
+          type: 'APP_UPDATE',
+          title: manifest.title || `Spendly V${manifest.version} Available`,
+          message: manifest.message || 'New improvements and features are now available.',
+          date: new Date().toISOString(),
+          isRead: false,
+          versionManifest: manifest,
+        };
+        return [updateNotif, ...prev];
+      });
+
+      showToast(`Spendly V${manifest.version} is now available`, 'info', 'View Update', () => {
+        setIsUpdateModalOpen(true);
+      });
+
+      markVersionNotified(manifest.version);
+    }
+  }, [showToast]);
+
+  const postponeUpdate = () => {
+    postponeUpdateNotification(7);
+    setIsUpdateModalOpen(false);
+    showToast('Update reminder postponed for 7 days', 'info');
+  };
+
+  // Hydrate User Data from IndexedDB & Supabase Cloud
+  const isHydratingRef = useRef<boolean>(false);
+
   const loadUserData = useCallback(
     async (userId: string) => {
+      isHydratingRef.current = true;
       setSyncStatus('SYNCING');
 
-      // 1. Immediately hydrate local storage cache for userId if present
-      const cachedAccs = StorageEngine.loadAccounts(userId);
-      const cachedTxs = StorageEngine.loadTransactions(userId);
-      const cachedBudgets = StorageEngine.loadBudgets(userId);
-      const cachedRec = StorageEngine.loadRecurring(userId);
-      const cachedNotifs = StorageEngine.loadNotifications(userId);
-      const cachedSettings = StorageEngine.loadSettings(userId);
-      const localCats = StorageEngine.loadCategories(userId);
-
-      if (cachedAccs.length > 0 || cachedTxs.length > 0) {
-        const recalculated = updateAccountBalances(cachedAccs, cachedTxs);
-        setAccounts(recalculated);
-        setTransactions(cachedTxs);
-        setBudgets(cachedBudgets);
-        setRecurringPayments(cachedRec);
-        setNotifications(cachedNotifs);
-        setSettings(cachedSettings);
-        setCategories(localCats);
-      }
-
-      // 2. Fetch Cloud Records from Supabase (Cloud Source of Truth)
       try {
+        // STEP 1: Load Local IndexedDB Data IN PARALLEL FIRST
+        let [idbAccs, idbTxs, idbBudgets, idbRec, idbNotifs, idbSettings, idbCats] = await Promise.all([
+          IndexedDBService.getStoreItems<Account>(STORES.ACCOUNTS, userId),
+          IndexedDBService.getStoreItems<Transaction>(STORES.TRANSACTIONS, userId),
+          IndexedDBService.getStoreItems<Budget>(STORES.BUDGETS, userId),
+          IndexedDBService.getStoreItems<RecurringPayment>(STORES.RECURRING, userId),
+          IndexedDBService.getStoreItems<NotificationItem>(STORES.NOTIFICATIONS, userId),
+          IndexedDBService.loadSettings(userId),
+          IndexedDBService.getStoreItems<Category>(STORES.CATEGORIES, userId),
+        ]);
+
+        // Migration Fallback: If IndexedDB is empty for userId, load from StorageEngine (localStorage)
+        if (idbAccs.length === 0 && idbTxs.length === 0) {
+          const lsAccs = StorageEngine.loadAccounts(userId);
+          const lsTxs = StorageEngine.loadTransactions(userId);
+          const lsBudgets = StorageEngine.loadBudgets(userId);
+          const lsRec = StorageEngine.loadRecurring(userId);
+          const lsNotifs = StorageEngine.loadNotifications(userId);
+          const lsSettings = StorageEngine.loadSettings(userId);
+          const lsCats = StorageEngine.loadCategories(userId);
+
+          if (lsAccs.length > 0 || lsTxs.length > 0) {
+            idbAccs = lsAccs;
+            idbTxs = lsTxs;
+            idbBudgets = lsBudgets;
+            idbRec = lsRec;
+            idbNotifs = lsNotifs;
+            idbSettings = lsSettings;
+            idbCats = lsCats;
+
+            // Migrate to IndexedDB in parallel
+            await Promise.all([
+              IndexedDBService.saveStoreItems(STORES.ACCOUNTS, lsAccs, userId),
+              IndexedDBService.saveStoreItems(STORES.TRANSACTIONS, lsTxs, userId),
+              IndexedDBService.saveStoreItems(STORES.BUDGETS, lsBudgets, userId),
+              IndexedDBService.saveStoreItems(STORES.RECURRING, lsRec, userId),
+              IndexedDBService.saveStoreItems(STORES.NOTIFICATIONS, lsNotifs, userId),
+              IndexedDBService.saveStoreItems(STORES.CATEGORIES, lsCats, userId),
+              lsSettings ? IndexedDBService.saveSettings(lsSettings, userId) : Promise.resolve(),
+            ]);
+          }
+        }
+
+        // STEP 2: Load Pending Operations FIRST
+        const currentPendingOps = await IndexedDBService.getPendingOperations(userId);
+        const pendingCount = currentPendingOps.length;
+        setPendingOpsCount(pendingCount);
+
+        // STEP 3: Display Local IndexedDB Data Immediately & UNBLOCK UI INSTANTLY
+        const recalculated = updateAccountBalances(idbAccs, idbTxs);
+        setAccounts(recalculated);
+        setTransactions(idbTxs);
+        setBudgets(idbBudgets);
+        setRecurringPayments(idbRec);
+        setNotifications(idbNotifs);
+        setCategories(idbCats.length > 0 ? idbCats : StorageEngine.loadCategories(userId));
+
+        if (idbSettings) {
+          setSettings(idbSettings);
+          setIsPinLocked(idbSettings.pinEnabled);
+        }
+
+        // UNBLOCK APP RENDERING IMMEDIATELY
+        setAuthLoading(false);
+
+        // STEP 4: Determine Online Status
+        if (!navigator.onLine) {
+          setSyncStatus(pendingCount > 0 ? 'LOCAL_CHANGES' : 'OFFLINE');
+          return;
+        }
+
+        // STEP 5: IF ONLINE -> Flush Pending Queue First & Fetch Cloud Data IN BACKGROUND
+        if (pendingCount > 0) {
+          await SyncService.flushPendingOperations(userId);
+          await refreshPendingOpsCount(userId);
+        }
+
+        // STEP 6: Fetch Cloud Changes
         const cloudData = await SyncService.fetchUserData(userId);
 
         if (cloudData.hasCloudData) {
-          // Cloud records exist! Hydrate state & local cache from Supabase
-          const recalculatedAccounts = updateAccountBalances(cloudData.accounts, cloudData.transactions);
+          // STEP 7: Merge Cloud Data with Local Data (Preserving unsynced pending items)
+          const remainingPending = await IndexedDBService.getPendingOperations(userId);
 
-          // Update local storage cache
-          StorageEngine.saveAccounts(recalculatedAccounts, userId);
-          StorageEngine.saveTransactions(cloudData.transactions, userId);
-          StorageEngine.saveBudgets(cloudData.budgets, userId);
-          StorageEngine.saveRecurring(cloudData.recurringPayments, userId);
-          StorageEngine.saveNotifications(cloudData.notifications, userId);
-          if (cloudData.settings) {
-            StorageEngine.saveSettings(cloudData.settings, userId);
-          }
+          const mergedAccMap = new Map<string, Account>();
+          cloudData.accounts.forEach((a) => mergedAccMap.set(a.id, a));
+          idbAccs.forEach((a) => {
+            const isPendingDelete = remainingPending.some(
+              (op) => op.entity === 'accounts' && op.entity_id === a.id && op.operation === 'delete'
+            );
+            if (!isPendingDelete) {
+              mergedAccMap.set(a.id, a);
+            }
+          });
+
+          const mergedTxMap = new Map<string, Transaction>();
+          cloudData.transactions.forEach((t) => mergedTxMap.set(t.id, t));
+          idbTxs.forEach((t) => {
+            const isPendingDelete = remainingPending.some(
+              (op) => op.entity === 'transactions' && op.entity_id === t.id && op.operation === 'delete'
+            );
+            if (!isPendingDelete) {
+              mergedTxMap.set(t.id, t);
+            }
+          });
+
+          const mergedAccounts = Array.from(mergedAccMap.values());
+          const mergedTransactions = Array.from(mergedTxMap.values()).sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+
+          const recalculatedMerged = updateAccountBalances(mergedAccounts, mergedTransactions);
+
+          // Update Local IndexedDB in parallel
+          await Promise.all([
+            IndexedDBService.saveStoreItems(STORES.ACCOUNTS, recalculatedMerged, userId),
+            IndexedDBService.saveStoreItems(STORES.TRANSACTIONS, mergedTransactions, userId),
+            IndexedDBService.saveStoreItems(STORES.BUDGETS, cloudData.budgets, userId),
+            IndexedDBService.saveStoreItems(STORES.RECURRING, cloudData.recurringPayments, userId),
+            IndexedDBService.saveStoreItems(STORES.NOTIFICATIONS, cloudData.notifications, userId),
+            cloudData.settings ? IndexedDBService.saveSettings(cloudData.settings, userId) : Promise.resolve(),
+          ]);
 
           // Update React State
-          setAccounts(recalculatedAccounts);
-          setCategories(localCats);
-          setTransactions(cloudData.transactions);
+          setAccounts(recalculatedMerged);
+          setTransactions(mergedTransactions);
           setBudgets(cloudData.budgets);
           setRecurringPayments(cloudData.recurringPayments);
           setNotifications(cloudData.notifications);
@@ -246,95 +430,83 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (cloudData.profile) {
             setUserProfile(cloudData.profile);
           }
-          setSyncStatus('SYNCED');
-        } else {
-          // No cloud records returned. Check if local storage contains an existing offline dataset
-          const hasLocalRecords = cachedAccs.length > 0 || cachedTxs.length > 0 || cachedBudgets.length > 0 || cachedRec.length > 0;
 
+          setSyncStatus('SYNCED');
+          setLastSyncTime(new Date().toLocaleTimeString());
+        } else {
+          // No cloud records exist yet on server for user
+          const hasLocalRecords = idbAccs.length > 0 || idbTxs.length > 0;
           if (hasLocalRecords && navigator.onLine) {
-            // Upload local dataset to Supabase for newly linked user
             const backup: BackupData = {
-              version: '2.0.0',
+              version: CURRENT_APP_VERSION,
               exportedAt: new Date().toISOString(),
-              accounts: cachedAccs,
-              categories: localCats,
-              transactions: cachedTxs,
-              budgets: cachedBudgets,
-              recurringPayments: cachedRec,
-              notifications: cachedNotifs,
-              settings: cachedSettings,
+              accounts: idbAccs,
+              categories: idbCats,
+              transactions: idbTxs,
+              budgets: idbBudgets,
+              recurringPayments: idbRec,
+              notifications: idbNotifs,
+              settings: idbSettings || INITIAL_SETTINGS,
             };
             await SyncService.uploadLocalDataToCloud(backup, userId);
-
-            const recalculatedAccounts = updateAccountBalances(cachedAccs, cachedTxs);
-            setAccounts(recalculatedAccounts);
-            setCategories(localCats);
-            setTransactions(cachedTxs);
-            setBudgets(cachedBudgets);
-            setRecurringPayments(cachedRec);
-            setNotifications(cachedNotifs);
-            setSettings(cachedSettings);
-            setIsPinLocked(cachedSettings.pinEnabled);
             setSyncStatus('SYNCED');
           } else {
-            // Clean New User with zero data anywhere
-            setAccounts([]);
-            setCategories(localCats);
-            setTransactions([]);
-            setBudgets([]);
-            setRecurringPayments([]);
-            setNotifications([]);
-            setSettings(cachedSettings);
-            setIsPinLocked(false);
             setSyncStatus(navigator.onLine ? 'SYNCED' : 'OFFLINE');
           }
         }
       } catch (err) {
         console.error('loadUserData exception:', err);
         setSyncStatus(navigator.onLine ? 'SYNC_FAILED' : 'OFFLINE');
+      } finally {
+        setAuthLoading(false);
+        setTimeout(() => {
+          isHydratingRef.current = false;
+        }, 300);
       }
     },
-    [updateAccountBalances]
+    [updateAccountBalances, refreshPendingOpsCount]
   );
 
   // Sync state back to local storage whenever in-memory data changes for active user
+  const loadedUserRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && !isHydratingRef.current) {
       StorageEngine.saveAccounts(accounts, user.id);
     }
   }, [accounts, user?.id]);
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && !isHydratingRef.current) {
       StorageEngine.saveTransactions(transactions, user.id);
     }
   }, [transactions, user?.id]);
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && !isHydratingRef.current) {
       StorageEngine.saveBudgets(budgets, user.id);
     }
   }, [budgets, user?.id]);
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && !isHydratingRef.current) {
       StorageEngine.saveRecurring(recurringPayments, user.id);
     }
   }, [recurringPayments, user?.id]);
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && !isHydratingRef.current) {
       StorageEngine.saveNotifications(notifications, user.id);
     }
   }, [notifications, user?.id]);
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && !isHydratingRef.current) {
       StorageEngine.saveSettings(settings, user.id);
     }
   }, [settings, user?.id]);
 
-  // Full Cloud Sync trigger
+  // Background Cloud Sync Trigger
   const triggerCloudSync = useCallback(async () => {
     if (!user?.id || !navigator.onLine) {
       setSyncStatus(navigator.onLine ? 'SYNCED' : 'OFFLINE');
@@ -343,32 +515,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     setSyncStatus('SYNCING');
     try {
-      const nowIso = new Date().toISOString();
-      const updatedSettings = { ...settings, lastSyncedAt: nowIso };
+      const flushRes = await SyncService.flushPendingOperations(user.id);
+      await refreshPendingOpsCount(user.id);
 
-      const backup: BackupData = {
-        version: '2.0.0',
-        exportedAt: nowIso,
-        accounts,
-        categories,
-        transactions,
-        budgets,
-        recurringPayments,
-        notifications,
-        settings: updatedSettings,
-      };
-
-      const success = await SyncService.uploadLocalDataToCloud(backup, user.id);
-      if (success) {
-        setSettings(updatedSettings);
+      if (flushRes.success) {
         setSyncStatus('SYNCED');
+        setLastSyncTime(new Date().toLocaleTimeString());
       } else {
         setSyncStatus('SYNC_FAILED');
       }
     } catch {
       setSyncStatus('SYNC_FAILED');
     }
-  }, [user?.id, accounts, categories, transactions, budgets, recurringPayments, notifications, settings]);
+  }, [user?.id, refreshPendingOpsCount]);
 
   // Explicit Manual Supabase Cloud Synchronization Control
   const triggerManualSync = async (): Promise<boolean> => {
@@ -377,28 +536,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return false;
     }
     if (!navigator.onLine) {
+      const remainingOps = await IndexedDBService.getPendingOperations(user.id);
+      setPendingOpsCount(remainingOps.length);
       setSyncStatus('OFFLINE');
-      showToast('Working offline. Local changes will sync when connected', 'warning');
+      showToast(
+        "You're offline. Changes are saved on this device and will sync when you're back online.",
+        'info'
+      );
       return false;
     }
 
     setSyncStatus('SYNCING');
     setLastSyncError(null);
 
-    console.group('SPENDLY MANUAL SYNC');
-    console.log('Authenticated user:', user);
-    console.log('User ID:', user?.id);
-    console.log('Local accounts:', accounts);
-    console.log('Local transactions:', transactions);
-    console.log('Local budgets:', budgets);
-    console.log('Local recurring payments:', recurringPayments);
-    console.log('Local notifications:', notifications);
-    console.groupEnd();
-
     try {
-      // 1. Upload local dataset to cloud FIRST
+      await SyncService.flushPendingOperations(user.id);
+      await refreshPendingOpsCount(user.id);
+
       const backup: BackupData = {
-        version: '2.0.0',
+        version: CURRENT_APP_VERSION,
         exportedAt: new Date().toISOString(),
         accounts,
         categories,
@@ -411,10 +567,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       await SyncService.uploadLocalDataToCloud(backup, user.id);
 
-      // 2. Fetch latest cloud records from Supabase
       const cloudData = await SyncService.fetchUserData(user.id);
 
-      // 3. Hydrate state
       if (cloudData.hasCloudData) {
         const recalculated = updateAccountBalances(cloudData.accounts, cloudData.transactions);
         setAccounts(recalculated);
@@ -425,7 +579,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (cloudData.settings) setSettings(cloudData.settings);
         if (cloudData.profile) setUserProfile(cloudData.profile);
 
-        // Update local storage cache
         StorageEngine.saveAccounts(recalculated, user.id);
         StorageEngine.saveTransactions(cloudData.transactions, user.id);
         StorageEngine.saveBudgets(cloudData.budgets, user.id);
@@ -461,41 +614,54 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     let isMounted = true;
 
-    // Get current active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!isMounted) return;
-      if (session?.user) {
-        setUser(session.user);
-        loadUserData(session.user.id).then(() => {
-          if (isMounted) setAuthLoading(false);
-        });
-        setCurrentView((prev) => (prev === 'login' || prev === 'signup' ? 'dashboard' : prev));
-      } else {
-        setUser(null);
-        setUserProfile(null);
-        setAccounts([]);
-        setTransactions([]);
-        setBudgets([]);
-        setRecurringPayments([]);
-        setNotifications([]);
-        setAuthLoading(false);
-      }
-    }).catch(() => {
-      if (isMounted) setAuthLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (!isMounted) return;
+        if (session?.user) {
+          setUser(session.user);
+          if (loadedUserRef.current !== session.user.id) {
+            loadedUserRef.current = session.user.id;
+            loadUserData(session.user.id).then(() => {
+              if (isMounted) setAuthLoading(false);
+            });
+          } else {
+            setAuthLoading(false);
+          }
+          setCurrentView((prev) => (prev === 'login' || prev === 'signup' ? 'dashboard' : prev));
+        } else {
+          setUser(null);
+          setUserProfile(null);
+          loadedUserRef.current = null;
+          setAccounts([]);
+          setTransactions([]);
+          setBudgets([]);
+          setRecurringPayments([]);
+          setNotifications([]);
+          setAuthLoading(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setAuthLoading(false);
+      });
 
-    // Subscribe to auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return;
       if (session?.user) {
         setUser(session.user);
-        loadUserData(session.user.id).then(() => {
-          if (isMounted) setAuthLoading(false);
-        });
+        if (loadedUserRef.current !== session.user.id) {
+          loadedUserRef.current = session.user.id;
+          loadUserData(session.user.id).then(() => {
+            if (isMounted) setAuthLoading(false);
+          });
+        }
         setCurrentView((prev) => (prev === 'login' || prev === 'signup' ? 'dashboard' : prev));
       } else {
         setUser(null);
         setUserProfile(null);
+        loadedUserRef.current = null;
         setAccounts([]);
         setTransactions([]);
         setBudgets([]);
@@ -512,26 +678,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   }, [loadUserData]);
 
-  // Network Status Monitor
+  // Network Status Monitor & Automatic Update Check
   useEffect(() => {
     const handleOnline = () => {
       setIsOffline(false);
-      setSyncStatus('SYNCED');
       showToast('Online connection restored', 'info');
       if (user?.id) triggerCloudSync();
+      checkAppUpdates();
     };
     const handleOffline = () => {
       setIsOffline(true);
       setSyncStatus('OFFLINE');
       showToast('Offline mode - local data saved', 'warning');
     };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
+    if (navigator.onLine) {
+      checkAppUpdates();
+    }
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [user?.id, triggerCloudSync, showToast]);
+  }, [user?.id, triggerCloudSync, showToast, checkAppUpdates]);
 
   // Logout
   const logout = async () => {
@@ -542,6 +714,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } finally {
       setUser(null);
       setUserProfile(null);
+      loadedUserRef.current = null;
       setAccounts([]);
       setTransactions([]);
       setBudgets([]);
@@ -552,12 +725,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  // --- CRUD ACTIONS WITH TRANSACTIONAL OFFLINE WRITES ---
+
   // Add Transaction
   const addTransaction = async (txData: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
     soundService.playTransactionChime();
     const newTx: Transaction = {
       ...txData,
-      id: 'tx-' + Date.now(),
+      id: 'tx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -585,7 +760,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             isRead: false,
           };
           setNotifications((prev) => [newNotif, ...prev]);
-          if (user?.id) SyncService.upsertNotification(newNotif, user.id);
+          if (user?.id) {
+            IndexedDBService.saveItem(STORES.NOTIFICATIONS, newNotif, user.id);
+            IndexedDBService.addPendingOperation(user.id, 'notifications', newNotif.id, 'upsert', newNotif);
+          }
           showToast(`Budget alert: ${catObj?.name || ''} is ${status}`, 'warning');
         }
       }
@@ -599,16 +777,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       'success'
     );
 
-    // Supabase Cloud Write
-    if (user?.id && navigator.onLine) {
-      setSyncStatus('SYNCING');
-      const txOk = await SyncService.upsertTransaction(newTx, user.id);
-      // Also update account balances in cloud
-      const accPromises = updatedAccs.map((a) => SyncService.upsertAccount(a, user.id));
-      await Promise.all(accPromises);
-      setSyncStatus(txOk ? 'SYNCED' : 'SYNC_FAILED');
-    } else {
-      setSyncStatus('LOCAL_CHANGES');
+    if (user?.id) {
+      await IndexedDBService.saveItem(STORES.TRANSACTIONS, newTx, user.id);
+      await Promise.all(updatedAccs.map((a) => IndexedDBService.saveItem(STORES.ACCOUNTS, a, user.id)));
+
+      await IndexedDBService.addPendingOperation(user.id, 'transactions', newTx.id, 'upsert', newTx);
+      await Promise.all(
+        updatedAccs.map((a) => IndexedDBService.addPendingOperation(user.id, 'accounts', a.id, 'upsert', a))
+      );
+
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
     }
   };
 
@@ -625,14 +809,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     showToast('Transaction updated', 'success');
 
-    if (user?.id && editedTx && navigator.onLine) {
-      setSyncStatus('SYNCING');
-      const txOk = await SyncService.upsertTransaction(editedTx, user.id);
-      const accPromises = updatedAccs.map((a) => SyncService.upsertAccount(a, user.id));
-      await Promise.all(accPromises);
-      setSyncStatus(txOk ? 'SYNCED' : 'SYNC_FAILED');
-    } else {
-      setSyncStatus('LOCAL_CHANGES');
+    if (user?.id && editedTx) {
+      await IndexedDBService.saveItem(STORES.TRANSACTIONS, editedTx, user.id);
+      await Promise.all(updatedAccs.map((a) => IndexedDBService.saveItem(STORES.ACCOUNTS, a, user.id)));
+
+      await IndexedDBService.addPendingOperation(user.id, 'transactions', editedTx.id, 'upsert', editedTx);
+      await Promise.all(
+        updatedAccs.map((a) => IndexedDBService.addPendingOperation(user.id, 'accounts', a.id, 'upsert', a))
+      );
+
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
     }
   };
 
@@ -646,14 +838,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     showToast('Transaction deleted', 'info');
 
-    if (user?.id && navigator.onLine) {
-      setSyncStatus('SYNCING');
-      const delOk = await SyncService.deleteTransaction(id, user.id);
-      const accPromises = updatedAccs.map((a) => SyncService.upsertAccount(a, user.id));
-      await Promise.all(accPromises);
-      setSyncStatus(delOk ? 'SYNCED' : 'SYNC_FAILED');
-    } else {
-      setSyncStatus('LOCAL_CHANGES');
+    if (user?.id) {
+      await IndexedDBService.deleteItem(STORES.TRANSACTIONS, id);
+      await Promise.all(updatedAccs.map((a) => IndexedDBService.saveItem(STORES.ACCOUNTS, a, user.id)));
+
+      await IndexedDBService.addPendingOperation(user.id, 'transactions', id, 'delete');
+      await Promise.all(
+        updatedAccs.map((a) => IndexedDBService.addPendingOperation(user.id, 'accounts', a.id, 'upsert', a))
+      );
+
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
     }
   };
 
@@ -661,7 +861,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addAccount = async (accData: Omit<Account, 'id' | 'updatedAt' | 'balance'>) => {
     const newAcc: Account = {
       ...accData,
-      id: 'acc-' + Date.now(),
+      id: 'acc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
       balance: accData.openingBalance,
       currency: '₹',
       isArchived: false,
@@ -673,12 +873,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     showToast(`Account "${newAcc.name}" created`, 'success');
 
-    if (user?.id && navigator.onLine) {
-      setSyncStatus('SYNCING');
-      const accOk = await SyncService.upsertAccount(newAcc, user.id);
-      setSyncStatus(accOk ? 'SYNCED' : 'SYNC_FAILED');
-    } else {
-      setSyncStatus('LOCAL_CHANGES');
+    if (user?.id) {
+      await IndexedDBService.saveItem(STORES.ACCOUNTS, newAcc, user.id);
+      await IndexedDBService.addPendingOperation(user.id, 'accounts', newAcc.id, 'upsert', newAcc);
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
     }
   };
 
@@ -691,12 +895,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setAccounts((prev) => prev.map((acc) => (acc.id === id ? updatedAcc : acc)));
     showToast('Account archived', 'info');
 
-    if (user?.id && navigator.onLine) {
-      setSyncStatus('SYNCING');
-      const ok = await SyncService.upsertAccount(updatedAcc, user.id);
-      setSyncStatus(ok ? 'SYNCED' : 'SYNC_FAILED');
-    } else {
-      setSyncStatus('LOCAL_CHANGES');
+    if (user?.id) {
+      await IndexedDBService.saveItem(STORES.ACCOUNTS, updatedAcc, user.id);
+      await IndexedDBService.addPendingOperation(user.id, 'accounts', updatedAcc.id, 'upsert', updatedAcc);
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
     }
   };
 
@@ -710,7 +918,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setBudgets((prev) => prev.map((b) => (b.id === existing.id ? targetBudget : b)));
     } else {
       targetBudget = {
-        id: 'b-' + Date.now(),
+        id: 'b-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
         ...bData,
       };
       setBudgets((prev) => [...prev, targetBudget]);
@@ -718,12 +926,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     showToast('Budget limit saved', 'success');
 
-    if (user?.id && navigator.onLine) {
-      setSyncStatus('SYNCING');
-      const ok = await SyncService.upsertBudget(targetBudget, user.id);
-      setSyncStatus(ok ? 'SYNCED' : 'SYNC_FAILED');
-    } else {
-      setSyncStatus('LOCAL_CHANGES');
+    if (user?.id) {
+      await IndexedDBService.saveItem(STORES.BUDGETS, targetBudget, user.id);
+      await IndexedDBService.addPendingOperation(user.id, 'budgets', targetBudget.id, 'upsert', targetBudget);
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
     }
   };
 
@@ -732,19 +944,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBudgets((prev) => prev.filter((b) => b.id !== id));
     showToast('Budget removed', 'info');
 
-    if (user?.id && navigator.onLine) {
-      setSyncStatus('SYNCING');
-      const ok = await SyncService.deleteBudget(id, user.id);
-      setSyncStatus(ok ? 'SYNCED' : 'SYNC_FAILED');
-    } else {
-      setSyncStatus('LOCAL_CHANGES');
+    if (user?.id) {
+      await IndexedDBService.deleteItem(STORES.BUDGETS, id);
+      await IndexedDBService.addPendingOperation(user.id, 'budgets', id, 'delete');
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
     }
   };
 
   // Category Management
-  const addCategory = (catData: Omit<Category, 'id'>) => {
+  const addCategory = async (catData: Omit<Category, 'id'>) => {
     const newCat: Category = {
-      id: 'cat-' + Date.now(),
+      id: 'cat-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
       ...catData,
     };
     setCategories((prev) => {
@@ -753,9 +969,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return updated;
     });
     showToast(`Category "${newCat.name}" added`, 'success');
+
+    if (user?.id) {
+      await IndexedDBService.saveItem(STORES.CATEGORIES, newCat, user.id);
+    }
   };
 
-  const editCategory = (id: string, name: string) => {
+  const editCategory = async (id: string, name: string) => {
     setCategories((prev) => {
       const updated = prev.map((c) => (c.id === id ? { ...c, name: name.trim() } : c));
       StorageEngine.saveCategories(updated, user?.id);
@@ -786,19 +1006,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Add / Edit / Pause / Delete Reminders
   const addRecurring = async (rData: Omit<RecurringPayment, 'id'>) => {
     const newR: RecurringPayment = {
-      id: 'rec-' + Date.now(),
+      id: 'rec-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
       ...rData,
     };
     setRecurringPayments((prev) => [...prev, newR]);
     scheduleReminderNotification(newR);
     showToast(`Reminder "${newR.title}" saved`, 'success');
 
-    if (user?.id && navigator.onLine) {
-      setSyncStatus('SYNCING');
-      const ok = await SyncService.upsertRecurring(newR, user.id);
-      setSyncStatus(ok ? 'SYNCED' : 'SYNC_FAILED');
-    } else {
-      setSyncStatus('LOCAL_CHANGES');
+    if (user?.id) {
+      await IndexedDBService.saveItem(STORES.RECURRING, newR, user.id);
+      await IndexedDBService.addPendingOperation(user.id, 'recurring_payments', newR.id, 'upsert', newR);
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
     }
   };
 
@@ -808,12 +1032,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     scheduleReminderNotification(updated);
     showToast(`Reminder "${updated.title}" updated`, 'success');
 
-    if (user?.id && navigator.onLine) {
-      setSyncStatus('SYNCING');
-      const ok = await SyncService.upsertRecurring(updated, user.id);
-      setSyncStatus(ok ? 'SYNCED' : 'SYNC_FAILED');
-    } else {
-      setSyncStatus('LOCAL_CHANGES');
+    if (user?.id) {
+      await IndexedDBService.saveItem(STORES.RECURRING, updated, user.id);
+      await IndexedDBService.addPendingOperation(user.id, 'recurring_payments', updated.id, 'upsert', updated);
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
     }
   };
 
@@ -831,12 +1059,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       showToast(`Reminder "${updated.title}" resumed`, 'info');
     }
 
-    if (user?.id && navigator.onLine) {
-      setSyncStatus('SYNCING');
-      const ok = await SyncService.upsertRecurring(updated, user.id);
-      setSyncStatus(ok ? 'SYNCED' : 'SYNC_FAILED');
-    } else {
-      setSyncStatus('LOCAL_CHANGES');
+    if (user?.id) {
+      await IndexedDBService.saveItem(STORES.RECURRING, updated, user.id);
+      await IndexedDBService.addPendingOperation(user.id, 'recurring_payments', updated.id, 'upsert', updated);
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
     }
   };
 
@@ -845,12 +1077,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     cancelReminderNotification(id);
     showToast('Reminder removed', 'info');
 
-    if (user?.id && navigator.onLine) {
-      setSyncStatus('SYNCING');
-      const ok = await SyncService.deleteRecurring(id, user.id);
-      setSyncStatus(ok ? 'SYNCED' : 'SYNC_FAILED');
-    } else {
-      setSyncStatus('LOCAL_CHANGES');
+    if (user?.id) {
+      await IndexedDBService.deleteItem(STORES.RECURRING, id);
+      await IndexedDBService.addPendingOperation(user.id, 'recurring_payments', id, 'delete');
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
     }
   };
 
@@ -862,8 +1098,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     setNotifications((prev) => prev.map((n) => (n.id === id ? updated : n)));
 
-    if (user?.id && navigator.onLine) {
-      SyncService.upsertNotification(updated, user.id);
+    if (user?.id) {
+      IndexedDBService.saveItem(STORES.NOTIFICATIONS, updated, user.id);
+      if (navigator.onLine) {
+        SyncService.upsertNotification(updated, user.id);
+      }
     }
   };
 
@@ -871,8 +1110,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications([]);
     showToast('Notifications cleared', 'info');
 
-    if (user?.id && navigator.onLine) {
-      SyncService.clearNotifications(user.id);
+    if (user?.id) {
+      await IndexedDBService.saveStoreItems(STORES.NOTIFICATIONS, [], user.id);
+      if (navigator.onLine) {
+        SyncService.clearNotifications(user.id);
+      }
     }
   };
 
@@ -880,8 +1122,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const toggleHideBalances = () => {
     const updated = { ...settings, hideBalances: !settings.hideBalances };
     setSettings(updated);
-    if (user?.id && navigator.onLine) {
-      SyncService.upsertSettings(updated, user.id);
+    if (user?.id) {
+      IndexedDBService.saveSettings(updated, user.id);
+      if (navigator.onLine) {
+        SyncService.upsertSettings(updated, user.id);
+      }
+    }
+  };
+
+  const toggleNotifyAppUpdates = () => {
+    const updated = { ...settings, notifyAppUpdates: !(settings.notifyAppUpdates ?? true) };
+    setSettings(updated);
+    showToast(updated.notifyAppUpdates ? 'App update notifications enabled' : 'App update notifications disabled', 'info');
+    if (user?.id) {
+      IndexedDBService.saveSettings(updated, user.id);
+      if (navigator.onLine) {
+        SyncService.upsertSettings(updated, user.id);
+      }
     }
   };
 
@@ -898,8 +1155,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       showToast('4-digit PIN protection enabled', 'info');
     }
 
-    if (user?.id && navigator.onLine) {
-      SyncService.upsertSettings(updated, user.id);
+    if (user?.id) {
+      IndexedDBService.saveSettings(updated, user.id);
+      if (navigator.onLine) {
+        SyncService.upsertSettings(updated, user.id);
+      }
     }
   };
 
@@ -955,7 +1215,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const loadDemoData = async () => {
-    // Check duplicate sample load
     const isAlreadyLoaded = accounts.some((a) => a.id === 'acc-sbi') || transactions.some((t) => t.id === 'tx-1');
     if (isAlreadyLoaded) {
       showToast('Sample dataset is already loaded in your workspace', 'info');
@@ -977,21 +1236,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications(demoNotifs);
     setSettings(demoSettings);
 
-    if (user?.id && navigator.onLine) {
-      setSyncStatus('SYNCING');
-      const backupData: BackupData = {
-        version: '2.0.0',
-        exportedAt: new Date().toISOString(),
-        accounts: demoAccs,
-        categories: categories,
-        transactions: demoTxs,
-        budgets: demoBudgets,
-        recurringPayments: demoRec,
-        notifications: demoNotifs,
-        settings: demoSettings,
-      };
-      await SyncService.uploadLocalDataToCloud(backupData, user.id);
-      setSyncStatus('SYNCED');
+    if (user?.id) {
+      await IndexedDBService.saveStoreItems(STORES.ACCOUNTS, demoAccs, user.id);
+      await IndexedDBService.saveStoreItems(STORES.TRANSACTIONS, demoTxs, user.id);
+      await IndexedDBService.saveStoreItems(STORES.BUDGETS, demoBudgets, user.id);
+      await IndexedDBService.saveStoreItems(STORES.RECURRING, demoRec, user.id);
+      await IndexedDBService.saveStoreItems(STORES.NOTIFICATIONS, demoNotifs, user.id);
+      await IndexedDBService.saveSettings(demoSettings, user.id);
+
+      if (navigator.onLine) {
+        setSyncStatus('SYNCING');
+        const backupData: BackupData = {
+          version: CURRENT_APP_VERSION,
+          exportedAt: new Date().toISOString(),
+          accounts: demoAccs,
+          categories: categories,
+          transactions: demoTxs,
+          budgets: demoBudgets,
+          recurringPayments: demoRec,
+          notifications: demoNotifs,
+          settings: demoSettings,
+        };
+        await SyncService.uploadLocalDataToCloud(backupData, user.id);
+        setSyncStatus('SYNCED');
+      }
     }
 
     showToast('Loaded sample dataset successfully!', 'success');
@@ -1004,6 +1272,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBudgets([]);
     setRecurringPayments([]);
     setNotifications([]);
+    setPendingOpsCount(0);
     showToast('Local device data cleared. Cloud data remains intact.', 'info');
   };
 
@@ -1025,6 +1294,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBudgets([]);
     setRecurringPayments([]);
     setNotifications([]);
+    setPendingOpsCount(0);
     showToast('All cloud and local financial data reset successfully.', 'success');
   };
 
@@ -1047,6 +1317,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         userProfile,
         authLoading,
         syncStatus,
+        pendingOpsCount,
         lastSyncError,
         lastSyncTime,
         runSyncDiagnostic,
@@ -1055,6 +1326,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         logout,
         triggerCloudSync,
         triggerManualSync,
+        latestManifest,
+        isUpdateModalOpen,
+        setIsUpdateModalOpen,
+        checkAppUpdates,
+        postponeUpdate,
         accounts,
         categories,
         transactions,
@@ -1093,6 +1369,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         markNotificationRead,
         clearNotifications,
         toggleHideBalances,
+        toggleNotifyAppUpdates,
         setPinCode,
         validatePin,
         updateProfileName,
@@ -1123,4 +1400,3 @@ export const useApp = () => {
   }
   return ctx;
 };
-
