@@ -6,7 +6,7 @@ import { SpendlyLogo } from '../components/ui/SpendlyLogo';
 import { AlertTriangle, Calendar, Info, Check, Trash2, Bell } from 'lucide-react';
 
 export const NotificationsView: React.FC = () => {
-  const { notifications, markNotificationRead, clearNotifications, setIsUpdateModalOpen } = useApp();
+  const { notifications, markNotificationRead, clearNotifications, setIsUpdateModalOpen, updateStatus, installedVersion, showToast } = useApp();
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -91,7 +91,11 @@ export const NotificationsView: React.FC = () => {
                     <button
                       onClick={() => {
                         markNotificationRead(n.id);
-                        setIsUpdateModalOpen(true);
+                        if (updateStatus === 'UPDATE_AVAILABLE') {
+                          setIsUpdateModalOpen(true);
+                        } else {
+                          showToast(`You're already up to date on Spendly V${installedVersion}`, 'info');
+                        }
                       }}
                       className="btn btn-primary"
                       style={{ padding: '6px 12px', fontSize: '0.78rem' }}

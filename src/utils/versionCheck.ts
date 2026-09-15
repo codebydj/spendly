@@ -323,3 +323,28 @@ export function postponeUpdateNotification(days = 7): void {
   const expiry = Date.now() + days * 24 * 60 * 60 * 1000;
   localStorage.setItem('spendly_update_postponed_general', String(expiry));
 }
+
+/**
+ * Remove stale update dismissed/postponed keys from localStorage when installedVersion >= version
+ */
+export function cleanupStaleUpdateStorage(installedVersion: string): void {
+  try {
+    const cleanInstalled = (installedVersion || '').replace(/^v/i, '').trim();
+    if (!cleanInstalled) return;
+
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+
+      if (key.startsWith('spendly_update_dismissed_') || key.startsWith('spendly_update_postponed_')) {
+        const verPart = key.replace('spendly_update_dismissed_', '').replace('spendly_update_postponed_', '');
+        if (verPart && compareSemVer(cleanInstalled, verPart) >= 0) {
+          console.log(`[Spendly Update] Purging stale localStorage key: ${key} (Installed: ${cleanInstalled})`);
+          localStorage.removeItem(key);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[Spendly Update] Cleanup storage failed:', e);
+  }
+}

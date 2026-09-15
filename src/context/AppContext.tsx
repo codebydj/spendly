@@ -12,12 +12,16 @@ import { hashPin, verifyPin } from '../utils/crypto';
 import { scheduleReminderNotification, cancelReminderNotification, scheduleUpdateNotification } from '../services/nativeNotifications';
 import {
   checkForAppUpdate,
+  compareSemVer,
+  cleanupStaleUpdateStorage,
   isVersionDismissed,
   dismissUpdateForVersion,
   postponeUpdateNotification,
   CURRENT_APP_VERSION,
   type UpdateCheckResult,
 } from '../utils/versionCheck';
+
+export type AppUpdateStatus = 'UP_TO_DATE' | 'UPDATE_AVAILABLE' | 'INSTALLED_NEWER' | 'OFFLINE' | 'CHECKING' | 'ERROR';
 import {
   calculateAccountBalance,
   calculateNetWorth,
@@ -75,7 +79,9 @@ interface AppContextType {
   triggerManualSync: () => Promise<boolean>;
 
   // App Update Notification
+  updateStatus: AppUpdateStatus;
   installedVersion: string;
+  latestVersion: string | null;
   latestManifest: AppVersionManifest | null;
   lastCheckResult: UpdateCheckResult | null;
   isUpdateModalOpen: boolean;
@@ -248,14 +254,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return ops.length;
   }, []);
 
-  // App Update State
+  // App Update State (Centralized Single Source of Truth)
+  const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus>('UP_TO_DATE');
   const [installedVersion, setInstalledVersion] = useState<string>(CURRENT_APP_VERSION);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [latestManifest, setLatestManifest] = useState<AppVersionManifest | null>(null);
   const [lastCheckResult, setLastCheckResult] = useState<UpdateCheckResult | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
 
-  // Check App Updates
+  // Check App Updates - Centralized Engine
   const checkAppUpdates = useCallback(
     async (isManual = false) => {
       if (!isManual && settingsRef.current.notifyAppUpdates === false) return;
@@ -265,66 +273,110 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const result = await checkForAppUpdate(isManual);
         setLastCheckResult(result);
 
-        if (result.currentVersion) {
-          setInstalledVersion(result.currentVersion);
-        }
+        const currentVer = result.currentVersion || CURRENT_APP_VERSION;
+        setInstalledVersion(currentVer);
+
+        // Always clean stale storage keys for version <= currentVer
+        cleanupStaleUpdateStorage(currentVer);
 
         if (result.status === 'update_available') {
+          const remoteVer = result.latestVersion;
+          const cmp = compareSemVer(currentVer, remoteVer);
+
+          console.log(`[Spendly Update Diagnostic] Installed version: ${currentVer}`);
+          console.log(`[Spendly Update Diagnostic] Latest version: ${remoteVer}`);
+          console.log(`[Spendly Update Diagnostic] Comparison result: ${cmp}`);
+
+          if (cmp < 0) {
+            // STRICT RULE: Only UPDATE_AVAILABLE if currentVer < remoteVer
+            setUpdateStatus('UPDATE_AVAILABLE');
+            setLatestVersion(remoteVer);
+            setLatestManifest(result.manifest);
+
+            console.log(`[Spendly Update Diagnostic] Final Update status: UPDATE_AVAILABLE`);
+
+            const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
+
+            // Open update modal automatically ONLY on native platform (or if manually triggered)
+            if (isManual || (isNative && !isVersionDismissed(remoteVer))) {
+              console.log('[Spendly Update] Showing update modal');
+              setIsUpdateModalOpen(true);
+            }
+
+            if (isNative) {
+              scheduleUpdateNotification(result.manifest);
+            }
+
+            // Add to Notification Center if not already present
+            setNotifications((prev) => {
+              const exists = prev.some((n) => n.type === 'APP_UPDATE' && n.title.includes(remoteVer));
+              if (exists) return prev;
+
+              const updateNotif: NotificationItem = {
+                id: `notif-update-${remoteVer}`,
+                type: 'APP_UPDATE',
+                title: result.manifest.title || `Spendly V${remoteVer} Available`,
+                message: result.manifest.message || 'New improvements and features are now available.',
+                date: new Date().toISOString(),
+                isRead: false,
+                versionManifest: result.manifest,
+              };
+              return [updateNotif, ...prev];
+            });
+
+            if (isManual) {
+              showToast(`Spendly V${remoteVer} is available!`, 'info');
+            }
+          } else {
+            // Current version >= Remote version: Force UP_TO_DATE
+            setUpdateStatus('UP_TO_DATE');
+            setLatestVersion(remoteVer);
+            setLatestManifest(result.manifest);
+            setIsUpdateModalOpen(false);
+
+            console.log(`[Spendly Update Diagnostic] Final Update status: UP_TO_DATE (Installed >= Remote)`);
+
+            // Clear any stale APP_UPDATE notifications
+            setNotifications((prev) => prev.filter((n) => n.type !== 'APP_UPDATE'));
+
+            if (isManual) {
+              showToast(`You're up to date! Spendly V${currentVer} is the latest version.`, 'success');
+            }
+          }
+        } else if (result.status === 'up_to_date' || result.status === 'installed_newer') {
+          const remoteVer = result.latestVersion || currentVer;
+          setUpdateStatus('UP_TO_DATE');
+          setLatestVersion(remoteVer);
           setLatestManifest(result.manifest);
+          setIsUpdateModalOpen(false);
 
-          const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
+          console.log(`[Spendly Update Diagnostic] Installed version: ${currentVer}`);
+          console.log(`[Spendly Update Diagnostic] Latest version: ${remoteVer}`);
+          console.log(`[Spendly Update Diagnostic] Final Update status: UP_TO_DATE`);
 
-          // Open update modal automatically ONLY on native platform (or if manually triggered)
-          if (isManual || (isNative && !isVersionDismissed(result.latestVersion))) {
-            console.log('[Spendly Update] Showing update modal');
-            setIsUpdateModalOpen(true);
-          }
-
-          if (isNative) {
-            // Schedule native Android notification
-            scheduleUpdateNotification(result.manifest);
-          }
-
-          // Add to Notification Center if not already present
-          setNotifications((prev) => {
-            const exists = prev.some((n) => n.type === 'APP_UPDATE' && n.title.includes(result.latestVersion));
-            if (exists) return prev;
-
-            const updateNotif: NotificationItem = {
-              id: `notif-update-${result.latestVersion}`,
-              type: 'APP_UPDATE',
-              title: result.manifest.title || `Spendly V${result.latestVersion} Available`,
-              message: result.manifest.message || 'New improvements and features are now available.',
-              date: new Date().toISOString(),
-              isRead: false,
-              versionManifest: result.manifest,
-            };
-            return [updateNotif, ...prev];
-          });
+          // Clear any stale APP_UPDATE notifications
+          setNotifications((prev) => prev.filter((n) => n.type !== 'APP_UPDATE'));
 
           if (isManual) {
-            showToast(`Spendly V${result.latestVersion} is available!`, 'info');
-          }
-        } else if (result.status === 'up_to_date') {
-          setLatestManifest(result.manifest);
-          if (isManual) {
-            showToast(`You're up to date! Spendly V${result.currentVersion} is the latest version.`, 'success');
-          }
-        } else if (result.status === 'installed_newer') {
-          setLatestManifest(result.manifest);
-          if (isManual) {
-            showToast(`You're on Spendly V${result.currentVersion} (newer than remote V${result.latestVersion}).`, 'info');
+            if (result.status === 'installed_newer') {
+              showToast(`You're on Spendly V${currentVer} (newer than remote V${remoteVer}).`, 'info');
+            } else {
+              showToast(`You're up to date! Spendly V${currentVer} is the latest version.`, 'success');
+            }
           }
         } else if (result.status === 'offline') {
+          setUpdateStatus('OFFLINE');
           if (isManual) {
             showToast("You're offline. We couldn't check for updates.", 'warning');
           }
         } else if (result.status === 'error') {
+          setUpdateStatus('ERROR');
           if (isManual) {
             showToast(result.message || "Could not check for updates.", 'danger');
           }
         }
       } catch (err) {
+        setUpdateStatus('ERROR');
         if (isManual) {
           showToast("Could not check for updates. Please try again later.", 'danger');
         }
@@ -1592,7 +1644,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         logout,
         triggerCloudSync,
         triggerManualSync,
+        updateStatus,
         installedVersion,
+        latestVersion,
         latestManifest,
         lastCheckResult,
         isUpdateModalOpen,

@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Download, Sparkles, Clock, ArrowRight } from 'lucide-react';
 import type { AppVersionManifest } from '../../types/finance';
 import { APP_VERSION, ANDROID_APK_DOWNLOAD_URL } from '../../config/appVersion';
+import { compareSemVer } from '../../utils/versionCheck';
 
 interface UpdateModalProps {
   isOpen: boolean;
@@ -19,7 +20,15 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
   installedVersion,
   onLater,
 }) => {
-  if (!manifest) return null;
+  if (!manifest || !isOpen) return null;
+
+  // Requirement 5: Prevent rendering modal if installed >= latest
+  const rawInstalled = installedVersion || APP_VERSION;
+  const rawLatest = manifest.version || APP_VERSION;
+  if (compareSemVer(rawInstalled, rawLatest) >= 0) {
+    console.log(`[UpdateModal Diagnostic] Suppressing update modal: Installed V${rawInstalled} >= Remote V${rawLatest}`);
+    return null;
+  }
 
   const latestVersion = manifest.version ? `V${manifest.version.replace(/^v/i, '')}` : `V${APP_VERSION}`;
   const currentVersion = installedVersion ? `V${installedVersion.replace(/^v/i, '')}` : `V${APP_VERSION}`;

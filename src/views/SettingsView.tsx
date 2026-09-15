@@ -76,6 +76,7 @@ export const SettingsView: React.FC = () => {
     deleteCategory,
     toggleHideBalances,
     toggleNotifyAppUpdates,
+    updateStatus,
     installedVersion,
     latestManifest,
     lastCheckResult,
@@ -1237,14 +1238,14 @@ export const SettingsView: React.FC = () => {
               style={{
                 fontWeight: 800,
                 color:
-                  lastCheckResult?.status === 'update_available'
+                  updateStatus === 'UPDATE_AVAILABLE'
                     ? 'var(--status-expense)'
-                    : lastCheckResult?.status === 'up_to_date'
+                    : updateStatus === 'UP_TO_DATE'
                     ? 'var(--accent-emerald)'
                     : 'var(--status-warning)',
               }}
             >
-              {lastCheckResult?.status?.toUpperCase() || 'NOT_RUN'}
+              {updateStatus}
             </span>
           </div>
 

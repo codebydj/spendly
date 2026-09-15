@@ -2,7 +2,6 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { Eye, EyeOff, Search, Plus, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck, Bell, Sparkles } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { isNewerVersionAvailable } from '../../utils/versionCheck';
 
 export const Header: React.FC = () => {
   const {
@@ -19,6 +18,7 @@ export const Header: React.FC = () => {
     setCurrentView,
     user,
     unreadNotificationCount,
+    updateStatus,
     latestManifest,
     setIsUpdateModalOpen,
   } = useApp();
@@ -153,7 +153,9 @@ export const Header: React.FC = () => {
   };
 
   const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
-  const isUpdateAvailable = isNative && latestManifest && isNewerVersionAvailable(latestManifest.version);
+  const isUpdateAvailable = isNative && updateStatus === 'UPDATE_AVAILABLE' && Boolean(latestManifest?.version);
+
+  console.log(`[Header Update Diagnostic] updateStatus: ${updateStatus}, isNative: ${isNative}, isUpdateAvailable: ${isUpdateAvailable}`);
 
   return (
     <>
@@ -187,7 +189,7 @@ export const Header: React.FC = () => {
         {/* Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
           {/* New App Update Badge Button */}
-          {isUpdateAvailable && (
+          {isUpdateAvailable && latestManifest && (
             <button
               onClick={() => setIsUpdateModalOpen(true)}
               style={{
