@@ -15,6 +15,7 @@ import {
   dismissUpdateForVersion,
   postponeUpdateNotification,
   CURRENT_APP_VERSION,
+  type UpdateCheckResult,
 } from '../utils/versionCheck';
 import {
   calculateAccountBalance,
@@ -75,6 +76,7 @@ interface AppContextType {
   // App Update Notification
   installedVersion: string;
   latestManifest: AppVersionManifest | null;
+  lastCheckResult: UpdateCheckResult | null;
   isUpdateModalOpen: boolean;
   setIsUpdateModalOpen: (open: boolean) => void;
   isCheckingUpdates: boolean;
@@ -248,6 +250,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // App Update State
   const [installedVersion, setInstalledVersion] = useState<string>(CURRENT_APP_VERSION);
   const [latestManifest, setLatestManifest] = useState<AppVersionManifest | null>(null);
+  const [lastCheckResult, setLastCheckResult] = useState<UpdateCheckResult | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
 
@@ -259,6 +262,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setIsCheckingUpdates(true);
       try {
         const result = await checkForAppUpdate(isManual);
+        setLastCheckResult(result);
+
         if (result.currentVersion) {
           setInstalledVersion(result.currentVersion);
         }
@@ -268,6 +273,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
           // Always open modal if manual check; on background check open modal if not dismissed
           if (isManual || !isVersionDismissed(result.latestVersion)) {
+            console.log('[Spendly Update] Showing update modal');
             setIsUpdateModalOpen(true);
           }
 
@@ -295,21 +301,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             showToast(`Spendly V${result.latestVersion} is available!`, 'info');
           }
         } else if (result.status === 'up_to_date') {
+          setLatestManifest(result.manifest);
           if (isManual) {
             showToast(`You're up to date! Spendly V${result.latestVersion} is the latest version.`, 'success');
           }
         } else if (result.status === 'offline') {
           if (isManual) {
-            showToast("You're offline. Connect to the internet to check for the latest version.", 'warning');
+            showToast("You're offline. We couldn't check for updates.", 'warning');
           }
         } else if (result.status === 'error') {
           if (isManual) {
-            showToast(result.message || "Couldn't check for updates. Please try again later.", 'danger');
+            showToast(result.message || "Could not check for updates.", 'danger');
           }
         }
       } catch (err) {
         if (isManual) {
-          showToast("Couldn't check for updates. Please try again later.", 'danger');
+          showToast("Could not check for updates. Please try again later.", 'danger');
         }
       } finally {
         setIsCheckingUpdates(false);
@@ -328,11 +335,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Update reminder postponed', 'info');
   }, [latestManifest, showToast]);
 
-  // Unblocked background update check on app mount
+  // Automatic background update check on app mount
   useEffect(() => {
     const timer = setTimeout(() => {
       checkAppUpdates(false);
-    }, 3000);
+    }, 1500);
     return () => clearTimeout(timer);
   }, [checkAppUpdates]);
 
@@ -1577,6 +1584,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         triggerManualSync,
         installedVersion,
         latestManifest,
+        lastCheckResult,
         isUpdateModalOpen,
         setIsUpdateModalOpen,
         isCheckingUpdates,

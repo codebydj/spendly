@@ -12,44 +12,49 @@ let errors = [];
 
 // 1. Check package.json version
 const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
-if (packageJson.version !== '3.1.3') {
-  errors.push(`package.json version is '${packageJson.version}', expected '3.1.3'`);
+const expectedVersion = packageJson.version; // e.g. "3.1.4"
+const expectedVersionCode = parseInt(expectedVersion.replace(/\./g, ''), 10); // e.g. 314
+
+console.log(`Checking version consistency for Spendly V${expectedVersion} (code: ${expectedVersionCode})...`);
+
+if (!expectedVersion) {
+  errors.push('package.json version missing');
 } else {
-  console.log('✅ package.json version: 3.1.3');
+  console.log(`✅ package.json version: ${expectedVersion}`);
 }
 
 // 2. Check appVersion.ts
 const appVersionTs = fs.readFileSync(path.join(rootDir, 'src', 'config', 'appVersion.ts'), 'utf8');
-if (!appVersionTs.includes("export const APP_VERSION = '3.1.3';")) {
-  errors.push("src/config/appVersion.ts does not contain export const APP_VERSION = '3.1.3';");
+if (!appVersionTs.includes(`export const APP_VERSION = '${expectedVersion}';`)) {
+  errors.push(`src/config/appVersion.ts does not contain export const APP_VERSION = '${expectedVersion}';`);
 } else {
-  console.log('✅ src/config/appVersion.ts APP_VERSION: 3.1.3');
+  console.log(`✅ src/config/appVersion.ts APP_VERSION: ${expectedVersion}`);
 }
 
 // 3. Check public/app-version.json
 const publicAppVersion = JSON.parse(fs.readFileSync(path.join(rootDir, 'public', 'app-version.json'), 'utf8'));
-if (publicAppVersion.version !== '3.1.3') {
-  errors.push(`public/app-version.json version is '${publicAppVersion.version}', expected '3.1.3'`);
+if (publicAppVersion.version !== expectedVersion) {
+  errors.push(`public/app-version.json version is '${publicAppVersion.version}', expected '${expectedVersion}'`);
 } else {
-  console.log('✅ public/app-version.json version: 3.1.3');
+  console.log(`✅ public/app-version.json version: ${expectedVersion}`);
 }
 
 // 4. Check android/app/build.gradle
 const buildGradle = fs.readFileSync(path.join(rootDir, 'android', 'app', 'build.gradle'), 'utf8');
-if (!buildGradle.includes('versionName "3.1.3"')) {
-  errors.push("android/app/build.gradle does not contain versionName \"3.1.3\"");
+if (!buildGradle.includes(`versionName "${expectedVersion}"`)) {
+  errors.push(`android/app/build.gradle does not contain versionName "${expectedVersion}"`);
 } else {
-  console.log('✅ android/app/build.gradle versionName: 3.1.3');
+  console.log(`✅ android/app/build.gradle versionName: ${expectedVersion}`);
 }
 
-if (!buildGradle.includes('versionCode 313')) {
-  errors.push("android/app/build.gradle does not contain versionCode 313");
+if (!buildGradle.includes(`versionCode ${expectedVersionCode}`)) {
+  errors.push(`android/app/build.gradle does not contain versionCode ${expectedVersionCode}`);
 } else {
-  console.log('✅ android/app/build.gradle versionCode: 313');
+  console.log(`✅ android/app/build.gradle versionCode: ${expectedVersionCode}`);
 }
 
 if (!buildGradle.includes('applicationId "com.spendly.finance"')) {
-  errors.push("android/app/build.gradle does not contain applicationId \"com.spendly.finance\"");
+  errors.push('android/app/build.gradle does not contain applicationId "com.spendly.finance"');
 } else {
   console.log('✅ android/app/build.gradle applicationId: com.spendly.finance');
 }
@@ -110,5 +115,5 @@ if (errors.length > 0) {
   errors.forEach((e) => console.error(`  - ${e}`));
   process.exit(1);
 } else {
-  console.log('🎉 SPENDLY V3.1.3 FULL AUDIT PASSED! READY FOR PRODUCTION RELEASE BUILD.');
+  console.log(`🎉 SPENDLY V${expectedVersion} FULL AUDIT PASSED! READY FOR PRODUCTION RELEASE BUILD.`);
 }

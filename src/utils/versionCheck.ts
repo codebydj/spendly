@@ -16,45 +16,68 @@ export type UpdateCheckResult =
       currentVersion: string;
       latestVersion: string;
       manifest: AppVersionManifest;
+      checkUrl: string;
+      httpStatus: number;
+      lastCheckedAt: string;
+      source: 'REMOTE_PRODUCTION' | 'BUNDLED' | 'UNKNOWN';
     }
   | {
       status: 'up_to_date';
       currentVersion: string;
       latestVersion: string;
       manifest: AppVersionManifest;
+      checkUrl: string;
+      httpStatus: number;
+      lastCheckedAt: string;
+      source: 'REMOTE_PRODUCTION' | 'BUNDLED' | 'UNKNOWN';
     }
   | {
       status: 'offline';
       currentVersion: string;
       message: string;
+      checkUrl?: string;
+      httpStatus?: number;
+      latestVersion?: string;
+      source?: 'REMOTE_PRODUCTION' | 'BUNDLED' | 'UNKNOWN';
+      lastCheckedAt: string;
     }
   | {
       status: 'error';
       currentVersion: string;
       message: string;
+      checkUrl?: string;
+      httpStatus?: number;
+      latestVersion?: string;
+      source?: 'REMOTE_PRODUCTION' | 'BUNDLED' | 'UNKNOWN';
+      lastCheckedAt: string;
     };
 
 /**
  * Dynamically read the actual installed app version from the device runtime.
- * On Android / native Capacitor runtime: reads versionName from App.getInfo() (e.g. "3.0.8", "3.1.2", "3.1.3").
- * On Web: returns the configured APP_VERSION ("3.1.3").
+ * On Android / native Capacitor runtime: reads versionName from App.getInfo() (e.g. "3.1.2", "3.1.4").
+ * On Web: returns the configured APP_VERSION ("3.1.4").
  */
 export async function getInstalledAppVersion(): Promise<string> {
-  if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+  const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
+  if (isNative) {
     try {
       const info = await App.getInfo();
       if (info && info.version) {
-        return info.version.replace(/^v/i, '').trim();
+        const ver = info.version.replace(/^v/i, '').trim();
+        console.log(`[Spendly Update] Platform: android | Installed: ${ver}`);
+        return ver;
       }
     } catch (e) {
-      console.warn('[VersionCheck] Native App.getInfo() failed, fallback to APP_VERSION:', e);
+      console.warn('[Spendly Update] Native App.getInfo() failed, fallback to APP_VERSION:', e);
     }
   }
-  return APP_VERSION.replace(/^v/i, '').trim();
+  const webVer = APP_VERSION.replace(/^v/i, '').trim();
+  console.log(`[Spendly Update] Platform: web | Installed: ${webVer}`);
+  return webVer;
 }
 
 /**
- * Compare two semantic version strings (e.g. "3.0.8" vs "3.1.3", "3.1.2" vs "3.1.3", "3.1.3" vs "3.1.4", "4.0.0" vs "3.9.9")
+ * Compare two semantic version strings (e.g. "3.1.2" vs "3.1.4", "3.1.4" vs "3.1.4")
  * Strips optional leading 'v' or 'V'.
  * Returns:
  *   -1 if v1 < v2 (v2 is newer)
@@ -90,90 +113,94 @@ export async function isNewerVersionAvailable(latestVersion: string): Promise<bo
 }
 
 /**
- * Constructs candidate remote app-version.json URLs.
- * On Native Capacitor Android apps or localhost, ALWAYS hit the canonical production server URL first so old APKs discover new web releases!
- */
-export function getAppVersionManifestUrls(): string[] {
-  const timestamp = Date.now();
-  const urls: string[] = [];
-
-  if (typeof window !== 'undefined') {
-    const origin = window.location.origin;
-    if (Capacitor.isNativePlatform() || origin.includes('localhost') || origin.includes('127.0.0.1')) {
-      // Native Android APK / local dev -> Must query remote production website over the internet!
-      urls.push(`${PRODUCTION_SITE_URL}/app-version.json?t=${timestamp}`);
-      urls.push(`/app-version.json?t=${timestamp}`);
-    } else {
-      // Web production domain
-      urls.push(`/app-version.json?t=${timestamp}`);
-      urls.push(`${PRODUCTION_SITE_URL}/app-version.json?t=${timestamp}`);
-    }
-  } else {
-    urls.push(`${PRODUCTION_SITE_URL}/app-version.json?t=${timestamp}`);
-  }
-
-  return urls;
-}
-
-/**
  * Fetch public application version manifest (/app-version.json) with cache busting
- * from the remote production server and evaluate against the dynamically detected installed version.
+ * directly from the remote production server (https://finance-spendly.vercel.app/app-version.json)
+ * and evaluate against the dynamically detected installed version.
  */
 export async function checkForAppUpdate(_forceFresh = false): Promise<UpdateCheckResult> {
   const currentVersion = await getInstalledAppVersion();
+  const lastCheckedAt = new Date().toISOString();
+  const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
 
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    console.log('[Spendly Update] Result: OFFLINE');
     return {
       status: 'offline',
       currentVersion,
       message: 'Connect to the internet to check for the latest version.',
+      lastCheckedAt,
     };
   }
 
-  const manifestUrls = getAppVersionManifestUrls();
+  // Canonical production URL with runtime timestamp query parameter
+  const targetUrl = `${PRODUCTION_SITE_URL}/app-version.json?t=${Date.now()}`;
+  console.log(`[Spendly Update] Remote URL: ${targetUrl}`);
+
   let manifest: AppVersionManifest | null = null;
+  let httpStatus = 0;
   let fetchErrorMsg = '';
 
-  for (const url of manifestUrls) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-      const res = await fetch(url, {
-        signal: controller.signal,
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
-        },
-      });
+    const res = await fetch(targetUrl, {
+      signal: controller.signal,
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
+    });
 
-      clearTimeout(timeoutId);
+    clearTimeout(timeoutId);
+    httpStatus = res.status;
+    console.log(`[Spendly Update] HTTP: ${httpStatus}`);
 
-      if (res.ok) {
-        const json = await res.json();
-        if (json && typeof json === 'object' && json.version) {
-          manifest = json;
-          break;
-        }
+    if (res.ok) {
+      const json = await res.json();
+      if (json && typeof json === 'object' && json.version) {
+        manifest = json;
       } else {
-        fetchErrorMsg = `HTTP ${res.status}`;
+        fetchErrorMsg = 'Invalid remote version JSON structure';
       }
-    } catch (err: any) {
-      fetchErrorMsg = err?.message || String(err);
-      console.warn(`[UpdateCheck] Failed fetching from ${url}:`, err);
+    } else {
+      fetchErrorMsg = `Server returned HTTP ${res.status}`;
+    }
+  } catch (err: any) {
+    fetchErrorMsg = err?.message || 'Network request failed';
+    console.warn(`[Spendly Update] Network fetch error from ${targetUrl}:`, err);
+  }
+
+  // Fallback for Web browser environment ONLY if production URL failed (e.g. preview deployment)
+  if (!manifest && !isNative) {
+    try {
+      const relativeUrl = `/app-version.json?t=${Date.now()}`;
+      console.log(`[Spendly Update] Fallback relative fetch: ${relativeUrl}`);
+      const res = await fetch(relativeUrl, { cache: 'no-store' });
+      if (res.ok) {
+        manifest = await res.json();
+        httpStatus = res.status;
+      }
+    } catch {
+      // ignore
     }
   }
 
   if (!manifest) {
+    console.log(`[Spendly Update] Comparison: ERROR (${fetchErrorMsg})`);
     return {
       status: 'error',
       currentVersion,
-      message: `Unable to check for updates (${fetchErrorMsg || 'network error'}).`,
+      message: `Could not check for updates (${fetchErrorMsg || 'network error'}).`,
+      checkUrl: targetUrl,
+      httpStatus,
+      lastCheckedAt,
     };
   }
 
   const latestVersion = String(manifest.version).replace(/^v/i, '').trim();
+  console.log(`[Spendly Update] Remote: ${latestVersion}`);
 
   // Cache latest fetched manifest in localStorage
   try {
@@ -186,20 +213,28 @@ export async function checkForAppUpdate(_forceFresh = false): Promise<UpdateChec
   const cmp = compareSemVer(currentVersion, latestVersion);
 
   if (cmp < 0) {
-    console.log(`[UpdateCheck] Installed: ${currentVersion} | Remote Latest: ${latestVersion} | Status: update_available`);
+    console.log(`[Spendly Update] Comparison: UPDATE_AVAILABLE (Installed: ${currentVersion}, Remote: ${latestVersion})`);
     return {
       status: 'update_available',
       currentVersion,
       latestVersion,
       manifest,
+      checkUrl: targetUrl,
+      httpStatus: httpStatus || 200,
+      lastCheckedAt,
+      source: 'REMOTE_PRODUCTION',
     };
   } else {
-    console.log(`[UpdateCheck] Installed: ${currentVersion} | Remote Latest: ${latestVersion} | Status: up_to_date`);
+    console.log(`[Spendly Update] Comparison: UP_TO_DATE (Installed: ${currentVersion}, Remote: ${latestVersion})`);
     return {
       status: 'up_to_date',
       currentVersion,
       latestVersion,
       manifest,
+      checkUrl: targetUrl,
+      httpStatus: httpStatus || 200,
+      lastCheckedAt,
+      source: 'REMOTE_PRODUCTION',
     };
   }
 }
@@ -231,7 +266,7 @@ export function getCachedVersionManifest(): AppVersionManifest | null {
  * Check if the user has dismissed/postponed notification for a specific latest version
  */
 export function isVersionDismissed(latestVersion: string): boolean {
-  // 1. Version-specific dismissal check
+  // 1. Version-specific dismissal check (e.g. spendly_update_dismissed_3.1.4)
   const dismissedKey = `spendly_update_dismissed_${latestVersion}`;
   if (localStorage.getItem(dismissedKey) === 'true') {
     return true;

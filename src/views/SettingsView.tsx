@@ -3,7 +3,6 @@ import { useApp } from '../context/AppContext';
 import { StorageEngine } from '../db/storage';
 import type { BackupData, Category } from '../types/finance';
 import { exportTransactionsCSV } from '../utils/exportUtils';
-import { compareSemVer } from '../utils/versionCheck';
 import {
   Shield,
   Eye,
@@ -37,6 +36,7 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  Loader2,
 } from 'lucide-react';
 
 const GithubIcon: React.FC<{ size?: number; color?: string }> = ({ size = 16, color = 'currentColor' }) => (
@@ -76,6 +76,7 @@ export const SettingsView: React.FC = () => {
     toggleNotifyAppUpdates,
     installedVersion,
     latestManifest,
+    lastCheckResult,
     isCheckingUpdates,
     checkAppUpdates,
     setPinCode,
@@ -85,7 +86,6 @@ export const SettingsView: React.FC = () => {
     loadDemoData,
     isOffline,
     syncStatus,
-    pendingOpsCount,
     triggerManualSync,
     soundEnabled,
     toggleSoundEnabled,
@@ -1419,49 +1419,98 @@ export const SettingsView: React.FC = () => {
         isOpen={isDiagnosticModalOpen}
         onClose={() => setIsDiagnosticModalOpen(false)}
         title="System & Version Diagnostic"
-        subtitle="Internal runtime metrics and update subsystem audit."
+        subtitle="Developer diagnostic metrics and live update engine state."
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.86rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.84rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Platform:</span>
+            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+              {typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform() ? 'Android Native' : 'Web Browser'}
+            </span>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
             <span style={{ color: 'var(--text-muted)' }}>Installed Version:</span>
-            <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>V{installedVersion || APP_VERSION}</span>
+            <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>{installedVersion || APP_VERSION}</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)', wordBreak: 'break-all' }}>
+            <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>Remote Manifest URL:</span>
+            <span style={{ fontWeight: 500, fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>
+              {lastCheckResult?.checkUrl || 'https://finance-spendly.vercel.app/app-version.json'}
+            </span>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Remote Manifest Version:</span>
-            <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>V{latestManifest?.version || APP_VERSION}</span>
+            <span style={{ color: 'var(--text-muted)' }}>Remote Version:</span>
+            <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>
+              {lastCheckResult?.latestVersion || latestManifest?.version || 'Unknown'}
+            </span>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Manifest Server URL:</span>
-            <span style={{ fontWeight: 500, fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>https://finance-spendly.vercel.app/app-version.json</span>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Platform Environment:</span>
+            <span style={{ color: 'var(--text-muted)' }}>Last Check:</span>
             <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-              {typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform() ? 'Android Native (Capacitor)' : 'Web Browser (Vercel)'}
+              {lastCheckResult?.lastCheckedAt ? new Date(lastCheckResult.lastCheckedAt).toLocaleTimeString() : 'Not Checked Yet'}
             </span>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Update Evaluation Result:</span>
-            <span style={{ fontWeight: 800, color: compareSemVer(installedVersion || APP_VERSION, latestManifest?.version || APP_VERSION) < 0 ? 'var(--status-expense)' : 'var(--accent-cyan)' }}>
-              {compareSemVer(installedVersion || APP_VERSION, latestManifest?.version || APP_VERSION) < 0 ? 'UPDATE AVAILABLE' : 'UP TO DATE'}
+            <span style={{ color: 'var(--text-muted)' }}>HTTP Result:</span>
+            <span style={{ fontWeight: 700, color: lastCheckResult?.httpStatus === 200 ? 'var(--accent-emerald)' : 'var(--status-expense)' }}>
+              {lastCheckResult?.httpStatus ? `HTTP ${lastCheckResult.httpStatus}` : isOffline ? 'Offline' : 'None'}
             </span>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Sync Engine Status:</span>
-            <span style={{ fontWeight: 600, color: 'var(--accent-cyan)' }}>{syncStatus} (Pending: {pendingOpsCount})</span>
+            <span style={{ color: 'var(--text-muted)' }}>Parsed Remote Version:</span>
+            <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>
+              {lastCheckResult?.latestVersion || latestManifest?.version || 'None'}
+            </span>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Storage Layer:</span>
-            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>IndexedDB (spendly_indexeddb)</span>
+            <span style={{ color: 'var(--text-muted)' }}>Comparison Result:</span>
+            <span
+              style={{
+                fontWeight: 800,
+                color:
+                  lastCheckResult?.status === 'update_available'
+                    ? 'var(--status-expense)'
+                    : lastCheckResult?.status === 'up_to_date'
+                    ? 'var(--accent-emerald)'
+                    : 'var(--status-warning)',
+              }}
+            >
+              {lastCheckResult?.status?.toUpperCase() || 'NOT_RUN'}
+            </span>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Update Check Error:</span>
+            <span style={{ fontWeight: 600, color: lastCheckResult?.status === 'error' ? 'var(--status-expense)' : 'var(--text-secondary)' }}>
+              {lastCheckResult?.status === 'error' ? lastCheckResult.message : lastCheckResult?.status === 'offline' ? 'Offline' : 'None'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Update Check Source:</span>
+            <span style={{ fontWeight: 600, color: 'var(--accent-cyan)' }}>
+              {lastCheckResult?.source || 'REMOTE_PRODUCTION'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginTop: '12px' }}>
+            <button
+              type="button"
+              onClick={() => checkAppUpdates(true)}
+              disabled={isCheckingUpdates}
+              className="btn btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem' }}
+            >
+              {isCheckingUpdates ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              Run Update Check Now
+            </button>
             <button type="button" onClick={() => setIsDiagnosticModalOpen(false)} className="btn btn-secondary">
               Close Diagnostic
             </button>
