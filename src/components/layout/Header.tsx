@@ -2,7 +2,6 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { Eye, EyeOff, Search, Plus, Wifi, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck, Bell, Sparkles } from 'lucide-react';
 import { isNewerVersionAvailable } from '../../utils/versionCheck';
-import { UpdateModal } from '../modals/UpdateModal';
 
 export const Header: React.FC = () => {
   const {
@@ -20,9 +19,7 @@ export const Header: React.FC = () => {
     user,
     unreadNotificationCount,
     latestManifest,
-    isUpdateModalOpen,
     setIsUpdateModalOpen,
-    postponeUpdate,
   } = useApp();
 
   const getPageMeta = () => {
@@ -351,14 +348,6 @@ export const Header: React.FC = () => {
           </button>
         </div>
       </header>
-
-      {/* App Update Modal */}
-      <UpdateModal
-        isOpen={isUpdateModalOpen}
-        onClose={() => setIsUpdateModalOpen(false)}
-        manifest={latestManifest}
-        onLater={postponeUpdate}
-      />
     </>
   );
 };

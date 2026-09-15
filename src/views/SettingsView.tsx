@@ -72,6 +72,7 @@ export const SettingsView: React.FC = () => {
     deleteCategory,
     toggleHideBalances,
     toggleNotifyAppUpdates,
+    isCheckingUpdates,
     checkAppUpdates,
     setPinCode,
     importBackupData,
@@ -886,15 +887,15 @@ export const SettingsView: React.FC = () => {
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
-                  onClick={async () => {
-                    showToast('Checking for application updates...', 'info');
-                    await checkAppUpdates();
+                  disabled={isCheckingUpdates}
+                  onClick={() => {
+                    checkAppUpdates(true);
                   }}
                   className="btn btn-secondary"
-                  style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                  style={{ padding: '6px 14px', fontSize: '0.82rem', opacity: isCheckingUpdates ? 0.7 : 1 }}
                 >
-                  <Sparkles size={14} color="var(--accent-cyan)" />
-                  <span>Check for Updates</span>
+                  <Sparkles size={14} color="var(--accent-cyan)" className={isCheckingUpdates ? 'spin' : ''} />
+                  <span>{isCheckingUpdates ? 'Checking for updates...' : 'Check for Updates'}</span>
                 </button>
               </div>
             </div>

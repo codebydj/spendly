@@ -13,6 +13,7 @@ import { AddAccountModal } from './components/forms/AddAccountModal';
 import { AddBudgetModal } from './components/forms/AddBudgetModal';
 import { AddRecurringModal } from './components/forms/AddRecurringModal';
 import { PinLockModal } from './components/forms/PinLockModal';
+import { UpdateModal } from './components/modals/UpdateModal';
 
 import { DashboardView } from './views/DashboardView';
 import { TransactionsView } from './views/TransactionsView';
@@ -76,6 +77,10 @@ const AppShell: React.FC = () => {
     setIsAddRecurringOpen,
     selectedAccountIdForDetail,
     setSelectedAccountIdForDetail,
+    latestManifest,
+    isUpdateModalOpen,
+    setIsUpdateModalOpen,
+    postponeUpdate,
   } = useApp();
 
   // Edge-to-edge StatusBar Setup
@@ -193,6 +198,12 @@ const AppShell: React.FC = () => {
           <MainContentRouter />
         </div>
         <ToastContainer />
+        <UpdateModal
+          isOpen={isUpdateModalOpen}
+          onClose={() => setIsUpdateModalOpen(false)}
+          manifest={latestManifest}
+          onLater={postponeUpdate}
+        />
       </div>
     );
   }
@@ -223,6 +234,12 @@ const AppShell: React.FC = () => {
       <AddBudgetModal />
       <AddRecurringModal />
       <PinLockModal />
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        manifest={latestManifest}
+        onLater={postponeUpdate}
+      />
       <ToastContainer />
     </div>
   );

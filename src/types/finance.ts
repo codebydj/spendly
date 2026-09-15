@@ -115,10 +115,13 @@ export interface PendingSyncOperation {
 
 export interface AppVersionManifest {
   version: string;
-  releaseDate: string;
-  title: string;
-  message: string;
+  versionName?: string;
+  buildDate?: string;
+  releaseDate?: string;
+  title?: string;
+  message?: string;
   downloadUrl?: string;
+  minimumSupportedVersion?: string;
   releaseNotesUrl?: string;
   releaseNotes?: string[];
 }

@@ -4,12 +4,36 @@ import { APP_VERSION, APP_BUILD_DATE } from '../config/appVersion';
 export const CURRENT_APP_VERSION = APP_VERSION;
 export const CURRENT_RELEASE_DATE = APP_BUILD_DATE;
 
-const LAST_NOTIFIED_KEY = 'spendly_last_notified_version';
 const POSTPONED_UNTIL_KEY = 'spendly_update_postponed_until';
 const CACHED_MANIFEST_KEY = 'spendly_cached_version_manifest';
 
+export type UpdateCheckResult =
+  | {
+      status: 'update_available';
+      currentVersion: string;
+      latestVersion: string;
+      manifest: AppVersionManifest;
+    }
+  | {
+      status: 'up_to_date';
+      currentVersion: string;
+      latestVersion: string;
+      manifest: AppVersionManifest;
+    }
+  | {
+      status: 'offline';
+      currentVersion: string;
+      message: string;
+    }
+  | {
+      status: 'error';
+      currentVersion: string;
+      message: string;
+    };
+
 /**
- * Compare two semantic version strings (e.g. "3.1.0" vs "3.0.8", "3.10.0" vs "3.9.0")
+ * Compare two semantic version strings (e.g. "3.1.2" vs "3.1.3", "4.0.0" vs "3.9.9")
+ * Strips optional leading 'v' or 'V'.
  * Returns:
  *   -1 if v1 < v2 (v2 is newer)
  *    0 if v1 === v2
@@ -42,52 +66,97 @@ export function isNewerVersionAvailable(latestVersion: string): boolean {
   return compareSemVer(CURRENT_APP_VERSION, latestVersion) < 0;
 }
 
-let inMemoryManifestCache: { data: AppVersionManifest; timestamp: number } | null = null;
-const FETCH_THROTTLE_MS = 5 * 60 * 1000; // 5 minutes
-
 /**
- * Fetch the public latest application version manifest (/app-version.json)
+ * Fetch public application version manifest (/app-version.json) with cache prevention
+ * and evaluate against CURRENT_APP_VERSION.
  */
-export async function fetchLatestAppVersion(): Promise<AppVersionManifest | null> {
-  // If cached in memory within 5 minutes, return memory cache immediately
-  if (inMemoryManifestCache && Date.now() - inMemoryManifestCache.timestamp < FETCH_THROTTLE_MS) {
-    return inMemoryManifestCache.data;
-  }
+export async function checkForAppUpdate(_forceFresh = false): Promise<UpdateCheckResult> {
+  const currentVersion = CURRENT_APP_VERSION;
 
-  // If offline, attempt to load cached manifest
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    return getCachedVersionManifest();
+    return {
+      status: 'offline',
+      currentVersion,
+      message: 'Connect to the internet to check for the latest version.',
+    };
   }
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     const res = await fetch(`/app-version.json?t=${Date.now()}`, {
       signal: controller.signal,
+      cache: 'no-store',
       headers: {
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
       },
     });
 
     clearTimeout(timeoutId);
 
     if (!res.ok) {
-      return getCachedVersionManifest();
+      return {
+        status: 'error',
+        currentVersion,
+        message: `Unable to check for updates (HTTP ${res.status}).`,
+      };
     }
 
-    const data: AppVersionManifest = await res.json();
-    if (data && data.version) {
-      // Cache latest fetched manifest
-      inMemoryManifestCache = { data, timestamp: Date.now() };
-      localStorage.setItem(CACHED_MANIFEST_KEY, JSON.stringify(data));
-      return data;
+    const manifest: AppVersionManifest = await res.json();
+    if (!manifest || typeof manifest !== 'object' || !manifest.version) {
+      return {
+        status: 'error',
+        currentVersion,
+        message: 'Invalid version manifest format received.',
+      };
     }
-    return getCachedVersionManifest();
-  } catch (err) {
-    console.warn('[Spendly Update Check] Network fetch skipped/failed:', err);
-    return getCachedVersionManifest();
+
+    const latestVersion = String(manifest.version).trim();
+
+    // Cache latest fetched manifest in localStorage
+    localStorage.setItem(CACHED_MANIFEST_KEY, JSON.stringify(manifest));
+
+    // Semantic comparison
+    const cmp = compareSemVer(currentVersion, latestVersion);
+
+    if (cmp < 0) {
+      console.log(`[UpdateCheck] Current: ${currentVersion} | Latest: ${latestVersion} | Status: update_available`);
+      return {
+        status: 'update_available',
+        currentVersion,
+        latestVersion,
+        manifest,
+      };
+    } else {
+      console.log(`[UpdateCheck] Current: ${currentVersion} | Latest: ${latestVersion} | Status: up_to_date`);
+      return {
+        status: 'up_to_date',
+        currentVersion,
+        latestVersion,
+        manifest,
+      };
+    }
+  } catch (err: any) {
+    console.warn('[UpdateCheck] Fetch error:', err);
+    return {
+      status: 'error',
+      currentVersion,
+      message: 'Unable to check for updates. Please try again later.',
+    };
   }
+}
+
+/**
+ * Fetch latest app version manifest directly (Helper)
+ */
+export async function fetchLatestAppVersion(): Promise<AppVersionManifest | null> {
+  const res = await checkForAppUpdate();
+  if (res.status === 'update_available' || res.status === 'up_to_date') {
+    return res.manifest;
+  }
+  return getCachedVersionManifest();
 }
 
 /**
@@ -103,42 +172,38 @@ export function getCachedVersionManifest(): AppVersionManifest | null {
 }
 
 /**
- * Check whether duplicate notification should be suppressed or postponed
+ * Check if the user has dismissed/postponed notification for a specific latest version
  */
-export function shouldShowUpdateNotification(latestVersion: string): boolean {
-  if (!isNewerVersionAvailable(latestVersion)) {
-    return false;
+export function isVersionDismissed(latestVersion: string): boolean {
+  // 1. Version-specific dismissal check
+  const dismissedKey = `spendly_update_dismissed_${latestVersion}`;
+  if (localStorage.getItem(dismissedKey) === 'true') {
+    return true;
   }
 
-  // 1. Check if user already saw notification for this exact version
-  const lastNotified = localStorage.getItem(LAST_NOTIFIED_KEY);
-  if (lastNotified && compareSemVer(lastNotified, latestVersion) >= 0) {
-    return false;
-  }
-
-  // 2. Check if user clicked "Later" (postponed)
+  // 2. Postponed delay expiry check
   const postponedUntil = localStorage.getItem(POSTPONED_UNTIL_KEY);
   if (postponedUntil) {
     const expiry = parseInt(postponedUntil, 10);
     if (!isNaN(expiry) && Date.now() < expiry) {
-      return false; // Still within postponed delay
+      return true;
     }
   }
 
-  return true;
+  return false;
 }
 
 /**
- * Mark version as notified
+ * Postpone / dismiss update notification for specified version (default 7 days)
  */
-export function markVersionNotified(version: string): void {
-  localStorage.setItem(LAST_NOTIFIED_KEY, version);
-  localStorage.removeItem(POSTPONED_UNTIL_KEY);
+export function dismissUpdateForVersion(version: string, days = 7): void {
+  const dismissedKey = `spendly_update_dismissed_${version}`;
+  localStorage.setItem(dismissedKey, 'true');
+
+  const expiry = Date.now() + days * 24 * 60 * 60 * 1000;
+  localStorage.setItem(POSTPONED_UNTIL_KEY, String(expiry));
 }
 
-/**
- * Postpone update notification for specified number of days (default 7 days)
- */
 export function postponeUpdateNotification(days = 7): void {
   const expiry = Date.now() + days * 24 * 60 * 60 * 1000;
   localStorage.setItem(POSTPONED_UNTIL_KEY, String(expiry));

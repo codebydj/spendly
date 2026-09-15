@@ -10,9 +10,9 @@ import { soundService } from '../services/soundService';
 import { hashPin, verifyPin } from '../utils/crypto';
 import { scheduleReminderNotification, cancelReminderNotification, scheduleUpdateNotification } from '../services/nativeNotifications';
 import {
-  fetchLatestAppVersion,
-  shouldShowUpdateNotification,
-  markVersionNotified,
+  checkForAppUpdate,
+  isVersionDismissed,
+  dismissUpdateForVersion,
   postponeUpdateNotification,
   CURRENT_APP_VERSION,
 } from '../utils/versionCheck';
@@ -74,7 +74,8 @@ interface AppContextType {
   latestManifest: AppVersionManifest | null;
   isUpdateModalOpen: boolean;
   setIsUpdateModalOpen: (open: boolean) => void;
-  checkAppUpdates: () => Promise<void>;
+  isCheckingUpdates: boolean;
+  checkAppUpdates: (isManual?: boolean) => Promise<void>;
   postponeUpdate: () => void;
 
   // Data
@@ -172,6 +173,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // App Update Modal State
   const [latestManifest, setLatestManifest] = useState<AppVersionManifest | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState<boolean>(false);
 
   const toggleSoundEnabled = () => {
     const next = !soundEnabled;
@@ -244,46 +246,86 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   // Check App Updates
-  const checkAppUpdates = useCallback(async () => {
-    if (settingsRef.current.notifyAppUpdates === false) return;
+  const checkAppUpdates = useCallback(
+    async (isManual = false) => {
+      if (!isManual && settingsRef.current.notifyAppUpdates === false) return;
 
-    const manifest = await fetchLatestAppVersion();
-    if (!manifest) return;
+      setIsCheckingUpdates(true);
+      try {
+        const result = await checkForAppUpdate(isManual);
 
-    if (shouldShowUpdateNotification(manifest.version)) {
-      setLatestManifest(manifest);
-      scheduleUpdateNotification(manifest);
+        if (result.status === 'update_available') {
+          setLatestManifest(result.manifest);
 
-      // Add to Notification Center if not already present
-      setNotifications((prev) => {
-        const exists = prev.some((n) => n.type === 'APP_UPDATE' && n.title.includes(manifest.version));
-        if (exists) return prev;
+          // Always open modal if manual check; on background check open modal if not dismissed
+          if (isManual || !isVersionDismissed(result.latestVersion)) {
+            setIsUpdateModalOpen(true);
+          }
 
-        const updateNotif: NotificationItem = {
-          id: `notif-update-${manifest.version}`,
-          type: 'APP_UPDATE',
-          title: manifest.title || `Spendly V${manifest.version} Available`,
-          message: manifest.message || 'New improvements and features are now available.',
-          date: new Date().toISOString(),
-          isRead: false,
-          versionManifest: manifest,
-        };
-        return [updateNotif, ...prev];
-      });
+          // Schedule native Android notification
+          scheduleUpdateNotification(result.manifest);
 
-      showToast(`Spendly V${manifest.version} is now available`, 'info', 'View Update', () => {
-        setIsUpdateModalOpen(true);
-      });
+          // Add to Notification Center if not already present
+          setNotifications((prev) => {
+            const exists = prev.some((n) => n.type === 'APP_UPDATE' && n.title.includes(result.latestVersion));
+            if (exists) return prev;
 
-      markVersionNotified(manifest.version);
+            const updateNotif: NotificationItem = {
+              id: `notif-update-${result.latestVersion}`,
+              type: 'APP_UPDATE',
+              title: result.manifest.title || `Spendly V${result.latestVersion} Available`,
+              message: result.manifest.message || 'New improvements and features are now available.',
+              date: new Date().toISOString(),
+              isRead: false,
+              versionManifest: result.manifest,
+            };
+            return [updateNotif, ...prev];
+          });
+
+          if (isManual) {
+            showToast(`Spendly V${result.latestVersion} is available!`, 'info');
+          }
+        } else if (result.status === 'up_to_date') {
+          if (isManual) {
+            showToast(`You're up to date! Spendly V${result.currentVersion} is the latest version.`, 'success');
+          }
+        } else if (result.status === 'offline') {
+          if (isManual) {
+            showToast("You're offline. Connect to the internet to check for the latest version.", 'warning');
+          }
+        } else if (result.status === 'error') {
+          if (isManual) {
+            showToast(result.message || "Couldn't check for updates. Please try again later.", 'danger');
+          }
+        }
+      } catch (err) {
+        if (isManual) {
+          showToast("Couldn't check for updates. Please try again later.", 'danger');
+        }
+      } finally {
+        setIsCheckingUpdates(false);
+      }
+    },
+    [showToast]
+  );
+
+  const postponeUpdate = useCallback(() => {
+    if (latestManifest?.version) {
+      dismissUpdateForVersion(latestManifest.version, 7);
+    } else {
+      postponeUpdateNotification(7);
     }
-  }, [showToast]);
-
-  const postponeUpdate = () => {
-    postponeUpdateNotification(7);
     setIsUpdateModalOpen(false);
-    showToast('Update reminder postponed for 7 days', 'info');
-  };
+    showToast('Update reminder postponed', 'info');
+  }, [latestManifest, showToast]);
+
+  // Unblocked background update check on app mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      checkAppUpdates(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [checkAppUpdates]);
 
   // Hydrate User Data from IndexedDB & Supabase Cloud
   const isHydratingRef = useRef<boolean>(false);
@@ -1509,6 +1551,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         latestManifest,
         isUpdateModalOpen,
         setIsUpdateModalOpen,
+        isCheckingUpdates,
         checkAppUpdates,
         postponeUpdate,
         accounts,
