@@ -5,6 +5,7 @@ import type { TransactionType } from '../../types/finance';
 import { ArrowLeftRight, Check, Sparkles, CheckCircle2, MapPin, Navigation, X, Loader2, Plus } from 'lucide-react';
 import { LocationService, type LocationResult } from '../../services/locationService';
 import { SelectLocationMapModal } from '../modals/SelectLocationMapModal';
+import { suggestCategoryForMerchant } from '../../utils/calculations';
 
 export const AddTransactionModal: React.FC = () => {
   const {
@@ -155,27 +156,14 @@ export const AddTransactionModal: React.FC = () => {
     setShowSuggestions(false);
   };
 
-  // Smart Category Suggestion algorithm
+  // Smart Category Suggestion algorithm & Merchant Memory
   useEffect(() => {
     if (!note.trim() || type === 'TRANSFER') {
       setSuggestedCatId(null);
       return;
     }
-    const text = note.toLowerCase();
-    let suggested: string | null = null;
 
-    if (text.includes('swiggy') || text.includes('zomato') || text.includes('lunch') || text.includes('dinner') || text.includes('cafe') || text.includes('food')) {
-      suggested = categories.find((c) => c.name === 'Food')?.id || null;
-    } else if (text.includes('amazon') || text.includes('flipkart') || text.includes('myntra') || text.includes('clothes') || text.includes('shopping')) {
-      suggested = categories.find((c) => c.name === 'Shopping')?.id || null;
-    } else if (text.includes('uber') || text.includes('rapido') || text.includes('ola') || text.includes('petrol') || text.includes('cab')) {
-      suggested = categories.find((c) => c.name === 'Transport')?.id || null;
-    } else if (text.includes('electricity') || text.includes('wifi') || text.includes('bill') || text.includes('recharge')) {
-      suggested = categories.find((c) => c.name === 'Bills')?.id || null;
-    } else if (text.includes('salary') || text.includes('stipend')) {
-      suggested = categories.find((c) => c.name === 'Salary')?.id || null;
-    }
-
+    const suggested = suggestCategoryForMerchant(note, categories);
     if (suggested && suggested !== categoryId) {
       setSuggestedCatId(suggested);
     } else {

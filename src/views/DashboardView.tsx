@@ -9,6 +9,13 @@ import { DonutChart } from '../components/ui/Charts';
 import type { CategoryData } from '../components/ui/Charts';
 import { DashboardSkeleton } from '../components/ui/SkeletonLoader';
 import {
+  calculateNetWorthBreakdown,
+  calculateCashFlowSummary,
+  generateDeterministicInsights,
+  generateFinancialHealthSummary,
+  calculateMonthlyClosingSummary,
+} from '../utils/calculations';
+import {
   ArrowDownLeft,
   ArrowUpRight,
   ChevronRight,
@@ -19,11 +26,14 @@ import {
   Receipt,
   Eye,
   EyeOff,
+  Calendar,
+  CheckCircle2,
+  ShieldCheck,
+  Clock,
 } from 'lucide-react';
 
 export const DashboardView: React.FC = () => {
   const {
-    totalBalance,
     monthlyIncome,
     monthlyExpenses,
     monthlySavings,
@@ -31,6 +41,7 @@ export const DashboardView: React.FC = () => {
     transactions,
     categories,
     recurringPayments,
+    budgets,
     setCurrentView,
     setSelectedAccountIdForDetail,
     setIsAddTransactionOpen,
@@ -40,6 +51,8 @@ export const DashboardView: React.FC = () => {
     settings,
     toggleHideBalances,
     authLoading,
+    addTransaction,
+    showToast,
   } = useApp();
 
   const activeAccounts = accounts.filter((a) => !a.isArchived);
@@ -49,6 +62,18 @@ export const DashboardView: React.FC = () => {
   let greeting = 'Good morning';
   if (currentHour >= 12 && currentHour < 17) greeting = 'Good afternoon';
   if (currentHour >= 17) greeting = 'Good evening';
+
+  // 1. Net Worth Breakdown
+  const netWorthData = calculateNetWorthBreakdown(accounts, transactions);
+
+  // 2. Cash Flow Summary (Today, Week, Month)
+  const cashFlow = calculateCashFlowSummary(transactions);
+
+  // 3. Monthly Closing Summary (Previous Month)
+  const monthlyClosing = calculateMonthlyClosingSummary(transactions, categories, budgets);
+
+  // 4. Financial Health Statements
+  const healthStatements = generateFinancialHealthSummary(transactions, budgets, accounts);
 
   // Category spending calculations for Donut Chart
   const currentMonthPrefix = new Date().toISOString().slice(0, 7);
@@ -84,41 +109,40 @@ export const DashboardView: React.FC = () => {
   const recentTransactions = transactions.slice(0, 5);
 
   // Deterministic Smart Insights Generation
-  const insights: InsightItem[] = [];
+  const deterministicInsightStrings = generateDeterministicInsights(transactions, categories, budgets);
+  const insights: InsightItem[] = deterministicInsightStrings.map((msg, idx) => ({
+    id: `insight-det-${idx}`,
+    type: msg.includes('exceeded') || msg.includes('higher') ? 'WARNING' : msg.includes('lower') ? 'POSITIVE' : 'NEUTRAL',
+    title: msg.split(' ')[0] + ' ' + msg.split(' ')[1],
+    message: msg,
+  }));
 
-  if (transactions.length >= 3) {
-    if (monthlyIncome > 0) {
-      const savingsRate = Math.round((monthlySavings / monthlyIncome) * 100);
-      if (savingsRate > 0) {
-        insights.push({
-          id: 'ins-savings',
-          type: 'POSITIVE',
-          title: `Savings Rate: ${savingsRate}%`,
-          message: `You saved ₹${monthlySavings.toLocaleString()} (${savingsRate}%) of income this month.`,
-        });
-      }
-    }
+  // Upcoming Recurring Payments
+  const upcomingPayments = recurringPayments
+    .filter((r) => !r.isPaused)
+    .slice(0, 3);
 
-    if (donutData.length > 0) {
-      const topCat = donutData[0];
-      insights.push({
-        id: 'ins-top-cat',
-        type: 'NEUTRAL',
-        title: `Top Category: ${topCat.name}`,
-        message: `${topCat.name} is ${topCat.percentage}% (₹${topCat.amount.toLocaleString()}) of spending.`,
-      });
+  // Action: Mark Recurring as Paid
+  const handleMarkPaid = (rec: any) => {
+    if (activeAccounts.length === 0) {
+      showToast('Please create an account first.', 'warning');
+      return;
     }
-
-    const upcomingRecurring = recurringPayments.find((r) => !r.isPaused);
-    if (upcomingRecurring) {
-      insights.push({
-        id: 'ins-recurring',
-        type: 'NEUTRAL',
-        title: `Upcoming: ${upcomingRecurring.title}`,
-        message: `₹${upcomingRecurring.amount.toLocaleString()} due on ${upcomingRecurring.nextDueDate}.`,
-      });
-    }
-  }
+    const accId = activeAccounts[0].id;
+    addTransaction({
+      type: 'EXPENSE',
+      amount: rec.amount,
+      accountId: accId,
+      categoryId: rec.categoryId || categories[0]?.id || 'cat-bills',
+      date: new Date().toISOString().slice(0, 10),
+      time: new Date().toTimeString().slice(0, 5),
+      merchant: rec.title,
+      description: `Recurring payment: ${rec.title}`,
+      note: 'Auto-marked as paid from dashboard',
+      paymentMethod: 'UPI / Online',
+    });
+    showToast(`Marked ${rec.title} (₹${rec.amount.toLocaleString()}) as paid!`, 'success');
+  };
 
   // Show Skeleton UI during Auth / Cloud Data Hydration
   if (authLoading) {
@@ -164,10 +188,7 @@ export const DashboardView: React.FC = () => {
             <div
               onClick={() => setIsAddAccountOpen(true)}
               className="card-level-2"
-              style={{
-                padding: '14px',
-                cursor: 'pointer',
-              }}
+              style={{ padding: '14px', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                 <span className="badge badge-emerald">Step 1</span>
@@ -180,10 +201,7 @@ export const DashboardView: React.FC = () => {
             <div
               onClick={() => setIsAddTransactionOpen(true)}
               className="card-level-2"
-              style={{
-                padding: '14px',
-                cursor: 'pointer',
-              }}
+              style={{ padding: '14px', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                 <span className="badge badge-neutral">Step 2</span>
@@ -196,10 +214,7 @@ export const DashboardView: React.FC = () => {
             <div
               onClick={() => setIsAddBudgetOpen(true)}
               className="card-level-2"
-              style={{
-                padding: '14px',
-                cursor: 'pointer',
-              }}
+              style={{ padding: '14px', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                 <span className="badge badge-neutral">Step 3</span>
@@ -226,9 +241,55 @@ export const DashboardView: React.FC = () => {
   // 2. Mobile & Desktop Authenticated Dashboard
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* PREVIOUS MONTH CLOSING SUMMARY BANNER */}
+      {monthlyClosing.hasData && (
+        <div
+          className="card-level-2"
+          style={{
+            backgroundColor: 'rgba(34, 211, 238, 0.06)',
+            border: '1px solid var(--accent-cyan-border)',
+            padding: '14px 18px',
+            borderRadius: 'var(--radius-md)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                backgroundColor: 'var(--accent-cyan-subtle)',
+                color: 'var(--accent-cyan)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Calendar size={20} />
+            </div>
+            <div>
+              <span style={{ fontSize: '0.76rem', color: 'var(--accent-cyan)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                LAST MONTH SUMMARY ({monthlyClosing.monthName})
+              </span>
+              <div style={{ fontSize: '0.86rem', color: 'var(--text-primary)', fontWeight: 600, marginTop: '2px' }}>
+                Income: ₹{monthlyClosing.income.toLocaleString()} • Expenses: ₹{monthlyClosing.expenses.toLocaleString()} • Net: <strong style={{ color: monthlyClosing.net >= 0 ? 'var(--accent-cyan)' : 'var(--status-expense)' }}>₹{monthlyClosing.net.toLocaleString()}</strong>
+              </div>
+            </div>
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            Top Category: <strong>{monthlyClosing.topCategoryName}</strong> (₹{monthlyClosing.topCategoryAmount.toLocaleString()})
+          </div>
+        </div>
+      )}
+
       {/* NET WORTH HERO CENTERPIECE CARD */}
       <div className="card-level-4 ambient-violet-glow ambient-cyan-glow" style={{ position: 'relative', overflow: 'hidden', padding: '24px 28px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '0.02em' }}>
               {greeting}, financial summary
@@ -258,12 +319,30 @@ export const DashboardView: React.FC = () => {
               }}
               className="tabular-nums"
             >
-              {settings.hideBalances ? '₹•••••' : `₹${totalBalance.toLocaleString()}`}
+              {settings.hideBalances ? '₹•••••' : `₹${netWorthData.totalNetWorth.toLocaleString()}`}
             </div>
+          </div>
+
+          {/* Asset vs Credit Debt Snapshot pill */}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ backgroundColor: 'rgba(34, 211, 238, 0.1)', border: '1px solid var(--accent-cyan-border)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', textAlign: 'right' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Assets</span>
+              <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {settings.hideBalances ? '₹••••' : `₹${netWorthData.totalAssets.toLocaleString()}`}
+              </div>
+            </div>
+            {netWorthData.totalCreditCardDebt > 0 && (
+              <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', textAlign: 'right' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--status-expense)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Credit Debt</span>
+                <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--status-expense)' }}>
+                  {settings.hideBalances ? '₹••••' : `-₹${netWorthData.totalCreditCardDebt.toLocaleString()}`}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Compact Supporting Financial Summary Strip */}
+        {/* Supporting Monthly Financial Summary Strip */}
         <div
           style={{
             display: 'grid',
@@ -306,6 +385,52 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
+      {/* CASH FLOW SUMMARY (Today, Week, Month) */}
+      <div className="card-level-2" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Cash Flow Summary</h3>
+          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Real Transaction Data</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+          {/* Today */}
+          <div style={{ padding: '12px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Today</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginTop: '6px', color: 'var(--text-secondary)' }}>
+              <span>Inc: ₹{cashFlow.today.income.toLocaleString()}</span>
+              <span>Exp: ₹{cashFlow.today.expense.toLocaleString()}</span>
+            </div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, marginTop: '4px', color: cashFlow.today.net >= 0 ? 'var(--accent-cyan)' : 'var(--status-expense)' }}>
+              Net: ₹{cashFlow.today.net.toLocaleString()}
+            </div>
+          </div>
+
+          {/* This Week */}
+          <div style={{ padding: '12px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>This Week</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginTop: '6px', color: 'var(--text-secondary)' }}>
+              <span>Inc: ₹{cashFlow.week.income.toLocaleString()}</span>
+              <span>Exp: ₹{cashFlow.week.expense.toLocaleString()}</span>
+            </div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, marginTop: '4px', color: cashFlow.week.net >= 0 ? 'var(--accent-cyan)' : 'var(--status-expense)' }}>
+              Net: ₹{cashFlow.week.net.toLocaleString()}
+            </div>
+          </div>
+
+          {/* This Month */}
+          <div style={{ padding: '12px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>This Month</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginTop: '6px', color: 'var(--text-secondary)' }}>
+              <span>Inc: ₹{cashFlow.month.income.toLocaleString()}</span>
+              <span>Exp: ₹{cashFlow.month.expense.toLocaleString()}</span>
+            </div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, marginTop: '4px', color: cashFlow.month.net >= 0 ? 'var(--accent-cyan)' : 'var(--status-expense)' }}>
+              Net: ₹{cashFlow.month.net.toLocaleString()}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ACCOUNTS 2-COLUMN COMPACT GRID */}
       <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -334,6 +459,55 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
+      {/* UPCOMING PAYMENTS CARD */}
+      {upcomingPayments.length > 0 && (
+        <div className="card-level-2" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Clock size={16} color="var(--accent-cyan)" />
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Upcoming Payments</h3>
+            </div>
+            <button onClick={() => setCurrentView('recurring')} style={{ fontSize: '0.78rem', color: 'var(--accent-cyan)', fontWeight: 600 }}>
+              Manage
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {upcomingPayments.map((rec) => (
+              <div
+                key={rec.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid var(--border-color)',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>{rec.title}</div>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                    Due: {rec.nextDueDate} • ₹{rec.amount.toLocaleString()}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleMarkPaid(rec)}
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <CheckCircle2 size={14} color="var(--accent-cyan)" /> Mark as Paid
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* CATEGORY BREAKDOWN & INSIGHTS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
         {/* Category Spending Donut Chart */}
@@ -346,12 +520,23 @@ export const DashboardView: React.FC = () => {
           <DonutChart data={donutData} totalAmount={monthlyExpenses} hideBalances={settings.hideBalances} />
         </div>
 
-        {/* Smart Financial Insights */}
+        {/* Smart Financial Insights & Health Summary */}
         <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Sparkles size={16} color="var(--accent-emerald)" />
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Insights</h3>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Financial Insights</h3>
           </div>
+          
+          {healthStatements.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '4px' }}>
+              {healthStatements.map((stmt, i) => (
+                <div key={i} style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ShieldCheck size={14} color="var(--accent-cyan)" /> {stmt}
+                </div>
+              ))}
+            </div>
+          )}
+
           <InsightCard insights={insights} />
         </div>
       </div>

@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { StorageEngine } from '../db/storage';
 import type { BackupData, Category } from '../types/finance';
 import { exportTransactionsCSV } from '../utils/exportUtils';
+import { compareSemVer } from '../utils/versionCheck';
 import {
   Shield,
   Eye,
@@ -74,6 +75,7 @@ export const SettingsView: React.FC = () => {
     toggleHideBalances,
     toggleNotifyAppUpdates,
     installedVersion,
+    latestManifest,
     isCheckingUpdates,
     checkAppUpdates,
     setPinCode,
@@ -83,6 +85,7 @@ export const SettingsView: React.FC = () => {
     loadDemoData,
     isOffline,
     syncStatus,
+    pendingOpsCount,
     triggerManualSync,
     soundEnabled,
     toggleSoundEnabled,
@@ -97,6 +100,7 @@ export const SettingsView: React.FC = () => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isEditingCategories, setIsEditingCategories] = useState(false);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+  const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const userEmail = userProfile?.email || user?.email || 'user@spendly.app';
@@ -899,7 +903,16 @@ export const SettingsView: React.FC = () => {
                 <span style={{ fontWeight: 500, fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{APP_PACKAGE_ID}</span>
               </div>
 
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsDiagnosticModalOpen(true)}
+                  className="btn btn-secondary"
+                  style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                >
+                  <Info size={14} color="var(--accent-violet)" />
+                  <span>System Diagnostic</span>
+                </button>
                 <button
                   type="button"
                   disabled={isCheckingUpdates}
@@ -1396,6 +1409,61 @@ export const SettingsView: React.FC = () => {
             </button>
             <button type="button" onClick={handleConfirmReassignAndDelete} className="btn btn-danger">
               Move Transactions & Delete Category
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal 3: System & Version Diagnostic (Internal Dev Tool) */}
+      <Modal
+        isOpen={isDiagnosticModalOpen}
+        onClose={() => setIsDiagnosticModalOpen(false)}
+        title="System & Version Diagnostic"
+        subtitle="Internal runtime metrics and update subsystem audit."
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.86rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Installed Version:</span>
+            <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>V{installedVersion || APP_VERSION}</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Remote Manifest Version:</span>
+            <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>V{latestManifest?.version || APP_VERSION}</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Manifest Server URL:</span>
+            <span style={{ fontWeight: 500, fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>https://finance-spendly.vercel.app/app-version.json</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Platform Environment:</span>
+            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+              {typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform() ? 'Android Native (Capacitor)' : 'Web Browser (Vercel)'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Update Evaluation Result:</span>
+            <span style={{ fontWeight: 800, color: compareSemVer(installedVersion || APP_VERSION, latestManifest?.version || APP_VERSION) < 0 ? 'var(--status-expense)' : 'var(--accent-cyan)' }}>
+              {compareSemVer(installedVersion || APP_VERSION, latestManifest?.version || APP_VERSION) < 0 ? 'UPDATE AVAILABLE' : 'UP TO DATE'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Sync Engine Status:</span>
+            <span style={{ fontWeight: 600, color: 'var(--accent-cyan)' }}>{syncStatus} (Pending: {pendingOpsCount})</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.04)' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Storage Layer:</span>
+            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>IndexedDB (spendly_indexeddb)</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+            <button type="button" onClick={() => setIsDiagnosticModalOpen(false)} className="btn btn-secondary">
+              Close Diagnostic
             </button>
           </div>
         </div>

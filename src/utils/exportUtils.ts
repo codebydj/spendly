@@ -1,4 +1,4 @@
-import type { Transaction, Account, Category } from '../types/finance';
+import type { Transaction, Account, Category, BackupData } from '../types/finance';
 
 /**
  * Clean, robust, offline-first CSV and File Export engine for Spendly V3.1.3.
@@ -88,7 +88,7 @@ export function exportTransactionsCSV(
   });
 
   // Include UTF-8 BOM (\uFEFF) for Excel character set recognition
-  const csvContent = '\uFEFF' + headers.map(h => `"${h}"`).join(',') + '\n' + rows.join('\n');
+  const csvContent = '\uFEFF' + headers.map((h) => `"${h}"`).join(',') + '\n' + rows.join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
 
@@ -103,4 +103,55 @@ export function exportTransactionsCSV(
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 
   return { success: true, count: transactions.length, fileName };
+}
+
+/**
+ * Export full Spendly JSON backup without sensitive auth tokens or Supabase secrets.
+ */
+export function exportJSONBackup(backupData: BackupData): ExportResult {
+  try {
+    // Strip any sensitive credentials/tokens if present
+    const cleanBackup: BackupData = {
+      version: backupData.version || '3.1.3',
+      exportedAt: backupData.exportedAt || new Date().toISOString(),
+      accounts: backupData.accounts || [],
+      transactions: backupData.transactions || [],
+      budgets: backupData.budgets || [],
+      recurringPayments: backupData.recurringPayments || [],
+      categories: backupData.categories || [],
+      notifications: backupData.notifications || [],
+      settings: backupData.settings || ({} as any),
+    };
+
+    const jsonStr = JSON.stringify(cleanBackup, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const fileName = `spendly_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    return { success: true, fileName };
+  } catch (err: any) {
+    return { success: false, message: err?.message || 'Failed to generate JSON backup' };
+  }
+}
+
+/**
+ * Validates a JSON backup object structure to prevent malformed files from corrupting local IndexedDB.
+ */
+export function validateJSONBackup(data: any): { isValid: boolean; error?: string } {
+  if (!data || typeof data !== 'object') {
+    return { isValid: false, error: 'Invalid JSON file structure.' };
+  }
+  if (!Array.isArray(data.accounts) && !Array.isArray(data.transactions)) {
+    return { isValid: false, error: 'Backup file missing valid accounts or transactions dataset.' };
+  }
+  return { isValid: true };
 }
