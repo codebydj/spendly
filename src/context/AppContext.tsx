@@ -36,7 +36,9 @@ export type ViewType =
   | 'notifications'
   | 'settings'
   | 'login'
-  | 'signup';
+  | 'signup'
+  | 'update-password'
+  | 'link-expired';
 
 export type SyncStatus = 'OFFLINE' | 'LOCAL_CHANGES' | 'SYNCING' | 'SYNCED' | 'SYNC_FAILED';
 
@@ -656,6 +658,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     let isMounted = true;
 
+    // Check URL fragment or query for errors/recovery tokens on mount
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      const path = window.location.pathname || '';
+
+      if (hash.includes('error=access_denied') || hash.includes('otp_expired') || search.includes('otp_expired')) {
+        setCurrentView('link-expired');
+      } else if (path.includes('update-password') || hash.includes('type=recovery')) {
+        setCurrentView('update-password');
+      }
+    }
+
     supabase.auth
       .getSession()
       .then(({ data: { session } }) => {
@@ -689,8 +704,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
+      if (event === 'PASSWORD_RECOVERY') {
+        setCurrentView('update-password');
+        setAuthLoading(false);
+        return;
+      }
       if (session?.user) {
         setUser(session.user);
         if (loadedUserRef.current !== session.user.id) {
@@ -709,7 +729,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setBudgets([]);
         setRecurringPayments([]);
         setNotifications([]);
-        setCurrentView('login');
+        setCurrentView((prev) => (prev === 'update-password' || prev === 'link-expired' ? prev : 'login'));
         setAuthLoading(false);
       }
     });

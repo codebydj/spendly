@@ -85,9 +85,12 @@ export const SelectLocationMapModal: React.FC<SelectLocationMapModalProps> = ({
         (mapContainerRef.current as any)._leaflet_id = null;
       }
 
+      const targetLat = initialLocation?.latitude || selectedCoords.lat || 16.5062;
+      const targetLng = initialLocation?.longitude || selectedCoords.lng || 80.648;
+
       const map = L.map(mapContainerRef.current, {
         zoomControl: false,
-      }).setView([selectedCoords.lat, selectedCoords.lng], 14);
+      }).setView([targetLat, targetLng], 14);
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -104,14 +107,16 @@ export const SelectLocationMapModal: React.FC<SelectLocationMapModalProps> = ({
       leafletMapRef.current = map;
 
       // Update Marker
-      updateMarker(selectedCoords.lat, selectedCoords.lng);
+      updateMarker(targetLat, targetLng);
 
-      // Invalidate size after layout stabilization
-      setTimeout(() => {
-        if (leafletMapRef.current) {
-          leafletMapRef.current.invalidateSize();
-        }
-      }, 150);
+      // Invalidate size after layout stabilization across multiple frames
+      [50, 150, 350].forEach((delay) => {
+        setTimeout(() => {
+          if (leafletMapRef.current) {
+            leafletMapRef.current.invalidateSize();
+          }
+        }, delay);
+      });
     }, 100);
 
     const handleResize = () => {
@@ -137,6 +142,8 @@ export const SelectLocationMapModal: React.FC<SelectLocationMapModalProps> = ({
     if (!leafletMapRef.current) return;
     const map = leafletMapRef.current;
 
+    const pinSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`;
+
     if (markerRef.current) {
       markerRef.current.setLatLng([lat, lng]);
     } else {
@@ -145,7 +152,7 @@ export const SelectLocationMapModal: React.FC<SelectLocationMapModalProps> = ({
         html: `
           <div class="modern-pin-wrapper">
             <div class="modern-pin-body selected">
-              <div class="modern-pin-inner">📍</div>
+              <div class="modern-pin-inner">${pinSvg}</div>
             </div>
             <div class="modern-pin-pulse"></div>
           </div>

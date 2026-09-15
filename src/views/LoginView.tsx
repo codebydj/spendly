@@ -5,6 +5,7 @@ import { GlassCard } from '../components/ui/GlassCard';
 import { SpendlyLogo } from '../components/ui/SpendlyLogo';
 import { Modal } from '../components/ui/Modal';
 import { Mail, Lock, Eye, EyeOff, LogIn, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { getUpdatePasswordUrl } from '../utils/authConfig';
 
 export const LoginView: React.FC = () => {
   const { setCurrentView, showToast, user, logout } = useApp();
@@ -89,7 +90,7 @@ export const LoginView: React.FC = () => {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: `${window.location.origin}`,
+        redirectTo: getUpdatePasswordUrl(),
       });
 
       if (error) {

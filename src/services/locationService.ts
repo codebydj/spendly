@@ -67,10 +67,10 @@ export class LocationService {
         console.warn('Native Capacitor geolocation error:', err);
         const msg = err.message ? err.message.toLowerCase() : '';
         if (msg.includes('denied') || msg.includes('permission')) {
-          throw new Error('Access denied to location. Please grant location permissions in device settings.');
+          throw new Error('Location permission is required to use your current location.');
         }
         if (msg.includes('disabled') || msg.includes('services') || msg.includes('turned off')) {
-          throw new Error('Location services/GPS is disabled on your device. Please turn on Location.');
+          throw new Error('Location permission is disabled in Android Settings.');
         }
         if (msg.includes('timeout')) {
           throw new Error('Location request timed out. Please try again or pick location on map.');
@@ -91,7 +91,7 @@ export class LocationService {
         },
         (err) => {
           if (err.code === err.PERMISSION_DENIED) {
-            reject(new Error('Access denied to location. Please allow location access or select on map.'));
+            reject(new Error('Location permission is required to use your current location.'));
           } else if (err.code === err.POSITION_UNAVAILABLE) {
             reject(new Error('Location unavailable. Please check GPS settings or select on map.'));
           } else if (err.code === err.TIMEOUT) {
@@ -170,7 +170,7 @@ export class LocationService {
           fetch(photonUrl).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(nominatimUrl, {
             headers: {
-              'User-Agent': 'SpendlyApp/3.0 (Personal Finance Application)',
+              'User-Agent': 'SpendlyApp/3.1 (Personal Finance Application)',
               'Accept-Language': 'en',
             },
           }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
@@ -303,14 +303,14 @@ export class LocationService {
       const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`;
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'SpendlyApp/3.0 (Personal Finance Application)',
+          'User-Agent': 'SpendlyApp/3.1 (Personal Finance Application)',
           'Accept-Language': 'en',
         },
       });
 
       if (!response.ok) {
         return {
-          name: `Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
+          name: 'Unknown Location',
           latitude,
           longitude,
         };
@@ -327,7 +327,7 @@ export class LocationService {
         addr.road ||
         addr.suburb ||
         addr.city ||
-        'Selected Location';
+        'Unknown Location';
 
       const areaDetails = [
         addr.suburb || addr.neighbourhood,
@@ -338,15 +338,15 @@ export class LocationService {
 
       return {
         placeId: data.place_id ? String(data.place_id) : undefined,
-        name,
-        address: areaDetails || data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+        name: name.trim() || 'Unknown Location',
+        address: areaDetails || data.display_name || undefined,
         latitude,
         longitude,
       };
     } catch (err) {
       console.warn('Reverse geocoding warning:', err);
       return {
-        name: `Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
+        name: 'Unknown Location',
         latitude,
         longitude,
       };

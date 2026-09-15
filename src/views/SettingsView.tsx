@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { StorageEngine } from '../db/storage';
 import type { BackupData, Category } from '../types/finance';
+import { exportTransactionsCSV } from '../utils/exportUtils';
 import {
   Shield,
   Eye,
@@ -202,6 +203,16 @@ export const SettingsView: React.FC = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('Exported full JSON backup', 'info');
+  };
+
+  // CSV Export Action
+  const handleExportCSV = () => {
+    const result = exportTransactionsCSV(transactions, StorageEngine.loadAccounts(user?.id), categories);
+    if (result.success) {
+      showToast(`Exported ${result.count} transactions to CSV`, 'info');
+    } else {
+      showToast(result.message || 'No transactions to export', 'warning');
+    }
   };
 
   // JSON Restore Import
@@ -718,6 +729,9 @@ export const SettingsView: React.FC = () => {
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', paddingTop: '8px' }}>
+                <button onClick={handleExportCSV} className="btn btn-secondary" style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}>
+                  <Download size={15} color="var(--accent-cyan)" /> Export CSV
+                </button>
                 <button onClick={handleExportJSON} className="btn btn-secondary" style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}>
                   <Download size={15} /> Export JSON Backup
                 </button>

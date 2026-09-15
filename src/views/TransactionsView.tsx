@@ -5,6 +5,7 @@ import { TransactionRow } from '../components/ui/TransactionRow';
 import { EditTransactionModal } from '../components/forms/EditTransactionModal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Search, Download, Trash2, Filter, Receipt, Plus } from 'lucide-react';
+import { exportTransactionsCSV } from '../utils/exportUtils';
 
 export const TransactionsView: React.FC = () => {
   const {
@@ -70,37 +71,16 @@ export const TransactionsView: React.FC = () => {
 
   // Export CSV Action
   const handleExportCSV = () => {
-    if (filteredTransactions.length === 0) return;
-
-    const headers = ['ID', 'Date', 'Time', 'Type', 'Amount', 'Category', 'Account', 'Destination Account', 'Note', 'Payment Method'];
-    const rows = filteredTransactions.map((tx) => {
-      const cat = categories.find((c) => c.id === tx.categoryId)?.name || '';
-      const acc = accounts.find((a) => a.id === tx.accountId)?.name || '';
-      const toAcc = accounts.find((a) => a.id === tx.toAccountId)?.name || '';
-      return [
-        tx.id,
-        tx.date,
-        tx.time,
-        tx.type,
-        tx.amount,
-        `"${cat}"`,
-        `"${acc}"`,
-        `"${toAcc}"`,
-        `"${tx.note.replace(/"/g, '""')}"`,
-        `"${tx.paymentMethod || ''}"`,
-      ].join(',');
-    });
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `spendly_transactions_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    showToast('Exported CSV file', 'info');
+    if (filteredTransactions.length === 0) {
+      showToast('No transactions match the selected filters', 'warning');
+      return;
+    }
+    const result = exportTransactionsCSV(filteredTransactions, accounts, categories);
+    if (result.success) {
+      showToast(`Exported ${result.count} transactions to CSV`, 'info');
+    } else {
+      showToast(result.message || 'Export failed', 'danger');
+    }
   };
 
   return (

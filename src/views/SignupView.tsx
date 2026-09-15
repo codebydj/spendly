@@ -4,6 +4,7 @@ import { supabase } from '../services/supabase';
 import { GlassCard } from '../components/ui/GlassCard';
 import { SpendlyLogo } from '../components/ui/SpendlyLogo';
 import { User, Mail, Lock, Eye, EyeOff, UserPlus, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { getAppSiteUrl } from '../utils/authConfig';
 
 export const SignupView: React.FC = () => {
   const { setCurrentView, showToast } = useApp();
@@ -64,6 +65,7 @@ export const SignupView: React.FC = () => {
         email: cleanEmail,
         password,
         options: {
+          emailRedirectTo: getAppSiteUrl(),
           data: {
             full_name: cleanName,
           },

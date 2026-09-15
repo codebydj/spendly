@@ -50,9 +50,10 @@ export const MapsView: React.FC = () => {
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isGettingUserGPS, setIsGettingUserGPS] = useState(false);
 
-  // Edit Location Modal State
+  // Edit / Manual Location Modal State
   const [isEditLocationOpen, setIsEditLocationOpen] = useState(false);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [mapPickerTarget, setMapPickerTarget] = useState<'edit' | 'manual'>('edit');
   const [isGettingEditGPS, setIsGettingEditGPS] = useState(false);
   const [editNameInput, setEditNameInput] = useState('');
   const [editAddressInput, setEditAddressInput] = useState('');
@@ -216,24 +217,39 @@ export const MapsView: React.FC = () => {
   }, [filteredTransactions]);
 
   useEffect(() => {
-    if (!mapContainerRef.current) return;
-
-    if (!leafletMapRef.current) {
-      const map = L.map(mapContainerRef.current, {
-        zoomControl: false,
-      }).setView([16.5062, 80.648], 12);
-
-      L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 19,
-      }).addTo(map);
-
-      leafletMapRef.current = map;
+    if (viewMode !== 'MAP') {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+        markersRef.current = [];
+      }
+      return;
     }
 
-    const map = leafletMapRef.current;
+    if (!mapContainerRef.current) return;
+
+    if (leafletMapRef.current) {
+      leafletMapRef.current.remove();
+      leafletMapRef.current = null;
+      markersRef.current = [];
+    }
+
+    if ((mapContainerRef.current as any)._leaflet_id) {
+      (mapContainerRef.current as any)._leaflet_id = null;
+    }
+
+    const map = L.map(mapContainerRef.current, {
+      zoomControl: false,
+    }).setView([16.5062, 80.648], 12);
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(map);
+
+    leafletMapRef.current = map;
 
     // Clear existing markers
     markersRef.current.forEach((m) => m.remove());
@@ -253,7 +269,7 @@ export const MapsView: React.FC = () => {
         const isUnknown = group.isUnknown;
 
         const pinSvg = isUnknown
-          ? `<span style="font-weight:800; font-size:0.75rem;">?</span>`
+          ? `<svg width="${isSelected ? 22 : 18}" height="${isSelected ? 22 : 18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
           : `<svg width="${isSelected ? 22 : 18}" height="${isSelected ? 22 : 18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`;
 
         const customIcon = L.divIcon({
@@ -287,6 +303,14 @@ export const MapsView: React.FC = () => {
       }
     }
 
+    [50, 150, 300].forEach((delay) => {
+      setTimeout(() => {
+        if (leafletMapRef.current) {
+          leafletMapRef.current.invalidateSize();
+        }
+      }, delay);
+    });
+
     const handleResize = () => {
       if (leafletMapRef.current) {
         leafletMapRef.current.invalidateSize();
@@ -295,17 +319,13 @@ export const MapsView: React.FC = () => {
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+        markersRef.current = [];
+      }
     };
-  }, [locationGroups, selectedGroup]);
-
-  // Invalidate Leaflet map size whenever switching back to MAP mode
-  useEffect(() => {
-    if (viewMode === 'MAP' && leafletMapRef.current) {
-      setTimeout(() => {
-        leafletMapRef.current?.invalidateSize();
-      }, 60);
-    }
-  }, [viewMode]);
+  }, [locationGroups, selectedGroup, viewMode]);
 
   // Handle Near Me Toggle
   const handleToggleNearMe = async () => {
@@ -1061,6 +1081,47 @@ export const MapsView: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveManualLocation} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Map Selection Action Bar */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMapPickerTarget('manual');
+                    setIsMapModalOpen(true);
+                  }}
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '9px 12px', fontSize: '0.84rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                >
+                  <MapPin size={16} color="var(--accent-cyan)" />
+                  <span>Pick on Map</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsGettingEditGPS(true);
+                    try {
+                      const coords = await LocationService.getCurrentLocation();
+                      const details = await LocationService.reverseGeocode(coords.latitude, coords.longitude);
+                      setManualNameInput(details.name ? details.name : 'Unknown Location');
+                      setManualAddressInput(details.address || '');
+                      setManualLatInput(String(details.latitude));
+                      setManualLngInput(String(details.longitude));
+                      showToast(`Current location set: ${details.name}`, 'info');
+                    } catch (err: any) {
+                      showToast(err.message || 'Location access unavailable.', 'warning');
+                    } finally {
+                      setIsGettingEditGPS(false);
+                    }
+                  }}
+                  disabled={isGettingEditGPS}
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '9px 12px', fontSize: '0.84rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                >
+                  <Compass size={16} color="var(--accent-cyan)" />
+                  <span>{isGettingEditGPS ? 'Locating...' : 'Current Location'}</span>
+                </button>
+              </div>
+
               <div>
                 <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
                   Target Transaction *
@@ -1156,7 +1217,16 @@ export const MapsView: React.FC = () => {
         isOpen={isMapModalOpen}
         onClose={() => setIsMapModalOpen(false)}
         initialLocation={
-          editLatInput && editLngInput && !isNaN(parseFloat(editLatInput)) && !isNaN(parseFloat(editLngInput))
+          mapPickerTarget === 'manual'
+            ? manualLatInput && manualLngInput && !isNaN(parseFloat(manualLatInput)) && !isNaN(parseFloat(manualLngInput))
+              ? {
+                  name: manualNameInput,
+                  address: manualAddressInput,
+                  latitude: parseFloat(manualLatInput),
+                  longitude: parseFloat(manualLngInput),
+                }
+              : undefined
+            : editLatInput && editLngInput && !isNaN(parseFloat(editLatInput)) && !isNaN(parseFloat(editLngInput))
             ? {
                 name: editNameInput,
                 address: editAddressInput,
@@ -1173,10 +1243,17 @@ export const MapsView: React.FC = () => {
             : undefined
         }
         onSelectLocation={(loc) => {
-          setEditNameInput(loc.name ? loc.name : 'Unknown Location');
-          setEditAddressInput(loc.address || '');
-          setEditLatInput(String(loc.latitude));
-          setEditLngInput(String(loc.longitude));
+          if (mapPickerTarget === 'manual') {
+            setManualNameInput(loc.name ? loc.name : 'Unknown Location');
+            setManualAddressInput(loc.address || '');
+            setManualLatInput(loc.latitude !== undefined ? String(loc.latitude) : '');
+            setManualLngInput(loc.longitude !== undefined ? String(loc.longitude) : '');
+          } else {
+            setEditNameInput(loc.name ? loc.name : 'Unknown Location');
+            setEditAddressInput(loc.address || '');
+            setEditLatInput(loc.latitude !== undefined ? String(loc.latitude) : '');
+            setEditLngInput(loc.longitude !== undefined ? String(loc.longitude) : '');
+          }
           setIsMapModalOpen(false);
         }}
       />

@@ -27,6 +27,8 @@ import { NotificationsView } from './views/NotificationsView';
 import { SettingsView } from './views/SettingsView';
 import { LoginView } from './views/LoginView';
 import { SignupView } from './views/SignupView';
+import { UpdatePasswordView } from './views/UpdatePasswordView';
+import { LinkExpiredView } from './views/LinkExpiredView';
 
 const MainContentRouter: React.FC = () => {
   const { currentView } = useApp();
@@ -56,6 +58,10 @@ const MainContentRouter: React.FC = () => {
       return <LoginView />;
     case 'signup':
       return <SignupView />;
+    case 'update-password':
+      return <UpdatePasswordView />;
+    case 'link-expired':
+      return <LinkExpiredView />;
     default:
       return <DashboardView />;
   }
@@ -146,11 +152,15 @@ const AppShell: React.FC = () => {
   useEffect(() => {
     if (authLoading) return;
 
-    const isAuthPage = currentView === 'login' || currentView === 'signup';
+    const isAuthPage =
+      currentView === 'login' ||
+      currentView === 'signup' ||
+      currentView === 'update-password' ||
+      currentView === 'link-expired';
 
     if (!user && !isAuthPage) {
       setCurrentView('login');
-    } else if (user && isAuthPage) {
+    } else if (user && isAuthPage && currentView !== 'update-password' && currentView !== 'link-expired') {
       setCurrentView('dashboard');
     }
   }, [user, authLoading, currentView, setCurrentView]);
@@ -179,7 +189,11 @@ const AppShell: React.FC = () => {
     );
   }
 
-  const isAuthPage = currentView === 'login' || currentView === 'signup';
+  const isAuthPage =
+    currentView === 'login' ||
+    currentView === 'signup' ||
+    currentView === 'update-password' ||
+    currentView === 'link-expired';
 
   if (isAuthPage) {
     return (
