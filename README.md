@@ -282,109 +282,16 @@ npx cap open android
 
 ---
 
-## 22. Version History
-
-### V3.1.1 (15 September 2026) — CURRENT
-- Fixed localhost performance lag with instant parallel IndexedDB hydration
-- Added in-memory version check throttling to prevent redundant network fetches
-- Critical offline-first data loss fix with transactional queueing
-- Updated application version to V3.1.1
-
-### V3.1.0 (15 September 2026)
-- Added notifications when a new Spendly app version is available
-- Improved offline data reliability and synchronization with native IndexedDB
-- Improved application stability and update handling
-- Added clearer version and release information
-
-### V3.0.8 (14 September 2026)
-- Added a proper Pick on Map option when editing transaction locations
-- Improved map location search, pin selection and location editing
-- Improved the Maps tab and removed unnecessary place counters
-- Improved version history and application information
-- Improved Calendar, Categories, Reminders and Settings usability
-- Added final responsive, stability and synchronization improvements
-
-### V3.0.7
-- Improved mobile responsiveness across small devices
-- Fixed interface alignment and icon rendering issues
-- Improved synchronization reliability
-- Prepared the application for the V3.0.8 release
-
-### V3.0.6
-- Improved Calendar layout and navigation controls
-- Added independent scrolling for transaction side lists
-- Expanded financial analytics breakdown and charts
-
-### V3.0.5
-- Improved category management interface
-- Added category drag reordering and safe transaction reassignment
-- Improved Settings layout and controls
-
-### V3.0.4
-- Improved payment and bill reminders tracking
-- Added native Android local notification scheduling
-- Improved reminder controls and notification behavior
-
-### V3.0.3
-- Improved online place searching with Photon and Nominatim
-- Improved location suggestions and place details
-- Improved handling of unknown location coordinates
-
-### V3.0.2
-- Added transaction location support
-- Added interactive Leaflet map functionality
-- Improved location search and details panel
-
-### V3.0.1
-- Improved mobile and desktop layouts
-- Fixed interface alignment and spacing issues
-- Improved application stability
-
-### V3.0.0
-- Introduced the new indigo, violet, blue and cyan visual identity
-- Improved the glass-style interface and responsive layouts
-- Improved accounts, transactions, budgets and dashboard experience
-- Added stronger cloud synchronization and offline support
-
-### V2.0.1
-- Enhanced offline synchronization reliability
-- Fixed minor UI alignment and animation issues
-
-### V2.0.0
-- Introduced the modern Spendly interface and glass-style design
-- Added offline support so the app can continue working without internet
-- Added Supabase cloud storage and account-based data synchronization
-- Added Android app support
-- Improved analytics and notification foundations
-
-### V1.0.3
-- Improved budget calculations and transaction form validation
-
-### V1.0.2
-- Added support for credit cards, bank accounts, and wallet tracking
-
-### V1.0.1
-- Fixed minor account balance display and security issues
-
-### V1.0.0
-- Track income and expenses
-- Manage multiple accounts and balances
-- Create monthly budgets
-- Sign in securely
-- View financial information from one dashboard
-
----
-
-## 23. Developer
+## 22. Developer
 
 Developed by **Dhanunjaya** (`@codebydj`)
 
 - **GitHub**: [https://github.com/codebydj](https://github.com/codebydj)
 
-© 2026 Dhanunjaya. All rights reserved.
+© 2026 Spendly.
 
 ---
 
-## 24. License
+## 23. License
 
 This project is maintained by Dhanunjaya. All rights reserved.
