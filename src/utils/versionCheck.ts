@@ -2,6 +2,7 @@ import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import type { AppVersionManifest } from '../types/finance';
 import { APP_VERSION, APP_BUILD_DATE } from '../config/appVersion';
+import { PRODUCTION_SITE_URL } from './authConfig';
 
 export const CURRENT_APP_VERSION = APP_VERSION;
 export const CURRENT_RELEASE_DATE = APP_BUILD_DATE;
@@ -34,7 +35,7 @@ export type UpdateCheckResult =
     };
 
 /**
- * Dynamically read the actual installed app version.
+ * Dynamically read the actual installed app version from the device runtime.
  * On Android / native Capacitor runtime: reads versionName from App.getInfo() (e.g. "3.0.8", "3.1.2", "3.1.3").
  * On Web: returns the configured APP_VERSION ("3.1.3").
  */
@@ -89,8 +90,34 @@ export async function isNewerVersionAvailable(latestVersion: string): Promise<bo
 }
 
 /**
+ * Constructs candidate remote app-version.json URLs.
+ * On Native Capacitor Android apps or localhost, ALWAYS hit the canonical production server URL first so old APKs discover new web releases!
+ */
+export function getAppVersionManifestUrls(): string[] {
+  const timestamp = Date.now();
+  const urls: string[] = [];
+
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
+    if (Capacitor.isNativePlatform() || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      // Native Android APK / local dev -> Must query remote production website over the internet!
+      urls.push(`${PRODUCTION_SITE_URL}/app-version.json?t=${timestamp}`);
+      urls.push(`/app-version.json?t=${timestamp}`);
+    } else {
+      // Web production domain
+      urls.push(`/app-version.json?t=${timestamp}`);
+      urls.push(`${PRODUCTION_SITE_URL}/app-version.json?t=${timestamp}`);
+    }
+  } else {
+    urls.push(`${PRODUCTION_SITE_URL}/app-version.json?t=${timestamp}`);
+  }
+
+  return urls;
+}
+
+/**
  * Fetch public application version manifest (/app-version.json) with cache busting
- * and evaluate against the dynamically detected installed version.
+ * from the remote production server and evaluate against the dynamically detected installed version.
  */
 export async function checkForAppUpdate(_forceFresh = false): Promise<UpdateCheckResult> {
   const currentVersion = await getInstalledAppVersion();
@@ -103,69 +130,76 @@ export async function checkForAppUpdate(_forceFresh = false): Promise<UpdateChec
     };
   }
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+  const manifestUrls = getAppVersionManifestUrls();
+  let manifest: AppVersionManifest | null = null;
+  let fetchErrorMsg = '';
 
-    const res = await fetch(`/app-version.json?t=${Date.now()}`, {
-      signal: controller.signal,
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
-      },
-    });
+  for (const url of manifestUrls) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    clearTimeout(timeoutId);
+      const res = await fetch(url, {
+        signal: controller.signal,
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      });
 
-    if (!res.ok) {
-      return {
-        status: 'error',
-        currentVersion,
-        message: `Unable to check for updates (HTTP ${res.status}).`,
-      };
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json && typeof json === 'object' && json.version) {
+          manifest = json;
+          break;
+        }
+      } else {
+        fetchErrorMsg = `HTTP ${res.status}`;
+      }
+    } catch (err: any) {
+      fetchErrorMsg = err?.message || String(err);
+      console.warn(`[UpdateCheck] Failed fetching from ${url}:`, err);
     }
+  }
 
-    const manifest: AppVersionManifest = await res.json();
-    if (!manifest || typeof manifest !== 'object' || !manifest.version) {
-      return {
-        status: 'error',
-        currentVersion,
-        message: 'Invalid version manifest format received.',
-      };
-    }
-
-    const latestVersion = String(manifest.version).replace(/^v/i, '').trim();
-
-    // Cache latest fetched manifest in localStorage
-    localStorage.setItem(CACHED_MANIFEST_KEY, JSON.stringify(manifest));
-
-    // Semantic comparison: installed (currentVersion) vs remote (latestVersion)
-    const cmp = compareSemVer(currentVersion, latestVersion);
-
-    if (cmp < 0) {
-      console.log(`[UpdateCheck] Installed: ${currentVersion} | Remote Latest: ${latestVersion} | Status: update_available`);
-      return {
-        status: 'update_available',
-        currentVersion,
-        latestVersion,
-        manifest,
-      };
-    } else {
-      console.log(`[UpdateCheck] Installed: ${currentVersion} | Remote Latest: ${latestVersion} | Status: up_to_date`);
-      return {
-        status: 'up_to_date',
-        currentVersion,
-        latestVersion,
-        manifest,
-      };
-    }
-  } catch (err: any) {
-    console.warn('[UpdateCheck] Fetch error:', err);
+  if (!manifest) {
     return {
       status: 'error',
       currentVersion,
-      message: 'Unable to check for updates. Please try again later.',
+      message: `Unable to check for updates (${fetchErrorMsg || 'network error'}).`,
+    };
+  }
+
+  const latestVersion = String(manifest.version).replace(/^v/i, '').trim();
+
+  // Cache latest fetched manifest in localStorage
+  try {
+    localStorage.setItem(CACHED_MANIFEST_KEY, JSON.stringify(manifest));
+  } catch {
+    // ignore
+  }
+
+  // Semantic comparison: installed (currentVersion) vs remote (latestVersion)
+  const cmp = compareSemVer(currentVersion, latestVersion);
+
+  if (cmp < 0) {
+    console.log(`[UpdateCheck] Installed: ${currentVersion} | Remote Latest: ${latestVersion} | Status: update_available`);
+    return {
+      status: 'update_available',
+      currentVersion,
+      latestVersion,
+      manifest,
+    };
+  } else {
+    console.log(`[UpdateCheck] Installed: ${currentVersion} | Remote Latest: ${latestVersion} | Status: up_to_date`);
+    return {
+      status: 'up_to_date',
+      currentVersion,
+      latestVersion,
+      manifest,
     };
   }
 }
