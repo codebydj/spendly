@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Lock, Unlock, LogOut } from 'lucide-react';
+import { Lock, Unlock } from 'lucide-react';
 
 export const PinLockModal: React.FC = () => {
-  const { isPinLocked, setIsPinLocked, settings, validatePin, logout, showToast } = useApp();
+  const { isPinLocked, setIsPinLocked, settings, setPinCode, validatePin, logout, showToast } = useApp();
   const [enteredPin, setEnteredPin] = useState('');
   const [error, setError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -118,19 +118,26 @@ export const PinLockModal: React.FC = () => {
               className="btn btn-primary"
               style={{ width: '100%', padding: '12px' }}
             >
-              <Unlock size={16} /> Unlock
+              <Unlock size={16} /> Unlock Spendly
             </button>
 
             <button
               type="button"
               onClick={() => {
-                setIsPinLocked(false);
-                logout();
+                if (
+                  confirm(
+                    'Forgot your App Lock PIN?\n\nSigning out will safely remove the local PIN lock from this device. You can sign back in with your Supabase account credentials.'
+                  )
+                ) {
+                  setPinCode('');
+                  setIsPinLocked(false);
+                  logout();
+                }
               }}
               className="btn btn-secondary"
-              style={{ width: '100%', padding: '10px', fontSize: '0.85rem' }}
+              style={{ width: '100%', padding: '10px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}
             >
-              <LogOut size={14} /> Sign Out
+              Forgot Lock? Reset via Sign Out
             </button>
           </div>
         </form>

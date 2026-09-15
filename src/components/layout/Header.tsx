@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Eye, EyeOff, Search, Plus, Wifi, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck, Bell, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Search, Plus, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck, Bell, Sparkles } from 'lucide-react';
 import { isNewerVersionAvailable } from '../../utils/versionCheck';
 
 export const Header: React.FC = () => {
@@ -55,7 +55,7 @@ export const Header: React.FC = () => {
 
   const renderSyncBadge = () => {
     if (isOffline || syncStatus === 'OFFLINE') {
-      const pendingText = pendingOpsCount > 0 ? ` • ${pendingOpsCount} pending` : '';
+      const pendingText = pendingOpsCount > 0 ? ` (${pendingOpsCount})` : '';
       return (
         <button
           onClick={triggerManualSync}
@@ -72,7 +72,7 @@ export const Header: React.FC = () => {
             border: '1px solid rgba(245, 158, 11, 0.25)',
             cursor: 'pointer',
           }}
-          title={pendingOpsCount > 0 ? `Working offline (${pendingOpsCount} changes pending sync)` : 'Working offline - tap to try syncing'}
+          title={pendingOpsCount > 0 ? `Working offline (${pendingOpsCount} changes pending sync) - tap to sync` : 'Working offline - tap to try syncing'}
         >
           <WifiOff size={16} />
           <span>Offline{pendingText}</span>
@@ -97,7 +97,7 @@ export const Header: React.FC = () => {
           }}
         >
           <RefreshCw size={16} style={{ animation: 'spin 1.5s linear infinite' }} />
-          <span>Syncing...</span>
+          <span>Syncing</span>
         </div>
       );
     }
@@ -122,7 +122,7 @@ export const Header: React.FC = () => {
           title="Sync issue - tap Sync Now to retry"
         >
           <AlertTriangle size={16} />
-          <span>Sync Issue</span>
+          <span>Sync Error</span>
         </button>
       );
     }
@@ -146,7 +146,7 @@ export const Header: React.FC = () => {
         title={`Synced at ${settings.lastSyncedAt ? new Date(settings.lastSyncedAt).toLocaleTimeString() : 'now'}. Tap to Sync Now`}
       >
         <CloudCheck size={16} />
-        <span>Synced</span>
+        <span>Online Synced</span>
       </button>
     );
   };
@@ -211,38 +211,7 @@ export const Header: React.FC = () => {
             </button>
           )}
 
-          {/* Network Status Indicator */}
-          <div
-            title={isOffline ? 'Network status: Offline' : 'Network status: Online'}
-            aria-label={isOffline ? 'Network Offline' : 'Network Online'}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '6px 10px',
-              borderRadius: 'var(--radius-sm)',
-              backgroundColor: isOffline ? 'var(--status-warning-subtle)' : 'rgba(16, 185, 129, 0.1)',
-              border: isOffline ? '1px solid rgba(245, 158, 11, 0.25)' : '1px solid rgba(16, 185, 129, 0.25)',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              color: isOffline ? 'var(--status-warning)' : 'var(--accent-emerald)',
-              gap: '6px',
-            }}
-          >
-            {isOffline ? (
-              <>
-                <WifiOff size={16} color="var(--status-warning)" />
-                <span className="desktop-only">Offline</span>
-              </>
-            ) : (
-              <>
-                <Wifi size={16} color="var(--accent-emerald)" />
-                <span className="desktop-only">Online</span>
-              </>
-            )}
-          </div>
-
-          {/* Manual Sync Status Badge */}
+          {/* Unified Sync & Network Status Badge */}
           {renderSyncBadge()}
 
           {/* Global Search (Desktop Only) */}

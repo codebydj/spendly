@@ -70,12 +70,12 @@ export const TransactionsView: React.FC = () => {
   const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
 
   // Export CSV Action
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (filteredTransactions.length === 0) {
       showToast('No transactions match the selected filters', 'warning');
       return;
     }
-    const result = exportTransactionsCSV(filteredTransactions, accounts, categories);
+    const result = await exportTransactionsCSV(filteredTransactions, accounts, categories);
     if (result.success) {
       showToast(`Exported ${result.count} transactions to CSV`, 'info');
     } else {

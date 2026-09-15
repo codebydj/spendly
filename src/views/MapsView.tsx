@@ -269,14 +269,14 @@ export const MapsView: React.FC = () => {
         const isUnknown = group.isUnknown;
 
         const pinSvg = isUnknown
-          ? `<svg width="${isSelected ? 22 : 18}" height="${isSelected ? 22 : 18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
-          : `<svg width="${isSelected ? 22 : 18}" height="${isSelected ? 22 : 18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`;
+          ? `<svg width="${isSelected ? 20 : 16}" height="${isSelected ? 20 : 16}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+          : `<svg width="${isSelected ? 20 : 16}" height="${isSelected ? 20 : 16}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`;
 
         const customIcon = L.divIcon({
           className: 'custom-map-pin-container',
           html: `
-            <div class="modern-pin-wrapper">
-              <div class="modern-pin-body ${isSelected ? 'selected' : ''}" style="${isUnknown ? 'background: linear-gradient(135deg, #f59e0b, #d97706);' : ''}">
+            <div class="modern-pin-wrapper ${isUnknown ? 'unknown' : ''}">
+              <div class="modern-pin-body ${isUnknown ? 'unknown' : ''} ${isSelected ? 'selected' : ''}">
                 <div class="modern-pin-inner">
                   ${group.transactionCount > 1 ? group.transactionCount : pinSvg}
                 </div>
@@ -293,6 +293,12 @@ export const MapsView: React.FC = () => {
         marker.on('click', () => {
           setSelectedGroup(group);
           map.panTo([group.latitude!, group.longitude!], { animate: true });
+          setTimeout(() => {
+            const panel = document.getElementById('selected-location-panel');
+            if (panel) {
+              panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+          }, 100);
         });
 
         markersRef.current.push(marker);
@@ -752,7 +758,7 @@ export const MapsView: React.FC = () => {
         {/* Right Side Panel: Selected Group Details & Top Locations */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {selectedGroup ? (
-            <div className="card-level-3 hero-emerald-glow" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div id="selected-location-panel" className="card-level-3 hero-emerald-glow" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

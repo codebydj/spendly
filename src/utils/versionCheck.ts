@@ -31,6 +31,16 @@ export type UpdateCheckResult =
       source: 'REMOTE_PRODUCTION' | 'BUNDLED' | 'UNKNOWN';
     }
   | {
+      status: 'installed_newer';
+      currentVersion: string;
+      latestVersion: string;
+      manifest: AppVersionManifest;
+      checkUrl: string;
+      httpStatus: number;
+      lastCheckedAt: string;
+      source: 'REMOTE_PRODUCTION' | 'BUNDLED' | 'UNKNOWN';
+    }
+  | {
       status: 'offline';
       currentVersion: string;
       message: string;
@@ -210,6 +220,18 @@ export async function checkForAppUpdate(_forceFresh = false): Promise<UpdateChec
     console.log(`[Spendly Update] Comparison: UPDATE_AVAILABLE (Installed: ${currentVersion}, Remote: ${latestVersion})`);
     return {
       status: 'update_available',
+      currentVersion,
+      latestVersion,
+      manifest,
+      checkUrl: targetUrl,
+      httpStatus: httpStatus || 200,
+      lastCheckedAt,
+      source: 'REMOTE_PRODUCTION',
+    };
+  } else if (cmp > 0) {
+    console.log(`[Spendly Update] Comparison: INSTALLED_NEWER (Installed: ${currentVersion}, Remote: ${latestVersion})`);
+    return {
+      status: 'installed_newer',
       currentVersion,
       latestVersion,
       manifest,

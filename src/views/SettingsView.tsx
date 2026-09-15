@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { StorageEngine } from '../db/storage';
 import type { BackupData, Category } from '../types/finance';
-import { exportTransactionsCSV } from '../utils/exportUtils';
+import { exportTransactionsCSV, exportJSONBackup } from '../utils/exportUtils';
 import {
   Shield,
   Eye,
@@ -60,6 +60,8 @@ import { ChangePasswordModal } from '../components/forms/ChangePasswordModal';
 import { Modal } from '../components/ui/Modal';
 import { APP_VERSION, APP_BUILD_DATE, APP_NAME, APP_PACKAGE_ID, ANDROID_APK_DOWNLOAD_URL } from '../config/appVersion';
 
+import { VERSION_HISTORY } from '../config/versionHistory';
+
 export const SettingsView: React.FC = () => {
   const {
     user,
@@ -80,6 +82,8 @@ export const SettingsView: React.FC = () => {
     isCheckingUpdates,
     checkAppUpdates,
     setPinCode,
+    validatePin,
+    setIsPinLocked,
     importBackupData,
     resetLocalData,
     resetAllData,
@@ -93,11 +97,22 @@ export const SettingsView: React.FC = () => {
     updateProfileName,
   } = useApp();
 
-  const [pinInput, setPinInput] = useState('');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'profile' | 'categories' | 'appearance' | 'notifications' | 'data' | 'security' | 'info'>('all');
   const [isSyncingManual, setIsSyncingManual] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+
+  // App Lock Modal State
+  const [isSetPinModalOpen, setIsSetPinModalOpen] = useState(false);
+  const [newPinInput, setNewPinInput] = useState('');
+  const [confirmPinInput, setConfirmPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+
+  const [isRemovePinModalOpen, setIsRemovePinModalOpen] = useState(false);
+  const [removePinInput, setRemovePinInput] = useState('');
+  const [removePinError, setRemovePinError] = useState('');
+
+  const [isForgotLockModalOpen, setIsForgotLockModalOpen] = useState(false);
   const [isEditingCategories, setIsEditingCategories] = useState(false);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState(false);
@@ -195,24 +210,19 @@ export const SettingsView: React.FC = () => {
   };
 
   // JSON Export Backup
-  const handleExportJSON = () => {
+  const handleExportJSON = async () => {
     const backup = StorageEngine.exportFullBackup(user?.id);
-    const jsonStr = JSON.stringify(backup, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `spendly_backup_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast('Exported full JSON backup', 'info');
+    const result = await exportJSONBackup(backup);
+    if (result.success) {
+      showToast('Exported full JSON backup', 'info');
+    } else {
+      showToast(result.message || 'Failed to export JSON backup', 'warning');
+    }
   };
 
   // CSV Export Action
-  const handleExportCSV = () => {
-    const result = exportTransactionsCSV(transactions, StorageEngine.loadAccounts(user?.id), categories);
+  const handleExportCSV = async () => {
+    const result = await exportTransactionsCSV(transactions, StorageEngine.loadAccounts(user?.id), categories);
     if (result.success) {
       showToast(`Exported ${result.count} transactions to CSV`, 'info');
     } else {
@@ -781,50 +791,72 @@ export const SettingsView: React.FC = () => {
           </div>
         )}
 
-        {/* 5. SECURITY */}
+        {/* 5. SECURITY & APP LOCK */}
         {(activeTab === 'all' || activeTab === 'security') && (
           <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Shield size={18} color="var(--accent-violet)" />
-              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)' }}>
-                Security & App Lock
-              </h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Shield size={18} color="var(--accent-violet)" />
+                <h3 style={{ fontSize: '0.98rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)' }}>
+                  Security & App Lock
+                </h3>
+              </div>
+              <span className={settings.pinEnabled ? 'badge badge-emerald' : 'badge badge-neutral'} style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+                {settings.pinEnabled ? 'App Lock: ON' : 'App Lock: OFF'}
+              </span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '1px solid var(--border-color)', paddingTop: '14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>4-Digit PIN Lock</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>4-Digit Security Passcode</span>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    {settings.pinEnabled ? 'PIN lock active.' : 'Require PIN code to open Spendly.'}
+                    {settings.pinEnabled
+                      ? 'App lock is active. Spendly requires your 4-digit PIN code upon app launch.'
+                      : 'Require a 4-digit PIN code to access Spendly on this device.'}
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input
-                    type="password"
-                    maxLength={4}
-                    placeholder="PIN"
-                    value={pinInput}
-                    onChange={(e) => setPinInput(e.target.value)}
-                    style={{ width: '90px', textAlign: 'center', letterSpacing: '0.2em', padding: '6px 8px', fontSize: '0.88rem' }}
-                  />
-                  <button
-                    onClick={() => {
-                      if (pinInput.length === 4) {
-                        setPinCode(pinInput);
-                        setPinInput('');
-                      } else if (pinInput.length === 0) {
-                        setPinCode('');
-                      } else {
-                        showToast('PIN must be 4 digits', 'warning');
-                      }
-                    }}
-                    className="btn btn-secondary"
-                    style={{ padding: '6px 14px', minHeight: '36px', fontSize: '0.82rem' }}
-                  >
-                    <Lock size={14} /> {settings.pinEnabled ? 'Update' : 'Set PIN'}
-                  </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  {!settings.pinEnabled ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewPinInput('');
+                        setConfirmPinInput('');
+                        setPinError('');
+                        setIsSetPinModalOpen(true);
+                      }}
+                      className="btn btn-primary"
+                      style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}
+                    >
+                      <Lock size={15} /> Add App Lock
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRemovePinInput('');
+                          setRemovePinError('');
+                          setIsRemovePinModalOpen(true);
+                        }}
+                        className="btn btn-danger"
+                        style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}
+                      >
+                        <Lock size={15} /> Remove App Lock
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsForgotLockModalOpen(true)}
+                        className="btn btn-secondary"
+                        style={{ padding: '8px 14px', minHeight: '38px', fontSize: '0.84rem' }}
+                      >
+                        <Key size={15} color="var(--accent-cyan)" /> Forgot Lock
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -955,312 +987,42 @@ export const SettingsView: React.FC = () => {
 
             {isVersionHistoryOpen && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', maxHeight: '460px', overflowY: 'auto', paddingRight: '4px' }}>
-                {/* V3.1.3 - CURRENT */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: 'rgba(34, 211, 238, 0.08)', padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-cyan-border)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-cyan)' }}>V3.1.3</span>
-                      <span style={{ fontSize: '0.66rem', fontWeight: 800, backgroundColor: 'var(--accent-cyan)', color: '#000000', padding: '1px 6px', borderRadius: '4px', letterSpacing: '0.04em' }}>
-                        CURRENT
-                      </span>
+                {VERSION_HISTORY.map((item) => (
+                  <div
+                    key={item.version}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      backgroundColor: item.isCurrent ? 'rgba(34, 211, 238, 0.08)' : 'transparent',
+                      padding: item.isCurrent ? '12px 14px' : '0',
+                      borderRadius: item.isCurrent ? 'var(--radius-md)' : '0',
+                      border: item.isCurrent ? '1px solid var(--accent-cyan-border)' : 'none',
+                      borderTop: !item.isCurrent ? '1px solid var(--border-color)' : undefined,
+                      paddingTop: !item.isCurrent ? '12px' : undefined,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: 800, fontSize: '0.95rem', color: item.isCurrent ? 'var(--accent-cyan)' : 'var(--text-primary)' }}>
+                          {item.version}
+                        </span>
+                        {item.isCurrent && (
+                          <span style={{ fontSize: '0.66rem', fontWeight: 800, backgroundColor: 'var(--accent-cyan)', color: '#000000', padding: '1px 6px', borderRadius: '4px', letterSpacing: '0.04em' }}>
+                            CURRENT RELEASE
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: item.isCurrent ? 600 : 400 }}>{item.date}</span>
                     </div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>16 September 2026</span>
+                    <h4 style={{ fontSize: '0.86rem', fontWeight: item.isCurrent ? 700 : 600, color: 'var(--text-primary)' }}>{item.title}</h4>
+                    <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: item.isCurrent ? 'var(--text-secondary)' : 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {item.highlights.map((h, i) => (
+                        <li key={i}>{h}</li>
+                      ))}
+                    </ul>
                   </div>
-                  <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>Full Offline/Online CSV Export, Maps Pick on Map & Native Permissions</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <li>Fixed offline & online CSV export with full transaction fields and UTF-8 BOM encoding</li>
-                    <li>Added visual map picker ("Pick on Map") with place search and location confirmation</li>
-                    <li>Preserved Unknown Location coordinates and interactive map markers</li>
-                    <li>Fixed Android location permission prompt and current location flow</li>
-                    <li>Fixed Android notification icon rendering with sharp monochrome Spendly symbol</li>
-                    <li>Configured authentication redirects for finance-spendly.vercel.app with dedicated /update-password page</li>
-                    <li>Authoritative V3.1.3 versioning and update checker with native version detection</li>
-                  </ul>
-                </div>
-
-                {/* V3.1.2 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.1.2</span>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>15 September 2026</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Automatic Sync and Update Experience</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Automatic bidirectional Supabase synchronization</li>
-                    <li>Realtime cloud updates across Web and Android</li>
-                    <li>Improved offline-to-online synchronization</li>
-                    <li>Centralized application versioning</li>
-                    <li>Improved update notification popup with postpone delay</li>
-                    <li>Subtle floating Spendly logo loading animation</li>
-                  </ul>
-                </div>
-
-                {/* V3.1.1 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.1.1</span>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>15 September 2026</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Sync and Stability Update</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Cloud persistence fixes and parallel IndexedDB hydration</li>
-                    <li>Supabase synchronization improvements</li>
-                    <li>Android and Web reliability improvements</li>
-                  </ul>
-                </div>
-
-                {/* V3.1.0 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.1.0</span>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>15 September 2026</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Data and Reliability Update</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Offline persistence improvements & IndexedDB storage</li>
-                    <li>Pending sync queue and cloud reconciliation</li>
-                    <li>App update notification system</li>
-                  </ul>
-                </div>
-
-                {/* V3.0.0 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.0.0</span>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>14 September 2026</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Final V3 Release</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>New indigo/violet/blue/cyan visual identity</li>
-                    <li>Refined glassmorphic UI, Analytics, Calendar & Maps</li>
-                    <li>Online place search, map pickers, and bill reminders</li>
-                  </ul>
-                </div>
-
-                {/* V2.0.0 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V2.0.0</span>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>August 2026</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Major UI and Architecture Update</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Major visual redesign and glassmorphism</li>
-                    <li>Offline-first architecture and Supabase cloud persistence</li>
-                    <li>Capacitor Android integration</li>
-                  </ul>
-                </div>
-
-                {/* V1.0.0 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V1.0.0</span>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>July 2026</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Initial Release</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Core personal finance tracking, accounts, income & expenses</li>
-                    <li>Category monthly budgets and secure authentication</li>
-                  </ul>
-                </div>
-
-                {/* V3.0.8 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.0.8</span>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>14 September 2026</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Final V3 Update</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Added a proper Pick on Map option when editing transaction locations</li>
-                    <li>Improved map location search, pin selection and location editing</li>
-                    <li>Improved the Maps tab and removed unnecessary place counters</li>
-                    <li>Improved version history and application information</li>
-                    <li>Improved Calendar, Categories, Reminders and Settings usability</li>
-                    <li>Added final responsive, stability and synchronization improvements</li>
-                  </ul>
-                </div>
-
-                {/* V3.0.7 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.0.7</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Final V3 preparation</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Improved mobile responsiveness across small devices</li>
-                    <li>Fixed interface alignment and icon rendering issues</li>
-                    <li>Improved synchronization reliability</li>
-                    <li>Prepared the application for the V3.0.8 release</li>
-                  </ul>
-                </div>
-
-                {/* V3.0.6 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.0.6</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Calendar and analytics improvements</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Improved Calendar layout and navigation controls</li>
-                    <li>Added independent scrolling for transaction side lists</li>
-                    <li>Expanded financial analytics breakdown and charts</li>
-                  </ul>
-                </div>
-
-                {/* V3.0.5 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.0.5</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Settings and category improvements</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Improved category management interface</li>
-                    <li>Added category drag reordering and safe transaction reassignment</li>
-                    <li>Improved Settings layout and controls</li>
-                  </ul>
-                </div>
-
-                {/* V3.0.4 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.0.4</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Reminders and notifications improvements</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Improved payment and bill reminders tracking</li>
-                    <li>Added native Android local notification scheduling</li>
-                    <li>Improved reminder controls and notification behavior</li>
-                  </ul>
-                </div>
-
-                {/* V3.0.3 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.0.3</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Location search improvements</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Improved online place searching with Photon and Nominatim</li>
-                    <li>Improved location suggestions and place details</li>
-                    <li>Improved handling of unknown location coordinates</li>
-                  </ul>
-                </div>
-
-                {/* V3.0.2 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.0.2</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Maps and location improvements</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Added transaction location support</li>
-                    <li>Added interactive Leaflet map functionality</li>
-                    <li>Improved location search and details panel</li>
-                  </ul>
-                </div>
-
-                {/* V3.0.1 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.0.1</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Stability and responsive improvements</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Improved mobile and desktop layouts</li>
-                    <li>Fixed interface alignment and spacing issues</li>
-                    <li>Improved application stability</li>
-                  </ul>
-                </div>
-
-                {/* V3.0.0 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.0.0</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Major V3 design and functionality update</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Introduced the new indigo, violet, blue and cyan visual identity</li>
-                    <li>Improved the glass-style interface and responsive layouts</li>
-                    <li>Improved accounts, transactions, budgets and dashboard experience</li>
-                    <li>Added stronger cloud synchronization and offline support</li>
-                  </ul>
-                </div>
-
-                {/* V2.0.1 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V2.0.1</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Performance and stability improvements</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Enhanced offline synchronization reliability</li>
-                    <li>Fixed minor UI alignment and animation issues</li>
-                  </ul>
-                </div>
-
-                {/* V2.0.0 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V2.0.0</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Major Spendly upgrade</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Introduced the modern Spendly interface and glass-style design</li>
-                    <li>Added offline support so the app can continue working without internet</li>
-                    <li>Added Supabase cloud storage and account-based data synchronization</li>
-                    <li>Added Android app support</li>
-                    <li>Improved analytics and notification foundations</li>
-                  </ul>
-                </div>
-
-                {/* V1.0.3 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V1.0.3</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Bug fixes and stability updates</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Improved budget calculations and transaction form validation</li>
-                  </ul>
-                </div>
-
-                {/* V1.0.2 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V1.0.2</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>UI polish and multi-account enhancements</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Added support for credit cards, bank accounts, and wallet tracking</li>
-                  </ul>
-                </div>
-
-                {/* V1.0.1 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V1.0.1</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Maintenance update</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Fixed minor account balance display and security issues</li>
-                  </ul>
-                </div>
-
-                {/* V1.0.0 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V1.0.0</span>
-                  </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Initial Spendly release</h4>
-                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Track income and expenses</li>
-                    <li>Manage multiple accounts and balances</li>
-                    <li>Create monthly budgets</li>
-                    <li>Sign in securely</li>
-                    <li>View financial information from one dashboard</li>
-                  </ul>
-                </div>
+                ))}
               </div>
             )}
           </div>
@@ -1513,6 +1275,170 @@ export const SettingsView: React.FC = () => {
             </button>
             <button type="button" onClick={() => setIsDiagnosticModalOpen(false)} className="btn btn-secondary">
               Close Diagnostic
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal 4: Add App Lock PIN */}
+      <Modal
+        isOpen={isSetPinModalOpen}
+        onClose={() => setIsSetPinModalOpen(false)}
+        title="Add Spendly App Lock"
+        subtitle="Set a 4-digit security PIN code to protect your financial workspace."
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!/^\d{4}$/.test(newPinInput)) {
+              setPinError('PIN must be exactly 4 numeric digits.');
+              return;
+            }
+            if (newPinInput !== confirmPinInput) {
+              setPinError('PIN codes do not match.');
+              return;
+            }
+            setPinCode(newPinInput);
+            setIsSetPinModalOpen(false);
+          }}
+          style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+        >
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+              Enter 4-Digit PIN
+            </label>
+            <input
+              type="password"
+              maxLength={4}
+              required
+              placeholder="••••"
+              value={newPinInput}
+              onChange={(e) => {
+                setPinError('');
+                setNewPinInput(e.target.value.replace(/\D/g, ''));
+              }}
+              style={{ width: '100%', textAlign: 'center', fontSize: '1.4rem', letterSpacing: '0.4em' }}
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+              Confirm 4-Digit PIN
+            </label>
+            <input
+              type="password"
+              maxLength={4}
+              required
+              placeholder="••••"
+              value={confirmPinInput}
+              onChange={(e) => {
+                setPinError('');
+                setConfirmPinInput(e.target.value.replace(/\D/g, ''));
+              }}
+              style={{ width: '100%', textAlign: 'center', fontSize: '1.4rem', letterSpacing: '0.4em' }}
+            />
+          </div>
+
+          {pinError && <span style={{ fontSize: '0.8rem', color: 'var(--status-expense)' }}>{pinError}</span>}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+            <button type="button" onClick={() => setIsSetPinModalOpen(false)} className="btn btn-secondary">
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary">
+              <Lock size={15} /> Enable App Lock
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal 5: Remove App Lock */}
+      <Modal
+        isOpen={isRemovePinModalOpen}
+        onClose={() => setIsRemovePinModalOpen(false)}
+        title="Remove App Lock"
+        subtitle="Enter your current 4-digit PIN code to disable App Lock."
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const isValid = await validatePin(removePinInput);
+            if (isValid) {
+              setPinCode('');
+              setIsRemovePinModalOpen(false);
+              showToast('App Lock removed successfully', 'info');
+            } else {
+              setRemovePinError('Incorrect PIN code. Please try again.');
+            }
+          }}
+          style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+        >
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+              Current 4-Digit PIN
+            </label>
+            <input
+              type="password"
+              maxLength={4}
+              required
+              placeholder="••••"
+              value={removePinInput}
+              onChange={(e) => {
+                setRemovePinError('');
+                setRemovePinInput(e.target.value.replace(/\D/g, ''));
+              }}
+              style={{ width: '100%', textAlign: 'center', fontSize: '1.4rem', letterSpacing: '0.4em' }}
+              autoFocus
+            />
+          </div>
+
+          {removePinError && <span style={{ fontSize: '0.8rem', color: 'var(--status-expense)' }}>{removePinError}</span>}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+            <button type="button" onClick={() => setIsRemovePinModalOpen(false)} className="btn btn-secondary">
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-danger">
+              Remove App Lock
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal 6: Forgot App Lock Recovery */}
+      <Modal
+        isOpen={isForgotLockModalOpen}
+        onClose={() => setIsForgotLockModalOpen(false)}
+        title="Forgot App Lock PIN?"
+        subtitle="Recovery information for local device PIN lock."
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            <p>
+              Spendly App Lock is a local passcode protecting this device. It is separate from your Supabase account password.
+            </p>
+            <p style={{ marginTop: '8px' }}>
+              If you forgot your PIN, you can safely remove it by signing out of your account. All your financial data is safely saved on Supabase cloud and will be restored when you sign back in.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+            <button type="button" onClick={() => setIsForgotLockModalOpen(false)} className="btn btn-secondary">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPinCode('');
+                setIsPinLocked(false);
+                setIsForgotLockModalOpen(false);
+                logout();
+              }}
+              className="btn btn-danger"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <LogOut size={15} /> Sign Out to Reset Lock
             </button>
           </div>
         </div>

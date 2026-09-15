@@ -303,7 +303,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         } else if (result.status === 'up_to_date') {
           setLatestManifest(result.manifest);
           if (isManual) {
-            showToast(`You're up to date! Spendly V${result.latestVersion} is the latest version.`, 'success');
+            showToast(`You're up to date! Spendly V${result.currentVersion} is the latest version.`, 'success');
+          }
+        } else if (result.status === 'installed_newer') {
+          setLatestManifest(result.manifest);
+          if (isManual) {
+            showToast(`You're on Spendly V${result.currentVersion} (newer than remote V${result.latestVersion}).`, 'info');
           }
         } else if (result.status === 'offline') {
           if (isManual) {

@@ -1,17 +1,19 @@
 {
-  "version": "3.1.5",
-  "versionName": "Spendly V3.1.5",
+  "version": "3.1.6",
+  "versionName": "Spendly V3.1.6",
   "buildDate": "2026-09-16",
   "releaseDate": "2026-09-16",
-  "title": "Spendly V3.1.5 Available",
-  "message": "Spendly V3.1.5 is now available.",
+  "title": "Spendly V3.1.6 Available",
+  "message": "Spendly V3.1.6 is now available.",
   "downloadUrl": "https://drive.google.com/file/d/1r9Sw2jy0p4Nd52u_Q2vsUig8WW7zsWO0/view?usp=sharing",
   "minimumSupportedVersion": "1.0.0",
   "releaseNotes": [
-    "Critical update notification fix enforcing production manifest fetching over HTTPS",
-    "Native Android installed version detection via Capacitor App.getInfo()",
-    "Interactive System & Version Diagnostic Modal in Settings with manual re-check option",
-    "Detailed update check diagnostics with HTTP status codes and error reporting",
-    "Version-specific notification dismissal preventing stale update suppression"
+    "Fixed same-version update comparison reporting up to date without popups",
+    "Native Android CSV & JSON file export with system file saving and share sheet",
+    "Interactive Spendly SVG map markers with Unknown Location details panel",
+    "Cleaned and deduplicated complete release version history",
+    "Redesigned App Lock settings UI with secure 4-digit PIN setup, removal, and recovery",
+    "Consolidated single-badge top header network and cloud sync indicator"
   ]
 }
+
