@@ -5,7 +5,7 @@
   "releaseDate": "2026-09-16",
   "title": "Spendly V3.1.6 Available",
   "message": "Spendly V3.1.6 is now available.",
-  "downloadUrl": "https://drive.google.com/file/d/1KycbrV-U9hEIL4RUeKsOW5OoAMkLyrS6/view?usp=sharing",
+  "downloadUrl": "https://drive.google.com/file/d/1W9LOJKdCLvvkOVjbW9Q-8lhGUtt5f7lw/view?usp=sharing",
   "minimumSupportedVersion": "1.0.0",
   "releaseNotes": [
     "Fixed same-version update comparison reporting up to date without popups",

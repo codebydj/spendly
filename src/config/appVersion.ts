@@ -10,7 +10,7 @@ export const APP_NAME = 'Spendly';
 export const APP_PACKAGE_ID = 'com.spendly.finance';
 
 export const ANDROID_APK_DOWNLOAD_URL =
-  'https://drive.google.com/file/d/1KycbrV-U9hEIL4RUeKsOW5OoAMkLyrS6/view?usp=sharing';
+  'https://drive.google.com/file/d/1W9LOJKdCLvvkOVjbW9Q-8lhGUtt5f7lw/view?usp=sharing';
 
 export const APP_RELEASE_NOTES = [
   'Fixed same-version update comparison reporting up to date without popups',
