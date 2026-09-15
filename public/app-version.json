@@ -5,7 +5,7 @@
   "releaseDate": "2026-09-16",
   "title": "Spendly V3.1.5 Available",
   "message": "Spendly V3.1.5 is now available.",
-  "downloadUrl": "https://drive.google.com/file/d/1_jG2HVHJpI5ciwJlXHbQ0NWhawC3evl4/view?usp=sharing",
+  "downloadUrl": "https://drive.google.com/file/d/1r9Sw2jy0p4Nd52u_Q2vsUig8WW7zsWO0/view?usp=sharing",
   "minimumSupportedVersion": "1.0.0",
   "releaseNotes": [
     "Critical update notification fix enforcing production manifest fetching over HTTPS",

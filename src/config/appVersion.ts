@@ -10,7 +10,7 @@ export const APP_NAME = 'Spendly';
 export const APP_PACKAGE_ID = 'com.spendly.finance';
 
 export const ANDROID_APK_DOWNLOAD_URL =
-  'https://drive.google.com/file/d/1_jG2HVHJpI5ciwJlXHbQ0NWhawC3evl4/view?usp=sharing';
+  'https://drive.google.com/file/d/1r9Sw2jy0p4Nd52u_Q2vsUig8WW7zsWO0/view?usp=sharing';
 
 export const APP_RELEASE_NOTES = [
   'Critical update notification fix enforcing production manifest fetching over HTTPS',

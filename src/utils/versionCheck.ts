@@ -145,11 +145,6 @@ export async function checkForAppUpdate(_forceFresh = false): Promise<UpdateChec
 
     const res = await fetch(targetUrl, {
       signal: controller.signal,
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
-      },
     });
 
     clearTimeout(timeoutId);
@@ -176,7 +171,7 @@ export async function checkForAppUpdate(_forceFresh = false): Promise<UpdateChec
     try {
       const relativeUrl = `/app-version.json?t=${Date.now()}`;
       console.log(`[Spendly Update] Fallback relative fetch: ${relativeUrl}`);
-      const res = await fetch(relativeUrl, { cache: 'no-store' });
+      const res = await fetch(relativeUrl);
       if (res.ok) {
         manifest = await res.json();
         httpStatus = res.status;
