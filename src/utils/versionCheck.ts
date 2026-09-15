@@ -7,7 +7,6 @@ import { PRODUCTION_SITE_URL } from './authConfig';
 export const CURRENT_APP_VERSION = APP_VERSION;
 export const CURRENT_RELEASE_DATE = APP_BUILD_DATE;
 
-const POSTPONED_UNTIL_KEY = 'spendly_update_postponed_until';
 const CACHED_MANIFEST_KEY = 'spendly_cached_version_manifest';
 
 export type UpdateCheckResult =
@@ -266,14 +265,18 @@ export function getCachedVersionManifest(): AppVersionManifest | null {
  * Check if the user has dismissed/postponed notification for a specific latest version
  */
 export function isVersionDismissed(latestVersion: string): boolean {
-  // 1. Version-specific dismissal check (e.g. spendly_update_dismissed_3.1.4)
-  const dismissedKey = `spendly_update_dismissed_${latestVersion}`;
+  const cleanVer = (latestVersion || '').replace(/^v/i, '').trim();
+  if (!cleanVer) return false;
+
+  // 1. Version-specific dismissal check (e.g. spendly_update_dismissed_3.1.5)
+  const dismissedKey = `spendly_update_dismissed_${cleanVer}`;
   if (localStorage.getItem(dismissedKey) === 'true') {
     return true;
   }
 
-  // 2. Postponed delay expiry check
-  const postponedUntil = localStorage.getItem(POSTPONED_UNTIL_KEY);
+  // 2. Version-specific postponed delay expiry check
+  const postponedKey = `spendly_update_postponed_${cleanVer}`;
+  const postponedUntil = localStorage.getItem(postponedKey);
   if (postponedUntil) {
     const expiry = parseInt(postponedUntil, 10);
     if (!isNaN(expiry) && Date.now() < expiry) {
@@ -288,14 +291,18 @@ export function isVersionDismissed(latestVersion: string): boolean {
  * Postpone / dismiss update notification for specified version (default 7 days)
  */
 export function dismissUpdateForVersion(version: string, days = 7): void {
-  const dismissedKey = `spendly_update_dismissed_${version}`;
+  const cleanVer = (version || '').replace(/^v/i, '').trim();
+  if (!cleanVer) return;
+
+  const dismissedKey = `spendly_update_dismissed_${cleanVer}`;
   localStorage.setItem(dismissedKey, 'true');
 
+  const postponedKey = `spendly_update_postponed_${cleanVer}`;
   const expiry = Date.now() + days * 24 * 60 * 60 * 1000;
-  localStorage.setItem(POSTPONED_UNTIL_KEY, String(expiry));
+  localStorage.setItem(postponedKey, String(expiry));
 }
 
 export function postponeUpdateNotification(days = 7): void {
   const expiry = Date.now() + days * 24 * 60 * 60 * 1000;
-  localStorage.setItem(POSTPONED_UNTIL_KEY, String(expiry));
+  localStorage.setItem('spendly_update_postponed_general', String(expiry));
 }
