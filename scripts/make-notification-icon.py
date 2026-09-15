@@ -12,9 +12,8 @@ def generate_monochrome_notification_icon():
     if bbox:
         img = img.crop(bbox)
 
-    # Convert non-transparent pixels to pure white (255, 255, 255, alpha)
-    r, g, b, a = img.split()
-    # Create solid white RGB channel
+    # Convert non-transparent pixels to pure white stencil (255, 255, 255, alpha)
+    _, _, _, a = img.split()
     white_rgb = Image.new('RGB', img.size, (255, 255, 255))
     monochrome = Image.composite(white_rgb, Image.new('RGB', img.size, (0, 0, 0)), a)
     monochrome.putalpha(a)
@@ -32,7 +31,7 @@ def generate_monochrome_notification_icon():
         folder_path = os.path.join(res_dir, folder_name)
         os.makedirs(folder_path, exist_ok=True)
 
-        # Create canvas with 10% padding for clean scaling
+        # Create canvas with 10% padding for clean Android status bar scaling
         canvas_size = target_dim
         padding = max(1, int(canvas_size * 0.1))
         content_size = canvas_size - (padding * 2)
@@ -48,9 +47,13 @@ def generate_monochrome_notification_icon():
         oy = (canvas_size - nh) // 2
         canvas.paste(resized, (ox, oy), resized)
 
-        output_path = os.path.join(folder_path, 'ic_stat_name.png')
-        canvas.save(output_path, 'PNG')
-        print(f"Saved {output_path} ({canvas_size}x{canvas_size})")
+        # Save as both ic_stat_spendly.png and ic_stat_name.png for complete resource compatibility
+        path_spendly = os.path.join(folder_path, 'ic_stat_spendly.png')
+        path_name = os.path.join(folder_path, 'ic_stat_name.png')
+
+        canvas.save(path_spendly, 'PNG')
+        canvas.save(path_name, 'PNG')
+        print(f"Saved {path_spendly} & {path_name} ({canvas_size}x{canvas_size})")
 
 if __name__ == '__main__':
     generate_monochrome_notification_icon()
