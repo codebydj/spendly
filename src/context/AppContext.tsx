@@ -678,6 +678,186 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   }, [loadUserData]);
 
+  // --- AUTOMATIC BIDIRECTIONAL SUPABASE REALTIME SYNCHRONIZATION ---
+  useEffect(() => {
+    if (!user?.id) return;
+    const userId = user.id;
+
+    console.log(`[Spendly Realtime] Subscribing to Supabase realtime channels for user ${userId}...`);
+
+    const channel = supabase
+      .channel(`spendly_user_realtime_${userId}`)
+      // 1. TRANSACTIONS REALTIME
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` },
+        async (payload) => {
+          console.log('[Realtime] Transaction event received:', payload.eventType, payload);
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const tx = SyncService.mapTransactionFromDb(payload.new);
+            await IndexedDBService.saveItem(STORES.TRANSACTIONS, tx, userId);
+            setTransactions((prev) => {
+              const idx = prev.findIndex((t) => t.id === tx.id);
+              let updated;
+              if (idx >= 0) {
+                updated = [...prev];
+                updated[idx] = tx;
+              } else {
+                updated = [tx, ...prev];
+              }
+              updated.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              setAccounts((accs) => updateAccountBalances(accs, updated));
+              return updated;
+            });
+          } else if (payload.eventType === 'DELETE' && payload.old?.id) {
+            const deleteId = payload.old.id;
+            await IndexedDBService.deleteItem(STORES.TRANSACTIONS, deleteId);
+            setTransactions((prev) => {
+              const updated = prev.filter((t) => t.id !== deleteId);
+              setAccounts((accs) => updateAccountBalances(accs, updated));
+              return updated;
+            });
+          }
+          setSyncStatus('SYNCED');
+          setLastSyncTime(new Date().toLocaleTimeString());
+        }
+      )
+      // 2. ACCOUNTS REALTIME
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'accounts', filter: `user_id=eq.${userId}` },
+        async (payload) => {
+          console.log('[Realtime] Account event received:', payload.eventType, payload);
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const acc = SyncService.mapAccountFromDb(payload.new);
+            await IndexedDBService.saveItem(STORES.ACCOUNTS, acc, userId);
+            setAccounts((prev) => {
+              const idx = prev.findIndex((a) => a.id === acc.id);
+              let updated;
+              if (idx >= 0) {
+                updated = [...prev];
+                updated[idx] = acc;
+              } else {
+                updated = [...prev, acc];
+              }
+              return updateAccountBalances(updated, transactions);
+            });
+          } else if (payload.eventType === 'DELETE' && payload.old?.id) {
+            const deleteId = payload.old.id;
+            await IndexedDBService.deleteItem(STORES.ACCOUNTS, deleteId);
+            setAccounts((prev) => prev.filter((a) => a.id !== deleteId));
+          }
+          setSyncStatus('SYNCED');
+          setLastSyncTime(new Date().toLocaleTimeString());
+        }
+      )
+      // 3. BUDGETS REALTIME
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'budgets', filter: `user_id=eq.${userId}` },
+        async (payload) => {
+          console.log('[Realtime] Budget event received:', payload.eventType, payload);
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const b = SyncService.mapBudgetFromDb(payload.new);
+            await IndexedDBService.saveItem(STORES.BUDGETS, b, userId);
+            setBudgets((prev) => {
+              const idx = prev.findIndex((item) => item.id === b.id);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = b;
+                return next;
+              }
+              return [...prev, b];
+            });
+          } else if (payload.eventType === 'DELETE' && payload.old?.id) {
+            await IndexedDBService.deleteItem(STORES.BUDGETS, payload.old.id);
+            setBudgets((prev) => prev.filter((item) => item.id !== payload.old.id));
+          }
+          setSyncStatus('SYNCED');
+        }
+      )
+      // 4. RECURRING PAYMENTS REALTIME
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'recurring_payments', filter: `user_id=eq.${userId}` },
+        async (payload) => {
+          console.log('[Realtime] Recurring event received:', payload.eventType, payload);
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const r = SyncService.mapRecurringFromDb(payload.new);
+            await IndexedDBService.saveItem(STORES.RECURRING, r, userId);
+            setRecurringPayments((prev) => {
+              const idx = prev.findIndex((item) => item.id === r.id);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = r;
+                return next;
+              }
+              return [...prev, r];
+            });
+          } else if (payload.eventType === 'DELETE' && payload.old?.id) {
+            await IndexedDBService.deleteItem(STORES.RECURRING, payload.old.id);
+            setRecurringPayments((prev) => prev.filter((item) => item.id !== payload.old.id));
+          }
+          setSyncStatus('SYNCED');
+        }
+      )
+      // 5. NOTIFICATIONS REALTIME
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        async (payload) => {
+          console.log('[Realtime] Notification event received:', payload.eventType, payload);
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const n = SyncService.mapNotificationFromDb(payload.new);
+            await IndexedDBService.saveItem(STORES.NOTIFICATIONS, n, userId);
+            setNotifications((prev) => {
+              const idx = prev.findIndex((item) => item.id === n.id);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = n;
+                return next;
+              }
+              return [n, ...prev];
+            });
+          } else if (payload.eventType === 'DELETE' && payload.old?.id) {
+            await IndexedDBService.deleteItem(STORES.NOTIFICATIONS, payload.old.id);
+            setNotifications((prev) => prev.filter((item) => item.id !== payload.old.id));
+          }
+        }
+      )
+      // 6. USER SETTINGS REALTIME
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_settings', filter: `user_id=eq.${userId}` },
+        async (payload) => {
+          console.log('[Realtime] Settings event received:', payload.eventType, payload);
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const s = SyncService.mapSettingsFromDb(payload.new);
+            await IndexedDBService.saveSettings(s, userId);
+            setSettings(s);
+          }
+        }
+      )
+      // 7. PROFILES REALTIME
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+        (payload) => {
+          console.log('[Realtime] Profile event received:', payload.eventType, payload);
+          if (payload.new && typeof payload.new === 'object') {
+            const profileData = payload.new as Record<string, any>;
+            setUserProfile({ fullName: profileData.full_name, email: profileData.email });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log(`[Spendly Realtime] Unsubscribing realtime channels for user ${userId}...`);
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, updateAccountBalances, transactions]);
+
   // Network Status Monitor & Automatic Update Check
   useEffect(() => {
     const handleOnline = () => {

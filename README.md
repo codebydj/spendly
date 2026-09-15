@@ -181,7 +181,7 @@ Centralized configuration organized into clear sections:
 5. **Security**: 4-digit PIN lock setup.
 6. **Categories**: Compact category management editor.
 7. **Download Application**: Android APK direct download link.
-8. **Application Information**: Version `V3.0.8`, Build Date `14 September 2026`, Package ID `com.spendly.finance`.
+8. **Application Information**: Version `V3.1.2`, Build Date `15 September 2026`, Package ID `com.spendly.finance`.
 9. **Version History**: Collapsible release history timeline.
 10. **Developer**: Dhanunjaya (`@codebydj`) attribution and GitHub link.
 
@@ -191,10 +191,10 @@ Centralized configuration organized into clear sections:
 
 Spendly Android APK is available via direct download without requiring the Google Play Store.
 
-- **Version**: `V3.0.8`
-- **Build Date**: `14 September 2026`
+- **Version**: `V3.1.2`
+- **Build Date**: `15 September 2026`
 - **Package ID**: `com.spendly.finance`
-- Configurable via `ANDROID_APK_DOWNLOAD_URL` constant in `SettingsView.tsx`.
+- Configurable via `ANDROID_APK_DOWNLOAD_URL` constant in `src/config/appVersion.ts`.
 
 ---
 

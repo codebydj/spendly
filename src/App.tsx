@@ -164,7 +164,9 @@ const AppShell: React.FC = () => {
           gap: '16px',
         }}
       >
-        <SpendlyLogo type="icon" size={56} />
+        <div className="logo-float-animation">
+          <SpendlyLogo type="icon" size={56} />
+        </div>
         <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
           Initializing Spendly...
         </span>

@@ -1,13 +1,17 @@
 {
-  "version": "3.1.1",
+  "version": "3.1.2",
+  "versionName": "Spendly V3.1.2",
+  "buildDate": "2026-09-15",
   "releaseDate": "2026-09-15",
-  "title": "Spendly V3.1.1",
-  "message": "Spendly V3.1.1 is now available with localhost performance optimizations, instant offline hydration, and stability improvements.",
-  "downloadUrl": "https://github.com/codebydj/spendly/releases/download/v3.1.1/spendly-v3.1.1.apk",
+  "title": "Spendly V3.1.2",
+  "message": "Automatic cloud sync, realtime multi-device updates, and app improvements are now available.",
+  "downloadUrl": "https://drive.google.com/file/d/1M-tc5q-QUpQO76qL52KmG0mUVHIuWEx0/view?usp=sharing",
   "releaseNotes": [
-    "Fixed localhost performance lag with instant parallel IndexedDB hydration",
-    "Added in-memory version check throttling to prevent redundant network fetches",
-    "Critical offline-first data loss fix with transactional queueing",
-    "Updated app version to V3.1.1"
+    "Automatic bidirectional Supabase realtime cloud synchronization",
+    "Instant multi-device live data updates across Web and Android",
+    "Centralized V3.1.2 application configuration and metadata",
+    "Centered app update notification modal with postponed controls",
+    "Subtle floating Spendly logo loading screen animation"
   ]
 }
+

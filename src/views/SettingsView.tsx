@@ -56,8 +56,7 @@ const GithubIcon: React.FC<{ size?: number; color?: string }> = ({ size = 16, co
 
 import { ChangePasswordModal } from '../components/forms/ChangePasswordModal';
 import { Modal } from '../components/ui/Modal';
-
-const ANDROID_APK_DOWNLOAD_URL = 'https://drive.google.com/file/d/1jQ7Zi4f5UEzi8lWWtMt10InJdPpitTu9/view?usp=sharing';
+import { APP_VERSION, APP_BUILD_DATE, APP_NAME, APP_PACKAGE_ID, ANDROID_APK_DOWNLOAD_URL } from '../config/appVersion';
 
 export const SettingsView: React.FC = () => {
   const {
@@ -826,7 +825,7 @@ export const SettingsView: React.FC = () => {
               <div>
                 <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Spendly for Android</h4>
                 <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Latest Version: <strong style={{ color: 'var(--accent-cyan)' }}>V3.1.1</strong> • Build Date: <strong style={{ color: 'var(--text-primary)' }}>15 September 2026</strong>
+                  Latest Version: <strong style={{ color: 'var(--accent-cyan)' }}>V{APP_VERSION}</strong> • Build Date: <strong style={{ color: 'var(--text-primary)' }}>{APP_BUILD_DATE}</strong>
                 </p>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                   <span>✓ Direct APK download</span>
@@ -861,17 +860,17 @@ export const SettingsView: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Application</span>
-                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Spendly</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{APP_NAME}</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Version</span>
-                <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>V3.1.1</span>
+                <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>V{APP_VERSION}</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Build Date</span>
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>15 September 2026</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{APP_BUILD_DATE}</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
@@ -881,7 +880,7 @@ export const SettingsView: React.FC = () => {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Package ID</span>
-                <span style={{ fontWeight: 500, fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)' }}>com.spendly.finance</span>
+                <span style={{ fontWeight: 500, fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{APP_PACKAGE_ID}</span>
               </div>
 
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
@@ -927,23 +926,39 @@ export const SettingsView: React.FC = () => {
 
             {isVersionHistoryOpen && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', maxHeight: '460px', overflowY: 'auto', paddingRight: '4px' }}>
-                {/* V3.1.1 - CURRENT */}
+                {/* V3.1.2 - CURRENT */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: 'rgba(34, 211, 238, 0.08)', padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-cyan-border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-cyan)' }}>V3.1.1</span>
+                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-cyan)' }}>V3.1.2</span>
                       <span style={{ fontSize: '0.66rem', fontWeight: 800, backgroundColor: 'var(--accent-cyan)', color: '#000000', padding: '1px 6px', borderRadius: '4px', letterSpacing: '0.04em' }}>
                         CURRENT
                       </span>
                     </div>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>15 September 2026</span>
                   </div>
-                  <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>Performance & Instant Hydration Release</h4>
+                  <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>Automatic Sync and Update Experience</h4>
                   <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <li>Fixed localhost performance lag with instant parallel IndexedDB hydration</li>
-                    <li>Added in-memory version check throttling to prevent redundant network calls</li>
-                    <li>Critical offline-first data loss fix with transactional queueing</li>
-                    <li>Updated application version to V3.1.1</li>
+                    <li>Automatic bidirectional Supabase synchronization</li>
+                    <li>Realtime cloud updates across Web and Android</li>
+                    <li>Improved offline-to-online synchronization</li>
+                    <li>Correct centralized application versioning (V3.1.2)</li>
+                    <li>Improved update notification popup with postpone delay</li>
+                    <li>Subtle floating Spendly logo loading animation</li>
+                  </ul>
+                </div>
+
+                {/* V3.1.1 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.1.1</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>15 September 2026</span>
+                  </div>
+                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Sync and Stability Update</h4>
+                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <li>Cloud persistence fixes and parallel IndexedDB hydration</li>
+                    <li>Supabase synchronization improvements</li>
+                    <li>Android and Web reliability improvements</li>
                   </ul>
                 </div>
 
@@ -953,11 +968,52 @@ export const SettingsView: React.FC = () => {
                     <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.1.0</span>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>15 September 2026</span>
                   </div>
-                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>New Update & Data Reliability Release</h4>
+                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Data and Reliability Update</h4>
                   <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <li>Added notifications when a new Spendly app version is available</li>
-                    <li>Improved offline data reliability and synchronization</li>
-                    <li>Improved application stability and update handling</li>
+                    <li>Offline persistence improvements & IndexedDB storage</li>
+                    <li>Pending sync queue and cloud reconciliation</li>
+                    <li>App update notification system</li>
+                  </ul>
+                </div>
+
+                {/* V3.0.0 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.0.0</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>14 September 2026</span>
+                  </div>
+                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Final V3 Release</h4>
+                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <li>New indigo/violet/blue/cyan visual identity</li>
+                    <li>Refined glassmorphic UI, Analytics, Calendar & Maps</li>
+                    <li>Online place search, map pickers, and bill reminders</li>
+                  </ul>
+                </div>
+
+                {/* V2.0.0 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V2.0.0</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>August 2026</span>
+                  </div>
+                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Major UI and Architecture Update</h4>
+                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <li>Major visual redesign and glassmorphism</li>
+                    <li>Offline-first architecture and Supabase cloud persistence</li>
+                    <li>Capacitor Android integration</li>
+                  </ul>
+                </div>
+
+                {/* V1.0.0 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V1.0.0</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>July 2026</span>
+                  </div>
+                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Initial Release</h4>
+                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <li>Core personal finance tracking, accounts, income & expenses</li>
+                    <li>Category monthly budgets and secure authentication</li>
                   </ul>
                 </div>
 

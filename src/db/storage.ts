@@ -1,5 +1,6 @@
 import type { Account, Category, Transaction, Budget, RecurringPayment, NotificationItem, AppSettings, BackupData } from '../types/finance';
 import { IndexedDBService, STORES } from './indexedDB';
+import { APP_VERSION } from '../config/appVersion';
 import {
   INITIAL_CATEGORIES,
   PRODUCTION_ACCOUNTS,
@@ -211,7 +212,7 @@ export class StorageEngine {
   // --- BACKUP IMPORT / EXPORT ---
   public static exportFullBackup(userId?: string): BackupData {
     return {
-      version: '3.1.1',
+      version: APP_VERSION,
       exportedAt: new Date().toISOString(),
       accounts: this.loadAccounts(userId),
       categories: this.loadCategories(userId),

@@ -1,7 +1,8 @@
 import type { AppVersionManifest } from '../types/finance';
+import { APP_VERSION, APP_BUILD_DATE } from '../config/appVersion';
 
-export const CURRENT_APP_VERSION = '3.1.1';
-export const CURRENT_RELEASE_DATE = '15 September 2026';
+export const CURRENT_APP_VERSION = APP_VERSION;
+export const CURRENT_RELEASE_DATE = APP_BUILD_DATE;
 
 const LAST_NOTIFIED_KEY = 'spendly_last_notified_version';
 const POSTPONED_UNTIL_KEY = 'spendly_update_postponed_until';

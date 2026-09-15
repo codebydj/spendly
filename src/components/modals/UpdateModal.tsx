@@ -10,8 +10,7 @@ interface UpdateModalProps {
   onLater: () => void;
 }
 
-export const ANDROID_APK_DOWNLOAD_URL =
-  'https://github.com/codebydj/spendly/releases/download/v3.0.8/spendly-v3.0.8.apk';
+import { ANDROID_APK_DOWNLOAD_URL } from '../../config/appVersion';
 
 export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, manifest, onLater }) => {
   if (!manifest) return null;
@@ -64,7 +63,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, manif
 
         {/* Message */}
         <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          {manifest.message || 'Spendly V3.1.0 is now available with new improvements and features.'}
+          {manifest.message || 'Spendly V3.1.2 is now available with automatic realtime cloud synchronization and improvements.'}
         </p>
 
         {/* Release Notes List */}
