@@ -8,18 +8,25 @@ interface UpdateModalProps {
   isOpen: boolean;
   onClose: () => void;
   manifest: AppVersionManifest | null;
+  installedVersion?: string;
   onLater: () => void;
 }
 
-export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, manifest, onLater }) => {
+export const UpdateModal: React.FC<UpdateModalProps> = ({
+  isOpen,
+  onClose,
+  manifest,
+  installedVersion,
+  onLater,
+}) => {
   if (!manifest) return null;
 
   const latestVersion = manifest.version ? `V${manifest.version.replace(/^v/i, '')}` : `V${APP_VERSION}`;
-  const currentVersion = `V${APP_VERSION}`;
-  const title = manifest.title || `Spendly ${latestVersion} Released`;
+  const currentVersion = installedVersion ? `V${installedVersion.replace(/^v/i, '')}` : `V${APP_VERSION}`;
+  const title = manifest.title || `Spendly ${latestVersion} Available`;
   const buildDate = manifest.buildDate || manifest.releaseDate || '16-09-2026';
   const downloadUrl = manifest.downloadUrl || ANDROID_APK_DOWNLOAD_URL;
-  const message = manifest.message || 'New improvements, automatic sync enhancements, and stability fixes are available.';
+  const message = manifest.message || `${title} is now available.`;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="" subtitle="">
@@ -56,12 +63,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, manif
                   letterSpacing: '0.04em',
                 }}
               >
-                NEW UPDATE AVAILABLE
+                UPDATE AVAILABLE
               </span>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{buildDate}</span>
             </div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }}>
-              Spendly Update
+              {title}
             </h2>
           </div>
         </div>
@@ -82,7 +89,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, manif
         >
           <div>
             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Current Version
+              Installed Version
             </span>
             <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '2px' }}>
               {currentVersion}
@@ -105,7 +112,6 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, manif
 
         {/* Update Summary / Release Message */}
         <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          <p style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>{title}</p>
           <p>{message}</p>
         </div>
 
@@ -136,4 +142,3 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, manif
     </Modal>
   );
 };
-

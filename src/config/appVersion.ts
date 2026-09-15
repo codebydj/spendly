@@ -4,7 +4,8 @@
  */
 
 export const APP_VERSION = '3.1.3';
-export const APP_BUILD_DATE = '15 September 2026';
+export const APP_VERSION_NAME = 'Spendly V3.1.3';
+export const APP_BUILD_DATE = '16 September 2026';
 export const APP_NAME = 'Spendly';
 export const APP_PACKAGE_ID = 'com.spendly.finance';
 
@@ -18,4 +19,6 @@ export const APP_RELEASE_NOTES = [
   'Fixed Android location permission prompt and current location flow',
   'Fixed Android notification icon rendering with sharp monochrome Spendly symbol',
   'Configured authentication redirects for finance-spendly.vercel.app with dedicated /update-password page',
+  'Authoritative V3.1.3 versioning and update checker with native version detection',
 ];
+

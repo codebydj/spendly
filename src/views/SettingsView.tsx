@@ -73,6 +73,7 @@ export const SettingsView: React.FC = () => {
     deleteCategory,
     toggleHideBalances,
     toggleNotifyAppUpdates,
+    installedVersion,
     isCheckingUpdates,
     checkAppUpdates,
     setPinCode,
@@ -879,8 +880,8 @@ export const SettingsView: React.FC = () => {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Version</span>
-                <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>V{APP_VERSION}</span>
+                <span style={{ color: 'var(--text-muted)' }}>Installed Version</span>
+                <span style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>V{installedVersion || APP_VERSION}</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem' }}>
@@ -941,23 +942,41 @@ export const SettingsView: React.FC = () => {
 
             {isVersionHistoryOpen && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', maxHeight: '460px', overflowY: 'auto', paddingRight: '4px' }}>
-                {/* V3.1.2 - CURRENT */}
+                {/* V3.1.3 - CURRENT */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: 'rgba(34, 211, 238, 0.08)', padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-cyan-border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-cyan)' }}>V3.1.2</span>
+                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--accent-cyan)' }}>V3.1.3</span>
                       <span style={{ fontSize: '0.66rem', fontWeight: 800, backgroundColor: 'var(--accent-cyan)', color: '#000000', padding: '1px 6px', borderRadius: '4px', letterSpacing: '0.04em' }}>
                         CURRENT
                       </span>
                     </div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>15 September 2026</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>16 September 2026</span>
                   </div>
-                  <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>Automatic Sync and Update Experience</h4>
+                  <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>Full Offline/Online CSV Export, Maps Pick on Map & Native Permissions</h4>
                   <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <li>Fixed offline & online CSV export with full transaction fields and UTF-8 BOM encoding</li>
+                    <li>Added visual map picker ("Pick on Map") with place search and location confirmation</li>
+                    <li>Preserved Unknown Location coordinates and interactive map markers</li>
+                    <li>Fixed Android location permission prompt and current location flow</li>
+                    <li>Fixed Android notification icon rendering with sharp monochrome Spendly symbol</li>
+                    <li>Configured authentication redirects for finance-spendly.vercel.app with dedicated /update-password page</li>
+                    <li>Authoritative V3.1.3 versioning and update checker with native version detection</li>
+                  </ul>
+                </div>
+
+                {/* V3.1.2 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>V3.1.2</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>15 September 2026</span>
+                  </div>
+                  <h4 style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Automatic Sync and Update Experience</h4>
+                  <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                     <li>Automatic bidirectional Supabase synchronization</li>
                     <li>Realtime cloud updates across Web and Android</li>
                     <li>Improved offline-to-online synchronization</li>
-                    <li>Correct centralized application versioning (V3.1.2)</li>
+                    <li>Centralized application versioning</li>
                     <li>Improved update notification popup with postpone delay</li>
                     <li>Subtle floating Spendly logo loading animation</li>
                   </ul>

@@ -73,6 +73,7 @@ interface AppContextType {
   triggerManualSync: () => Promise<boolean>;
 
   // App Update Notification
+  installedVersion: string;
   latestManifest: AppVersionManifest | null;
   isUpdateModalOpen: boolean;
   setIsUpdateModalOpen: (open: boolean) => void;
@@ -172,10 +173,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabledState] = useState<boolean>(soundService.getSoundEnabled());
 
-  // App Update Modal State
-  const [latestManifest, setLatestManifest] = useState<AppVersionManifest | null>(null);
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
-  const [isCheckingUpdates, setIsCheckingUpdates] = useState<boolean>(false);
+  // App Update Modal State (unified at lines 251+)
 
   const toggleSoundEnabled = () => {
     const next = !soundEnabled;
@@ -247,6 +245,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return ops.length;
   }, []);
 
+  // App Update State
+  const [installedVersion, setInstalledVersion] = useState<string>(CURRENT_APP_VERSION);
+  const [latestManifest, setLatestManifest] = useState<AppVersionManifest | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
+
   // Check App Updates
   const checkAppUpdates = useCallback(
     async (isManual = false) => {
@@ -255,6 +259,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setIsCheckingUpdates(true);
       try {
         const result = await checkForAppUpdate(isManual);
+        if (result.currentVersion) {
+          setInstalledVersion(result.currentVersion);
+        }
 
         if (result.status === 'update_available') {
           setLatestManifest(result.manifest);
@@ -289,7 +296,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
         } else if (result.status === 'up_to_date') {
           if (isManual) {
-            showToast(`You're up to date! Spendly V${result.currentVersion} is the latest version.`, 'success');
+            showToast(`You're up to date! Spendly V${result.latestVersion} is the latest version.`, 'success');
           }
         } else if (result.status === 'offline') {
           if (isManual) {
@@ -1568,6 +1575,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         logout,
         triggerCloudSync,
         triggerManualSync,
+        installedVersion,
         latestManifest,
         isUpdateModalOpen,
         setIsUpdateModalOpen,

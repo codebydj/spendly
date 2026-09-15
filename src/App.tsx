@@ -83,6 +83,7 @@ const AppShell: React.FC = () => {
     setIsAddRecurringOpen,
     selectedAccountIdForDetail,
     setSelectedAccountIdForDetail,
+    installedVersion,
     latestManifest,
     isUpdateModalOpen,
     setIsUpdateModalOpen,
@@ -216,6 +217,7 @@ const AppShell: React.FC = () => {
           isOpen={isUpdateModalOpen}
           onClose={() => setIsUpdateModalOpen(false)}
           manifest={latestManifest}
+          installedVersion={installedVersion}
           onLater={postponeUpdate}
         />
       </div>
@@ -252,6 +254,7 @@ const AppShell: React.FC = () => {
         isOpen={isUpdateModalOpen}
         onClose={() => setIsUpdateModalOpen(false)}
         manifest={latestManifest}
+        installedVersion={installedVersion}
         onLater={postponeUpdate}
       />
       <ToastContainer />

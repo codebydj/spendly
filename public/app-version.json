@@ -1,17 +1,19 @@
 {
-  "version": "3.1.2",
-  "versionName": "Spendly V3.1.2",
-  "buildDate": "2026-09-15",
-  "releaseDate": "2026-09-15",
-  "title": "Spendly V3.1.2",
-  "message": "Automatic cloud sync, realtime multi-device updates, and app improvements are now available.",
-  "downloadUrl": "https://drive.google.com/file/d/1dcNiC2ZIV3Tx1NtXeX3ZIxrb7pq4x47p/view?usp=sharing",
+  "version": "3.1.3",
+  "versionName": "Spendly V3.1.3",
+  "buildDate": "2026-09-16",
+  "releaseDate": "2026-09-16",
+  "title": "Spendly V3.1.3",
+  "message": "Spendly V3.1.3 is now available.",
+  "downloadUrl": "https://drive.google.com/file/d/1KkB6VGJV_Z2kpXa2_bi3X6oUZRSEShh0/view?usp=sharing",
+  "minimumSupportedVersion": "1.0.0",
   "releaseNotes": [
-    "Automatic bidirectional Supabase realtime cloud synchronization",
-    "Instant multi-device live data updates across Web and Android",
-    "Centralized V3.1.2 application configuration and metadata",
-    "Centered app update notification modal with postponed controls",
-    "Subtle floating Spendly logo loading screen animation"
+    "Fixed offline & online CSV export with full transaction fields and UTF-8 BOM encoding",
+    "Added visual map picker (\"Pick on Map\") with place search and location confirmation",
+    "Preserved Unknown Location coordinates and interactive map markers",
+    "Fixed Android location permission prompt and current location flow",
+    "Fixed Android notification icon rendering with sharp monochrome Spendly symbol",
+    "Configured authentication redirects for finance-spendly.vercel.app with dedicated /update-password page",
+    "Authoritative V3.1.3 versioning and update checker with native version detection"
   ]
 }
-

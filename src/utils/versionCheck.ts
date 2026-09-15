@@ -1,3 +1,5 @@
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import type { AppVersionManifest } from '../types/finance';
 import { APP_VERSION, APP_BUILD_DATE } from '../config/appVersion';
 
@@ -32,7 +34,26 @@ export type UpdateCheckResult =
     };
 
 /**
- * Compare two semantic version strings (e.g. "3.1.2" vs "3.1.3", "4.0.0" vs "3.9.9")
+ * Dynamically read the actual installed app version.
+ * On Android / native Capacitor runtime: reads versionName from App.getInfo() (e.g. "3.0.8", "3.1.2", "3.1.3").
+ * On Web: returns the configured APP_VERSION ("3.1.3").
+ */
+export async function getInstalledAppVersion(): Promise<string> {
+  if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+    try {
+      const info = await App.getInfo();
+      if (info && info.version) {
+        return info.version.replace(/^v/i, '').trim();
+      }
+    } catch (e) {
+      console.warn('[VersionCheck] Native App.getInfo() failed, fallback to APP_VERSION:', e);
+    }
+  }
+  return APP_VERSION.replace(/^v/i, '').trim();
+}
+
+/**
+ * Compare two semantic version strings (e.g. "3.0.8" vs "3.1.3", "3.1.2" vs "3.1.3", "3.1.3" vs "3.1.4", "4.0.0" vs "3.9.9")
  * Strips optional leading 'v' or 'V'.
  * Returns:
  *   -1 if v1 < v2 (v2 is newer)
@@ -60,18 +81,19 @@ export function compareSemVer(v1: string, v2: string): number {
 }
 
 /**
- * Check if a new version is available relative to CURRENT_APP_VERSION
+ * Check if a new version is available relative to installed app version
  */
-export function isNewerVersionAvailable(latestVersion: string): boolean {
-  return compareSemVer(CURRENT_APP_VERSION, latestVersion) < 0;
+export async function isNewerVersionAvailable(latestVersion: string): Promise<boolean> {
+  const currentVersion = await getInstalledAppVersion();
+  return compareSemVer(currentVersion, latestVersion) < 0;
 }
 
 /**
- * Fetch public application version manifest (/app-version.json) with cache prevention
- * and evaluate against CURRENT_APP_VERSION.
+ * Fetch public application version manifest (/app-version.json) with cache busting
+ * and evaluate against the dynamically detected installed version.
  */
 export async function checkForAppUpdate(_forceFresh = false): Promise<UpdateCheckResult> {
-  const currentVersion = CURRENT_APP_VERSION;
+  const currentVersion = await getInstalledAppVersion();
 
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return {
@@ -113,16 +135,16 @@ export async function checkForAppUpdate(_forceFresh = false): Promise<UpdateChec
       };
     }
 
-    const latestVersion = String(manifest.version).trim();
+    const latestVersion = String(manifest.version).replace(/^v/i, '').trim();
 
     // Cache latest fetched manifest in localStorage
     localStorage.setItem(CACHED_MANIFEST_KEY, JSON.stringify(manifest));
 
-    // Semantic comparison
+    // Semantic comparison: installed (currentVersion) vs remote (latestVersion)
     const cmp = compareSemVer(currentVersion, latestVersion);
 
     if (cmp < 0) {
-      console.log(`[UpdateCheck] Current: ${currentVersion} | Latest: ${latestVersion} | Status: update_available`);
+      console.log(`[UpdateCheck] Installed: ${currentVersion} | Remote Latest: ${latestVersion} | Status: update_available`);
       return {
         status: 'update_available',
         currentVersion,
@@ -130,7 +152,7 @@ export async function checkForAppUpdate(_forceFresh = false): Promise<UpdateChec
         manifest,
       };
     } else {
-      console.log(`[UpdateCheck] Current: ${currentVersion} | Latest: ${latestVersion} | Status: up_to_date`);
+      console.log(`[UpdateCheck] Installed: ${currentVersion} | Remote Latest: ${latestVersion} | Status: up_to_date`);
       return {
         status: 'up_to_date',
         currentVersion,
