@@ -9,7 +9,7 @@ export const APP_NAME = 'Spendly';
 export const APP_PACKAGE_ID = 'com.spendly.finance';
 
 export const ANDROID_APK_DOWNLOAD_URL =
-  'https://drive.google.com/file/d/1M-tc5q-QUpQO76qL52KmG0mUVHIuWEx0/view?usp=sharing';
+  'https://drive.google.com/file/d/1dcNiC2ZIV3Tx1NtXeX3ZIxrb7pq4x47p/view?usp=sharing';
 
 export const APP_RELEASE_NOTES = [
   'Automatic bidirectional Supabase realtime cloud synchronization',
