@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { Eye, EyeOff, Search, Plus, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck, Bell, Sparkles } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { isNewerVersionAvailable } from '../../utils/versionCheck';
 
 export const Header: React.FC = () => {
@@ -151,7 +152,8 @@ export const Header: React.FC = () => {
     );
   };
 
-  const isUpdateAvailable = latestManifest && isNewerVersionAvailable(latestManifest.version);
+  const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
+  const isUpdateAvailable = isNative && latestManifest && isNewerVersionAvailable(latestManifest.version);
 
   return (
     <>

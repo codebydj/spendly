@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { Account, Transaction, Budget, RecurringPayment, NotificationItem, AppSettings, Category, BackupData, AppVersionManifest } from '../types/finance';
+import { Capacitor } from '@capacitor/core';
 import { StorageEngine } from '../db/storage';
 import { IndexedDBService, STORES } from '../db/indexedDB';
 import { INITIAL_SETTINGS } from '../db/initialData';
@@ -271,14 +272,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (result.status === 'update_available') {
           setLatestManifest(result.manifest);
 
-          // Always open modal if manual check; on background check open modal if not dismissed
-          if (isManual || !isVersionDismissed(result.latestVersion)) {
+          const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
+
+          // Open update modal automatically ONLY on native platform (or if manually triggered)
+          if (isManual || (isNative && !isVersionDismissed(result.latestVersion))) {
             console.log('[Spendly Update] Showing update modal');
             setIsUpdateModalOpen(true);
           }
 
-          // Schedule native Android notification
-          scheduleUpdateNotification(result.manifest);
+          if (isNative) {
+            // Schedule native Android notification
+            scheduleUpdateNotification(result.manifest);
+          }
 
           // Add to Notification Center if not already present
           setNotifications((prev) => {
