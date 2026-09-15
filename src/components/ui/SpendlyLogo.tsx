@@ -16,8 +16,7 @@ export const SpendlyLogo: React.FC<SpendlyLogoProps> = ({
   style,
 }) => {
   const iconSize = type === 'full' ? height : size;
-  const isBadge = type === 'icon';
-  const logoSrc = isBadge ? '/spendly-icon.png' : '/spendly-logo.png';
+  const logoSrc = '/spendly-icon.png';
 
   const iconElement = (
     <img
@@ -30,7 +29,7 @@ export const SpendlyLogo: React.FC<SpendlyLogoProps> = ({
         display: 'inline-block',
         verticalAlign: 'middle',
         flexShrink: 0,
-        filter: isBadge
+        filter: type === 'icon'
           ? 'drop-shadow(0 4px 12px rgba(139, 92, 246, 0.35))'
           : 'drop-shadow(0 4px 10px rgba(139, 92, 246, 0.3))',
       }}

@@ -183,28 +183,31 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
           {/* New App Update Badge Button */}
           {isUpdateAvailable && (
             <button
               onClick={() => setIsUpdateModalOpen(true)}
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '5px 12px',
+                gap: '5px',
+                padding: '4px 9px',
                 borderRadius: 'var(--radius-sm)',
                 backgroundColor: 'rgba(168, 85, 247, 0.15)',
                 color: 'var(--accent-lavender)',
-                fontSize: '0.78rem',
+                fontSize: '0.76rem',
                 fontWeight: 700,
                 border: '1px solid var(--accent-violet-border)',
                 cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
               title={`New update V${latestManifest.version} is available. Click to view details.`}
             >
-              <Sparkles size={16} color="var(--accent-cyan)" />
-              <span>V{latestManifest.version} Update</span>
+              <Sparkles size={14} color="var(--accent-cyan)" />
+              <span>V{latestManifest.version}</span>
+              <span className="desktop-only" style={{ marginLeft: '2px' }}>Update</span>
             </button>
           )}
 

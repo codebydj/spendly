@@ -2,7 +2,8 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/ui/GlassCard';
 import { EmptyState } from '../components/ui/EmptyState';
-import { AlertTriangle, Calendar, Info, Check, Trash2, Bell, Sparkles } from 'lucide-react';
+import { SpendlyLogo } from '../components/ui/SpendlyLogo';
+import { AlertTriangle, Calendar, Info, Check, Trash2, Bell } from 'lucide-react';
 
 export const NotificationsView: React.FC = () => {
   const { notifications, markNotificationRead, clearNotifications, setIsUpdateModalOpen } = useApp();
@@ -43,7 +44,7 @@ export const NotificationsView: React.FC = () => {
             let icon = <Info size={18} color="var(--accent-blue)" />;
             if (n.type === 'BUDGET_ALERT') icon = <AlertTriangle size={18} color="var(--status-danger)" />;
             if (n.type === 'RECURRING_REMINDER') icon = <Calendar size={18} color="var(--status-warning)" />;
-            if (n.type === 'APP_UPDATE') icon = <Sparkles size={18} color="var(--accent-cyan)" />;
+            if (n.type === 'APP_UPDATE') icon = <SpendlyLogo type="icon" size={22} />;
 
             return (
               <GlassCard

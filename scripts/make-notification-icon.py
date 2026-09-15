@@ -2,7 +2,7 @@ import os
 from PIL import Image
 
 def generate_monochrome_notification_icon():
-    source_path = os.path.join(os.path.dirname(__file__), '..', 'public', 'spendly-logo.png')
+    source_path = os.path.join(os.path.dirname(__file__), '..', 'public', 'spendly-icon.png')
     res_dir = os.path.join(os.path.dirname(__file__), '..', 'android', 'app', 'src', 'main', 'res')
 
     img = Image.open(source_path).convert('RGBA')
