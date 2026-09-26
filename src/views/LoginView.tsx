@@ -164,7 +164,7 @@ export const LoginView: React.FC = () => {
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {/* Email Input */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+            <label htmlFor="login-email" style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
               Email Address
             </label>
             <div style={{ position: 'relative' }}>
@@ -174,6 +174,7 @@ export const LoginView: React.FC = () => {
                 style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
               />
               <input
+                id="login-email"
                 type="email"
                 required
                 placeholder="name@example.com"
@@ -188,7 +189,7 @@ export const LoginView: React.FC = () => {
           {/* Password Input */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Password</label>
+              <label htmlFor="login-password" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Password</label>
               <button
                 type="button"
                 onClick={() => {
@@ -209,6 +210,7 @@ export const LoginView: React.FC = () => {
                 style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
               />
               <input
+                id="login-password"
                 type={showPassword ? 'text' : 'password'}
                 required
                 placeholder="••••••••"
@@ -221,6 +223,7 @@ export const LoginView: React.FC = () => {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="btn-icon"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', padding: '4px' }}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -314,12 +317,13 @@ export const LoginView: React.FC = () => {
             )}
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+              <label htmlFor="reset-email" style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
                 Email Address
               </label>
               <div style={{ position: 'relative' }}>
                 <Mail size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
+                  id="reset-email"
                   type="email"
                   required
                   placeholder="name@example.com"

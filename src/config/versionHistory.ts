@@ -8,8 +8,35 @@ export interface VersionHistoryItem {
 
 export const VERSION_HISTORY: VersionHistoryItem[] = [
   {
-    version: 'V3.1.6',
+    version: 'V3.2.2',
     isCurrent: true,
+    date: '27 September 2026',
+    title: 'Spendly V3.2.2 UI & Feature Upgrade',
+    highlights: [
+      'Redesigned transaction list rows with category-first vector icons and clean typography',
+      'Enhanced transaction type indicators (+Income green, -Expense red, ⇄ Transfer neutral blue)',
+      'Completely redesigned Locations tab with classic teardrop map pins and perfectly upright category icons',
+      'Resolved map camera reset issues with persistent Leaflet map container and single-execution fitBounds',
+      'Enhanced bank branding component and distinct account type recognition icons',
+      'Redesigned Financial Calendar with daily totals, date transaction panel, and bill reminders',
+      'Streamlined navigation with Savings Goal hidden from UI while preserving data compatibility',
+    ],
+  },
+  {
+    version: 'V3.2.1',
+    date: '27 September 2026',
+    title: 'Spendly V3.2.1 Design & Feature Release',
+    highlights: [
+      'Restored consistent dark navy, blue, cyan & violet theme across all screens',
+      'Compact 10-section accessible settings accordion with live search',
+      'Saved transaction filter preferences per user with reset action',
+      'Duplicate transaction action pre-filling new record modal with current timestamp',
+      'Unsaved-change form protection and double-submit prevention',
+      'Dashboard refinement with concise insight titles and balanced cards',
+    ],
+  },
+  {
+    version: 'V3.1.6',
     date: '16 September 2026',
     title: 'Spendly V3.1.6 Stabilization & Parity Release',
     highlights: [

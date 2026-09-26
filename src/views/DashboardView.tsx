@@ -8,6 +8,7 @@ import type { InsightItem } from '../components/ui/InsightCard';
 import { DonutChart } from '../components/ui/Charts';
 import type { CategoryData } from '../components/ui/Charts';
 import { DashboardSkeleton } from '../components/ui/SkeletonLoader';
+import { AnimatedNumber } from '../components/motion/AnimatedNumber';
 import {
   calculateNetWorthBreakdown,
   calculateCashFlowSummary,
@@ -15,6 +16,7 @@ import {
   generateFinancialHealthSummary,
   calculateMonthlyClosingSummary,
 } from '../utils/calculations';
+import { formatINR, formatINRMasked } from '../utils/currency';
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -30,9 +32,14 @@ import {
   CheckCircle2,
   ShieldCheck,
   Clock,
+  SlidersHorizontal,
+  Target,
 } from 'lucide-react';
+import { useFeatures } from '../context/FeatureContext';
 
 export const DashboardView: React.FC = () => {
+  const { goals, dashboardWidgets, toggleDashboardWidget, restoreDashboardWidgets } = useFeatures();
+  const [customizing, setCustomizing] = React.useState(false);
   const {
     monthlyIncome,
     monthlyExpenses,
@@ -53,6 +60,7 @@ export const DashboardView: React.FC = () => {
     authLoading,
     addTransaction,
     showToast,
+    userProfile,
   } = useApp();
 
   const activeAccounts = accounts.filter((a) => !a.isArchived);
@@ -109,12 +117,12 @@ export const DashboardView: React.FC = () => {
   const recentTransactions = transactions.slice(0, 5);
 
   // Deterministic Smart Insights Generation
-  const deterministicInsightStrings = generateDeterministicInsights(transactions, categories, budgets);
-  const insights: InsightItem[] = deterministicInsightStrings.map((msg, idx) => ({
+  const deterministicInsights = generateDeterministicInsights(transactions, categories, budgets);
+  const insights: InsightItem[] = deterministicInsights.map((item, idx) => ({
     id: `insight-det-${idx}`,
-    type: msg.includes('exceeded') || msg.includes('higher') ? 'WARNING' : msg.includes('lower') ? 'POSITIVE' : 'NEUTRAL',
-    title: msg.split(' ')[0] + ' ' + msg.split(' ')[1],
-    message: msg,
+    type: item.type,
+    title: item.title,
+    message: item.message,
   }));
 
   // Upcoming Recurring Payments
@@ -141,7 +149,7 @@ export const DashboardView: React.FC = () => {
       note: 'Auto-marked as paid from dashboard',
       paymentMethod: 'UPI / Online',
     });
-    showToast(`Marked ${rec.title} (₹${rec.amount.toLocaleString()}) as paid!`, 'success');
+    showToast(`Marked ${rec.title} (${formatINR(rec.amount)}) as paid!`, 'success');
   };
 
   // Show Skeleton UI during Auth / Cloud Data Hydration
@@ -153,19 +161,19 @@ export const DashboardView: React.FC = () => {
   if (activeAccounts.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '720px', margin: '20px auto' }}>
-        <GlassCard elevated className="card-level-3 hero-emerald-glow" style={{ textAlign: 'center', padding: '36px 24px', position: 'relative', overflow: 'hidden' }}>
+        <GlassCard elevated className="card-level-3 hero-blue-glow" style={{ textAlign: 'center', padding: '36px 24px', position: 'relative', overflow: 'hidden' }}>
           <div
             style={{
               width: '56px',
               height: '56px',
               borderRadius: 'var(--radius-md)',
-              backgroundColor: 'var(--accent-emerald-subtle)',
-              color: 'var(--accent-emerald)',
+              backgroundColor: 'var(--accent-blue-subtle)',
+              color: 'var(--accent-cyan)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 16px auto',
-              border: '1px solid var(--accent-emerald-border)',
+              border: '1px solid var(--accent-blue-border)',
             }}
           >
             <Wallet size={28} />
@@ -191,8 +199,8 @@ export const DashboardView: React.FC = () => {
               style={{ padding: '14px', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <span className="badge badge-emerald">Step 1</span>
-                <Wallet size={16} color="var(--accent-emerald)" />
+                <span className="badge badge-cyan">Step 1</span>
+                <Wallet size={16} color="var(--accent-cyan)" />
               </div>
               <h4 style={{ fontSize: '0.9rem', fontWeight: 700 }}>Add an Account</h4>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>Bank, Cash, or Credit</p>
@@ -230,7 +238,7 @@ export const DashboardView: React.FC = () => {
               <Plus size={18} /> Add Your First Account
             </button>
             <button onClick={loadDemoData} className="btn btn-secondary" style={{ padding: '10px 18px' }}>
-              <Sparkles size={18} color="var(--accent-emerald)" /> Load Sample Data
+              <Sparkles size={18} color="var(--accent-cyan)" /> Load Sample Data
             </button>
           </div>
         </GlassCard>
@@ -241,6 +249,8 @@ export const DashboardView: React.FC = () => {
   // 2. Mobile & Desktop Authenticated Dashboard
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div className="dashboard-toolbar"><div><span className="eyebrow">YOUR FINANCIAL WORKSPACE</span><h2>{greeting}{userProfile?.fullName ? `, ${userProfile.fullName.split(' ')[0]}` : ''}</h2></div><button className="btn btn-secondary" onClick={() => setCustomizing((value) => !value)} aria-expanded={customizing}><SlidersHorizontal size={17} /> Customize</button></div>
+      {customizing && <section className="widget-customizer card-level-1" aria-label="Dashboard widgets"><div><strong>Dashboard widgets</strong><p>Choose which supporting panels appear. Your choice is stored on this device.</p></div><div className="widget-toggles">{(['accounts','spending','budgets','bills','insights','activity'] as const).map((widget) => <label key={widget}><input type="checkbox" checked={dashboardWidgets.includes(widget)} onChange={() => toggleDashboardWidget(widget)} /><span>{widget.charAt(0).toUpperCase() + widget.slice(1)}</span></label>)}</div><button className="btn btn-secondary" onClick={restoreDashboardWidgets}>Restore defaults</button></section>}
       {/* PREVIOUS MONTH CLOSING SUMMARY BANNER */}
       {monthlyClosing.hasData && (
         <div
@@ -277,12 +287,12 @@ export const DashboardView: React.FC = () => {
                 LAST MONTH SUMMARY ({monthlyClosing.monthName})
               </span>
               <div style={{ fontSize: '0.86rem', color: 'var(--text-primary)', fontWeight: 600, marginTop: '2px' }}>
-                Income: ₹{monthlyClosing.income.toLocaleString()} • Expenses: ₹{monthlyClosing.expenses.toLocaleString()} • Net: <strong style={{ color: monthlyClosing.net >= 0 ? 'var(--accent-cyan)' : 'var(--status-expense)' }}>₹{monthlyClosing.net.toLocaleString()}</strong>
+                Income: {formatINR(monthlyClosing.income)} • Expenses: {formatINR(monthlyClosing.expenses)} • Net: <strong style={{ color: monthlyClosing.net >= 0 ? 'var(--accent-cyan)' : 'var(--status-expense)' }}>{formatINR(monthlyClosing.net)}</strong>
               </div>
             </div>
           </div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            Top Category: <strong>{monthlyClosing.topCategoryName}</strong> (₹{monthlyClosing.topCategoryAmount.toLocaleString()})
+            Top Category: <strong>{monthlyClosing.topCategoryName}</strong> ({formatINR(monthlyClosing.topCategoryAmount)})
           </div>
         </div>
       )}
@@ -292,7 +302,7 @@ export const DashboardView: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '0.02em' }}>
-              {greeting}, financial summary
+              Financial Net Worth Summary
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
               <span style={{ fontSize: '0.74rem', color: 'var(--accent-lavender)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
@@ -319,7 +329,7 @@ export const DashboardView: React.FC = () => {
               }}
               className="tabular-nums"
             >
-              {settings.hideBalances ? '₹•••••' : `₹${netWorthData.totalNetWorth.toLocaleString()}`}
+              <AnimatedNumber value={netWorthData.totalNetWorth} isMasked={settings.hideBalances} />
             </div>
           </div>
 
@@ -328,14 +338,14 @@ export const DashboardView: React.FC = () => {
             <div style={{ backgroundColor: 'rgba(34, 211, 238, 0.1)', border: '1px solid var(--accent-cyan-border)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', textAlign: 'right' }}>
               <span style={{ fontSize: '0.7rem', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Assets</span>
               <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {settings.hideBalances ? '₹••••' : `₹${netWorthData.totalAssets.toLocaleString()}`}
+                {formatINRMasked(netWorthData.totalAssets, settings.hideBalances)}
               </div>
             </div>
             {netWorthData.totalCreditCardDebt > 0 && (
               <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', textAlign: 'right' }}>
                 <span style={{ fontSize: '0.7rem', color: 'var(--status-expense)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Credit Debt</span>
                 <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--status-expense)' }}>
-                  {settings.hideBalances ? '₹••••' : `-₹${netWorthData.totalCreditCardDebt.toLocaleString()}`}
+                  {settings.hideBalances ? '₹••••' : `-${formatINR(netWorthData.totalCreditCardDebt)}`}
                 </div>
               </div>
             )}
@@ -359,7 +369,7 @@ export const DashboardView: React.FC = () => {
               <span>Income</span>
             </div>
             <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '3px', display: 'block' }} className="tabular-nums">
-              {settings.hideBalances ? '₹••••' : `₹${monthlyIncome.toLocaleString()}`}
+              <AnimatedNumber value={monthlyIncome} isMasked={settings.hideBalances} />
             </span>
           </div>
 
@@ -369,7 +379,7 @@ export const DashboardView: React.FC = () => {
               <span>Expenses</span>
             </div>
             <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '3px', display: 'block' }} className="tabular-nums">
-              {settings.hideBalances ? '₹••••' : `₹${monthlyExpenses.toLocaleString()}`}
+              <AnimatedNumber value={monthlyExpenses} isMasked={settings.hideBalances} />
             </span>
           </div>
 
@@ -379,7 +389,7 @@ export const DashboardView: React.FC = () => {
               <span>Savings</span>
             </div>
             <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--accent-cyan)', marginTop: '3px', display: 'block' }} className="tabular-nums">
-              {settings.hideBalances ? '₹••••' : `₹${monthlySavings.toLocaleString()}`}
+              <AnimatedNumber value={monthlySavings} isMasked={settings.hideBalances} />
             </span>
           </div>
         </div>
@@ -397,11 +407,11 @@ export const DashboardView: React.FC = () => {
           <div style={{ padding: '12px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)' }}>
             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Today</span>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginTop: '6px', color: 'var(--text-secondary)' }}>
-              <span>Inc: ₹{cashFlow.today.income.toLocaleString()}</span>
-              <span>Exp: ₹{cashFlow.today.expense.toLocaleString()}</span>
+              <span>Inc: {formatINR(cashFlow.today.income)}</span>
+              <span>Exp: {formatINR(cashFlow.today.expense)}</span>
             </div>
             <div style={{ fontSize: '0.95rem', fontWeight: 700, marginTop: '4px', color: cashFlow.today.net >= 0 ? 'var(--accent-cyan)' : 'var(--status-expense)' }}>
-              Net: ₹{cashFlow.today.net.toLocaleString()}
+              Net: {formatINR(cashFlow.today.net)}
             </div>
           </div>
 
@@ -409,11 +419,11 @@ export const DashboardView: React.FC = () => {
           <div style={{ padding: '12px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)' }}>
             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>This Week</span>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginTop: '6px', color: 'var(--text-secondary)' }}>
-              <span>Inc: ₹{cashFlow.week.income.toLocaleString()}</span>
-              <span>Exp: ₹{cashFlow.week.expense.toLocaleString()}</span>
+              <span>Inc: {formatINR(cashFlow.week.income)}</span>
+              <span>Exp: {formatINR(cashFlow.week.expense)}</span>
             </div>
             <div style={{ fontSize: '0.95rem', fontWeight: 700, marginTop: '4px', color: cashFlow.week.net >= 0 ? 'var(--accent-cyan)' : 'var(--status-expense)' }}>
-              Net: ₹{cashFlow.week.net.toLocaleString()}
+              Net: {formatINR(cashFlow.week.net)}
             </div>
           </div>
 
@@ -421,23 +431,23 @@ export const DashboardView: React.FC = () => {
           <div style={{ padding: '12px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)' }}>
             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>This Month</span>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginTop: '6px', color: 'var(--text-secondary)' }}>
-              <span>Inc: ₹{cashFlow.month.income.toLocaleString()}</span>
-              <span>Exp: ₹{cashFlow.month.expense.toLocaleString()}</span>
+              <span>Inc: {formatINR(cashFlow.month.income)}</span>
+              <span>Exp: {formatINR(cashFlow.month.expense)}</span>
             </div>
             <div style={{ fontSize: '0.95rem', fontWeight: 700, marginTop: '4px', color: cashFlow.month.net >= 0 ? 'var(--accent-cyan)' : 'var(--status-expense)' }}>
-              Net: ₹{cashFlow.month.net.toLocaleString()}
+              Net: {formatINR(cashFlow.month.net)}
             </div>
           </div>
         </div>
       </div>
 
       {/* ACCOUNTS 2-COLUMN COMPACT GRID */}
-      <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px 20px' }}>
+      {dashboardWidgets.includes('accounts') && <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Accounts</h3>
           <button
             onClick={() => setCurrentView('accounts')}
-            style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '2px' }}
+            style={{ fontSize: '0.78rem', color: 'var(--accent-cyan)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '2px' }}
           >
             <span>View all</span>
             <ChevronRight size={14} />
@@ -457,10 +467,10 @@ export const DashboardView: React.FC = () => {
             />
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* UPCOMING PAYMENTS CARD */}
-      {upcomingPayments.length > 0 && (
+      {dashboardWidgets.includes('bills') && upcomingPayments.length > 0 && (
         <div className="card-level-2" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -491,7 +501,7 @@ export const DashboardView: React.FC = () => {
                 <div>
                   <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>{rec.title}</div>
                   <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                    Due: {rec.nextDueDate} • ₹{rec.amount.toLocaleString()}
+                    Due: {rec.nextDueDate} • {formatINR(rec.amount)}
                   </div>
                 </div>
                 <button
@@ -508,22 +518,24 @@ export const DashboardView: React.FC = () => {
         </div>
       )}
 
+      {dashboardWidgets.includes('goals') && goals.length > 0 && <section className="card-level-2 dashboard-goals"><div className="section-heading"><div><Target size={18} /><h3>Savings goals</h3></div><button onClick={() => setCurrentView('goals')}>Manage <ChevronRight size={14}/></button></div><div className="dashboard-goal-grid">{goals.slice(0, 3).map((goal) => { const saved = goal.contributions.reduce((sum, item) => sum + item.amount, 0); const percent = Math.min(100, Math.round(saved / goal.targetAmount * 100)); return <button key={goal.id} onClick={() => setCurrentView('goals')}><span>{goal.name}</span><strong>{formatINR(saved)} <small>/ {formatINR(goal.targetAmount)}</small></strong><div className="progress-track"><i style={{ width: `${percent}%`, background: goal.color }}/></div><small>{percent}% allocated</small></button>; })}</div></section>}
+
       {/* CATEGORY BREAKDOWN & INSIGHTS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+      {(dashboardWidgets.includes('spending') || dashboardWidgets.includes('insights')) && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '20px' }}>
         {/* Category Spending Donut Chart */}
-        <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px 20px' }}>
+        {dashboardWidgets.includes('spending') && <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Monthly Spending</h3>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>This Month</span>
           </div>
 
           <DonutChart data={donutData} totalAmount={monthlyExpenses} hideBalances={settings.hideBalances} />
-        </div>
+        </div>}
 
         {/* Smart Financial Insights & Health Summary */}
-        <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px 20px' }}>
+        {dashboardWidgets.includes('insights') && <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sparkles size={16} color="var(--accent-emerald)" />
+            <Sparkles size={16} color="var(--accent-cyan)" />
             <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Financial Insights</h3>
           </div>
           
@@ -538,16 +550,16 @@ export const DashboardView: React.FC = () => {
           )}
 
           <InsightCard insights={insights} />
-        </div>
-      </div>
+        </div>}
+      </div>}
 
       {/* RECENT TRANSACTIONS */}
-      <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px 20px' }}>
+      {dashboardWidgets.includes('activity') && <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Recent Activity</h3>
           <button
             onClick={() => setCurrentView('transactions')}
-            style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '2px' }}
+            style={{ fontSize: '0.78rem', color: 'var(--accent-cyan)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '2px' }}
           >
             <span>View all</span>
             <ChevronRight size={14} />
@@ -578,7 +590,7 @@ export const DashboardView: React.FC = () => {
             })}
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 };

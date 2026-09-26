@@ -1,5 +1,6 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
 import type { AppVersionManifest } from '../types/finance';
+import { formatINR } from '../utils/currency';
 
 export const setupNotificationChannels = async () => {
   try {
@@ -116,7 +117,7 @@ export const scheduleReminderNotification = async (reminder: {
     const notificationId = hashStringToInt(reminder.id);
     const daysText = daysBefore === 0 ? 'today' : daysBefore === 1 ? 'tomorrow' : `in ${daysBefore} days`;
     const titleText = `${reminder.title} due ${daysText}`;
-    const bodyText = `₹${reminder.amount.toLocaleString()} • Due ${reminder.nextDueDate}`;
+    const bodyText = `${formatINR(reminder.amount)} • Due ${reminder.nextDueDate}`;
 
     await cancelReminderNotification(reminder.id);
 
@@ -251,8 +252,8 @@ export const scheduleNaturalBudgetAlert = async (
     const isOver = spent > limit;
     const title = isOver ? 'Budget update' : "You're getting close";
     const body = isOver
-      ? `Your ${categoryName} spending has gone over this month's budget by ₹${Math.round(spent - limit).toLocaleString()}.`
-      : `Your ${categoryName} budget is almost used up. You have ₹${Math.round(limit - spent).toLocaleString()} left this month.`;
+      ? `Your ${categoryName} spending has gone over this month's budget by ${formatINR(spent - limit)}.`
+      : `Your ${categoryName} budget is almost used up. You have ${formatINR(limit - spent)} left this month.`;
 
     const id = Math.floor(20000 + Math.random() * 9000);
 

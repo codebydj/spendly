@@ -3,10 +3,10 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
 import { AppProvider, useApp } from './context/AppContext';
+import { FeatureProvider } from './context/FeatureContext';
 import { DesktopSidebar } from './components/layout/DesktopSidebar';
 import { MobileNav } from './components/layout/MobileNav';
 import { Header } from './components/layout/Header';
-import { SpendlyLogo } from './components/ui/SpendlyLogo';
 import { ToastContainer } from './components/ui/Toast';
 import { AddTransactionModal } from './components/forms/AddTransactionModal';
 import { AddAccountModal } from './components/forms/AddAccountModal';
@@ -14,6 +14,9 @@ import { AddBudgetModal } from './components/forms/AddBudgetModal';
 import { AddRecurringModal } from './components/forms/AddRecurringModal';
 import { PinLockModal } from './components/forms/PinLockModal';
 import { UpdateModal } from './components/modals/UpdateModal';
+import { CommandPalette } from './components/modals/CommandPalette';
+import { BootstrapLoader } from './components/feedback/BootstrapLoader';
+import { PageTransition } from './components/motion/PageTransition';
 
 import { DashboardView } from './views/DashboardView';
 import { TransactionsView } from './views/TransactionsView';
@@ -42,6 +45,8 @@ const MainContentRouter: React.FC = () => {
       return <AccountsView />;
     case 'budgets':
       return <BudgetsView />;
+    case 'goals':
+      return <DashboardView />;
     case 'analytics':
       return <AnalyticsView />;
     case 'recurring':
@@ -167,27 +172,7 @@ const AppShell: React.FC = () => {
   }, [user, authLoading, currentView, setCurrentView]);
 
   if (authLoading) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          width: '100%',
-          backgroundColor: 'var(--bg-dark)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '16px',
-        }}
-      >
-        <div className="logo-float-animation">
-          <SpendlyLogo type="icon" size={56} />
-        </div>
-        <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-          Initializing Spendly...
-        </span>
-      </div>
-    );
+    return <BootstrapLoader message="Preparing your finances..." />;
   }
 
   const isAuthPage =
@@ -210,7 +195,9 @@ const AppShell: React.FC = () => {
         }}
       >
         <div style={{ width: '100%', maxWidth: '440px' }}>
-          <MainContentRouter />
+          <PageTransition key={currentView}>
+            <MainContentRouter />
+          </PageTransition>
         </div>
         <ToastContainer />
         <UpdateModal
@@ -235,7 +222,9 @@ const AppShell: React.FC = () => {
       <div className="main-content">
         <Header />
         <main className="page-container">
-          <MainContentRouter />
+          <PageTransition key={currentView}>
+            <MainContentRouter />
+          </PageTransition>
         </main>
       </div>
 
@@ -258,6 +247,7 @@ const AppShell: React.FC = () => {
         onLater={postponeUpdate}
       />
       <ToastContainer />
+      <CommandPalette />
     </div>
   );
 };
@@ -265,7 +255,7 @@ const AppShell: React.FC = () => {
 export default function App() {
   return (
     <AppProvider>
-      <AppShell />
+      <FeatureProvider><AppShell /></FeatureProvider>
     </AppProvider>
   );
 }

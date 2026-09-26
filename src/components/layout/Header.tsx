@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Eye, EyeOff, Search, Plus, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck, Bell, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Search, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck, Bell, Sparkles } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 
 export const Header: React.FC = () => {
@@ -8,9 +8,6 @@ export const Header: React.FC = () => {
     currentView,
     settings,
     toggleHideBalances,
-    searchQuery,
-    setSearchQuery,
-    setIsAddTransactionOpen,
     isOffline,
     syncStatus,
     pendingOpsCount,
@@ -33,12 +30,16 @@ export const Header: React.FC = () => {
         return { title: 'Accounts', subtitle: 'Manage your money across all accounts.' };
       case 'budgets':
         return { title: 'Budgets', subtitle: 'Track monthly limits and category spending.' };
+      case 'goals':
+        return { title: 'Savings goals', subtitle: 'Plan targets without changing account balances.' };
       case 'analytics':
         return { title: 'Analytics', subtitle: 'Understand your spending trends and savings rate.' };
       case 'recurring':
-        return { title: 'Recurring Payments', subtitle: 'Subscriptions and scheduled recurring bills.' };
+        return { title: 'Reminders', subtitle: 'Subscriptions and scheduled recurring bills.' };
       case 'calendar':
-        return { title: 'Financial Calendar', subtitle: 'Daily breakdown of financial activity.' };
+        return { title: 'Calendar', subtitle: 'Daily breakdown of financial activity.' };
+      case 'maps':
+        return { title: 'Maps', subtitle: 'Transaction locations and spending patterns.' };
       case 'notifications':
         return { title: 'Notifications', subtitle: 'Alerts, payment reminders, and summaries.' };
       case 'settings':
@@ -163,7 +164,7 @@ export const Header: React.FC = () => {
         style={{
           height: 'var(--header-height)',
           borderBottom: '1px solid var(--border-color)',
-          backgroundColor: 'rgba(13, 16, 36, 0.85)',
+          backgroundColor: 'rgba(13, 17, 38, 0.88)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           display: 'flex',
@@ -176,9 +177,8 @@ export const Header: React.FC = () => {
           maxWidth: '100vw',
         }}
       >
-        {/* Mobile / Desktop Title Area */}
-        <div style={{ minWidth: 0, flexShrink: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div className="header-title-group">
+          <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
             {title}
           </h1>
           <p className="desktop-only" style={{ fontSize: '0.82rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -219,32 +219,14 @@ export const Header: React.FC = () => {
           {renderSyncBadge()}
 
           {/* Global Search (Desktop Only) */}
-          <div style={{ position: 'relative', width: '200px' }} className="desktop-only">
+          <button type="button" onClick={() => window.dispatchEvent(new Event('spendly:command'))} style={{ position: 'relative', width: '200px', textAlign: 'left' }} className="desktop-only header-command-trigger" aria-label="Open search and quick navigation">
             <Search
               size={18}
               color="var(--text-muted)"
               style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
             />
-            <input
-              type="text"
-              placeholder="Search entries..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                if (currentView !== 'transactions') {
-                  setCurrentView('transactions');
-                }
-              }}
-              style={{
-                width: '100%',
-                paddingLeft: '38px',
-                paddingTop: '8px',
-                paddingBottom: '8px',
-                fontSize: '0.86rem',
-                backgroundColor: 'rgba(17, 21, 46, 0.85)',
-              }}
-            />
-          </div>
+            <span>Search or jump…</span><kbd>⌘K</kbd>
+          </button>
 
           {/* Notification Bell with Badge */}
           <button
@@ -313,15 +295,6 @@ export const Header: React.FC = () => {
             </div>
           </button>
 
-          {/* Top Desktop Add Transaction Button */}
-          <button
-            onClick={() => setIsAddTransactionOpen(true)}
-            className="btn btn-gradient desktop-only"
-            style={{ padding: '8px 20px', fontSize: '0.88rem', minHeight: '40px', borderRadius: 'var(--radius-md)' }}
-          >
-            <Plus size={20} strokeWidth={2.8} />
-            <span>Add transaction</span>
-          </button>
         </div>
       </header>
     </>

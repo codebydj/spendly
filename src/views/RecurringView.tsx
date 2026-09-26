@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/ui/GlassCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import type { RecurringPayment } from '../types/finance';
+import { formatINR, formatINRMasked } from '../utils/currency';
 import {
   Plus,
   Pause,
@@ -118,13 +119,13 @@ export const RecurringView: React.FC = () => {
     });
 
     setPaidHistory((prev) => new Set(prev).add(paidKey));
-    showToast(`Marked "${reminder.title}" as paid & added expense transaction ₹${reminder.amount.toLocaleString()}`, 'success');
+    showToast(`Marked "${reminder.title}" as paid & added expense transaction ${formatINR(reminder.amount)}`, 'success');
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* 1. Reminders Top Hero Banner */}
-      <div className="card-level-3 hero-emerald-glow" style={{ padding: '22px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+      <div className="card-level-3 hero-blue-glow" style={{ padding: '22px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Bell size={24} color="var(--accent-cyan)" />
@@ -137,9 +138,11 @@ export const RecurringView: React.FC = () => {
           </p>
         </div>
 
-        <button onClick={() => setIsAddRecurringOpen(true)} className="btn btn-primary" style={{ padding: '11px 22px' }}>
-          <Plus size={18} /> Add Reminder
-        </button>
+        {recurringPayments.length > 0 && (
+          <button onClick={() => setIsAddRecurringOpen(true)} className="btn btn-primary" style={{ padding: '11px 22px' }}>
+            <Plus size={18} /> Add Reminder
+          </button>
+        )}
       </div>
 
       {/* 2. Reminders Summary Cards */}
@@ -149,7 +152,7 @@ export const RecurringView: React.FC = () => {
             ESTIMATED MONTHLY DUES
           </span>
           <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }} className="tabular-nums">
-            {settings.hideBalances ? '₹•••••' : `₹${Math.round(totalActiveMonthly).toLocaleString()}`}
+            {formatINRMasked(totalActiveMonthly, settings.hideBalances)}
           </div>
           <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Sum of active recurring bills</span>
         </div>
@@ -158,7 +161,7 @@ export const RecurringView: React.FC = () => {
           <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
             ACTIVE REMINDERS
           </span>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-emerald)', marginTop: '4px' }}>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-cyan)', marginTop: '4px' }}>
             {activeCount}
           </div>
           <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Notifications active</span>
@@ -176,7 +179,7 @@ export const RecurringView: React.FC = () => {
       </div>
 
       {/* 3. Section Filter Pills */}
-      <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', maxWidth: '100%', paddingBottom: '4px' }}>
         {[
           { id: 'ALL', label: `All Reminders (${recurringPayments.length})` },
           { id: 'UPCOMING', label: `Upcoming (${activeCount})` },
@@ -220,7 +223,7 @@ export const RecurringView: React.FC = () => {
                   Due Today ({groupedReminders.todayList.length})
                 </h3>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: '16px' }}>
                 {groupedReminders.todayList.map((item) => renderReminderCard(item))}
               </div>
             </div>
@@ -235,7 +238,7 @@ export const RecurringView: React.FC = () => {
                   Due This Week ({groupedReminders.thisWeekList.length})
                 </h3>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: '16px' }}>
                 {groupedReminders.thisWeekList.map((item) => renderReminderCard(item))}
               </div>
             </div>
@@ -250,7 +253,7 @@ export const RecurringView: React.FC = () => {
                   Upcoming Later ({groupedReminders.laterList.length})
                 </h3>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: '16px' }}>
                 {groupedReminders.laterList.map((item) => renderReminderCard(item))}
               </div>
             </div>
@@ -265,7 +268,7 @@ export const RecurringView: React.FC = () => {
                   Paused Reminders ({groupedReminders.pausedList.length})
                 </h3>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: '16px' }}>
                 {groupedReminders.pausedList.map((item) => renderReminderCard(item))}
               </div>
             </div>
@@ -309,7 +312,7 @@ export const RecurringView: React.FC = () => {
             </span>
           </div>
 
-          <span className={item.isPaused ? 'badge badge-neutral' : 'badge badge-emerald'}>
+          <span className={item.isPaused ? 'badge badge-neutral' : 'badge badge-cyan'}>
             {item.isPaused ? 'PAUSED' : item.frequency}
           </span>
         </div>
@@ -319,7 +322,7 @@ export const RecurringView: React.FC = () => {
             Amount Due
           </span>
           <span style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px', display: 'block' }} className="tabular-nums">
-            {settings.hideBalances ? '₹•••••' : `₹${item.amount.toLocaleString()}`}
+            {formatINRMasked(item.amount, settings.hideBalances)}
           </span>
         </div>
 
@@ -350,7 +353,7 @@ export const RecurringView: React.FC = () => {
             type="button"
             onClick={() => handleMarkAsPaid(item)}
             className="btn btn-secondary"
-            style={{ padding: '6px 12px', minHeight: '34px', fontSize: '0.78rem', color: 'var(--accent-emerald)', fontWeight: 700 }}
+            style={{ padding: '6px 12px', minHeight: '34px', fontSize: '0.78rem', color: 'var(--accent-cyan)', fontWeight: 700 }}
           >
             <Check size={14} /> Mark as Paid
           </button>
@@ -373,7 +376,7 @@ export const RecurringView: React.FC = () => {
               title={item.isPaused ? 'Resume Reminder' : 'Pause Reminder'}
               style={{ padding: '6px' }}
             >
-              {item.isPaused ? <Play size={15} color="var(--accent-emerald)" /> : <Pause size={15} color="var(--text-muted)" />}
+              {item.isPaused ? <Play size={15} color="var(--accent-cyan)" /> : <Pause size={15} color="var(--text-muted)" />}
             </button>
 
             <button

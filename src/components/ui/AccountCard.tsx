@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Account } from '../../types/finance';
-import { CreditCard, Landmark, Wallet, Banknote } from 'lucide-react';
+import { BankLogo } from './BankLogo';
+import { formatINR, formatINRMasked } from '../../utils/currency';
 
 interface AccountCardProps {
   account: Account;
@@ -13,42 +14,16 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   hideBalances = false,
   onClick,
 }) => {
-  const getAccountIcon = (type: string, name: string) => {
-    const text = name.toLowerCase();
-    if (text.includes('sbi') || text.includes('bank')) {
-      return <Landmark size={22} color="var(--accent-blue)" />;
-    }
-    if (text.includes('hdfc') || type === 'CREDIT_CARD') {
-      return <CreditCard size={22} color="var(--status-expense)" />;
-    }
-    if (type === 'CASH') {
-      return <Banknote size={22} color="#F59E0B" />;
-    }
-    if (type === 'WALLET' || text.includes('upi') || text.includes('paytm')) {
-      return <Wallet size={22} color="var(--accent-cyan)" />;
-    }
-    return <Landmark size={22} color="var(--accent-violet)" />;
-  };
-
-  const getAccountTintClass = (type: string, name: string) => {
-    const text = name.toLowerCase();
-    if (text.includes('sbi')) return 'account-tint-sbi';
-    if (text.includes('hdfc') || type === 'CREDIT_CARD') return 'account-tint-hdfc';
-    if (type === 'CASH') return 'account-tint-cash';
-    return 'account-tint-upi';
-  };
-
   const isCreditCard = account.type === 'CREDIT_CARD';
   const outstanding = account.balance;
   const creditLimit = account.creditLimit || 0;
   const availableCredit = Math.max(0, creditLimit - outstanding);
   const usedPercentage = creditLimit > 0 ? Math.min(100, Math.round((outstanding / creditLimit) * 100)) : 0;
-  const tintClass = getAccountTintClass(account.type, account.name);
 
   return (
     <div
       onClick={onClick}
-      className={`card-level-2 ${tintClass}`}
+      className="card-level-2 card-interactive btn-micro"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -59,22 +34,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: 'var(--radius-md)',
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              backdropFilter: 'blur(12px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '1px solid rgba(255, 255, 255, 0.14)',
-              boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.25)',
-            }}
-          >
-            {getAccountIcon(account.type, account.name)}
-          </div>
+          <BankLogo accountName={account.name} accountType={account.type} size={22} />
           <div>
             <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>{account.name}</h4>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -95,13 +55,13 @@ export const AccountCard: React.FC<AccountCardProps> = ({
               <div>
                 <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Outstanding</span>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--status-expense)', marginTop: '2px' }} className="tabular-nums">
-                  {hideBalances ? '₹•••••' : `₹${outstanding.toLocaleString()}`}
+                  {formatINRMasked(outstanding, hideBalances)}
                 </div>
               </div>
               <div>
                 <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Available</span>
                 <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent-cyan)', marginTop: '2px' }} className="tabular-nums">
-                  {hideBalances ? '₹•••••' : `₹${availableCredit.toLocaleString()}`}
+                  {formatINRMasked(availableCredit, hideBalances)}
                 </div>
               </div>
             </div>
@@ -112,7 +72,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                   <div style={{ width: `${usedPercentage}%`, height: '100%', backgroundColor: usedPercentage > 80 ? 'var(--status-expense)' : 'var(--status-warning)', borderRadius: '2px' }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  <span>Limit: ₹{creditLimit.toLocaleString()}</span>
+                  <span>Limit: {formatINR(creditLimit)}</span>
                   <span>{usedPercentage}% Used</span>
                 </div>
               </div>
@@ -122,7 +82,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           <div>
             <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Available Balance</span>
             <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }} className="tabular-nums">
-              {hideBalances ? '₹•••••' : `₹${account.balance.toLocaleString()}`}
+              {formatINRMasked(account.balance, hideBalances)}
             </div>
           </div>
         )}

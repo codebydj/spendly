@@ -1,11 +1,23 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Transaction, TransactionType } from '../types/finance';
-import { MapPin, Filter, Sparkles, X, ChevronRight, Compass, ExternalLink, List as ListIcon, Search, Pencil, Plus } from 'lucide-react';
+import {
+  MapPin,
+  Filter,
+  X,
+  Compass,
+  List as ListIcon,
+  Search,
+  Layers,
+  Maximize2,
+} from 'lucide-react';
 import { LocationService } from '../services/locationService';
-import { SelectLocationMapModal } from '../components/modals/SelectLocationMapModal';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { BottomSheet } from '../components/ui/BottomSheet';
+import { formatINR, formatINRMasked } from '../utils/currency';
+import { CategoryIcon } from '../components/ui/CategoryIcon';
+import { TransactionRow } from '../components/ui/TransactionRow';
 
 interface LocationGroup {
   locationKey: string;
@@ -16,27 +28,147 @@ interface LocationGroup {
   isUnknown: boolean;
   isManual: boolean;
   totalSpent: number;
+  totalIncome: number;
   transactionCount: number;
   transactions: Transaction[];
+  dominantCategory: string;
+  dominantType: TransactionType | 'MIXED';
   categoryBreakdown: { [categoryName: string]: number };
+}
+
+interface MapCluster {
+  id: string;
+  latitude: number;
+  longitude: number;
+  groups: LocationGroup[];
+  totalSpent: number;
+  transactionCount: number;
+  dominantCategory: string;
+  dominantType: TransactionType | 'MIXED';
+  isMultiCategory: boolean;
+}
+
+// Helper to return clean inline SVG path & color class for custom Leaflet DivIcons
+function getMarkerSVGDetails(
+  categoryName: string = '',
+  txType: TransactionType | 'MIXED' = 'EXPENSE'
+): { colorClass: string; svgPath: string } {
+  const name = categoryName.toLowerCase().trim();
+
+  if (txType === 'INCOME') {
+    return {
+      colorClass: 'pin-income',
+      svgPath: `<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>`,
+    };
+  }
+
+  if (txType === 'TRANSFER') {
+    return {
+      colorClass: 'pin-transfer',
+      svgPath: `<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="M16 21l4-4-4-4"/><path d="M20 17H4"/>`,
+    };
+  }
+
+  if (txType === 'MIXED') {
+    return {
+      colorClass: 'pin-cluster',
+      svgPath: `<circle cx="12" cy="12" r="6"/>`,
+    };
+  }
+
+  if (name.includes('food') || name.includes('restaurant') || name.includes('swiggy') || name.includes('zomato') || name.includes('cafe')) {
+    return {
+      colorClass: 'pin-expense-food',
+      svgPath: `<path d="M4 3v5a2 2 0 0 0 4 0V3"/><path d="M6 3v18"/><path d="M20 14V3a4 4 0 0 0-4 4v5a2 2 0 0 0 2 2h2Zm0 0v7"/>`,
+    };
+  }
+
+  if (name.includes('grocery') || name.includes('groceries') || name.includes('supermarket') || name.includes('blinkit') || name.includes('zepto')) {
+    return {
+      colorClass: 'pin-expense-food',
+      svgPath: `<path d="m5 11 4-7"/><path d="m19 11-4-7"/><path d="M2 11h20"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.6-7.4"/>`,
+    };
+  }
+
+  if (name.includes('shop') || name.includes('amazon') || name.includes('myntra') || name.includes('flipkart') || name.includes('zara')) {
+    return {
+      colorClass: 'pin-expense-shopping',
+      svgPath: `<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>`,
+    };
+  }
+
+  if (name.includes('transport') || name.includes('uber') || name.includes('ola') || name.includes('bus') || name.includes('auto') || name.includes('taxi')) {
+    return {
+      colorClass: 'pin-expense-transport',
+      svgPath: `<path d="m19 17-2-6H7l-2 6"/><path d="M14 17H10"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/><path d="M3 11v6h18v-6l-2-6H5Z"/>`,
+    };
+  }
+
+  if (name.includes('fuel') || name.includes('petrol') || name.includes('diesel') || name.includes('shell')) {
+    return {
+      colorClass: 'pin-expense-transport',
+      svgPath: `<line x1="3" x2="15" y1="22" y2="22"/><line x1="4" x2="14" y1="9" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/>`,
+    };
+  }
+
+  if (name.includes('bill') || name.includes('utility') || name.includes('electricity') || name.includes('water') || name.includes('dth') || name.includes('rent') || name.includes('house')) {
+    return {
+      colorClass: 'pin-expense-bills',
+      svgPath: `<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/>`,
+    };
+  }
+
+  if (name.includes('education') || name.includes('tuition') || name.includes('school') || name.includes('college') || name.includes('course') || name.includes('book')) {
+    return {
+      colorClass: 'pin-expense-education',
+      svgPath: `<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>`,
+    };
+  }
+
+  if (name.includes('entertainment') || name.includes('movie') || name.includes('netflix') || name.includes('spotify') || name.includes('pvr')) {
+    return {
+      colorClass: 'pin-expense-entertainment',
+      svgPath: `<rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" x2="7" y1="2" y2="22"/><line x1="17" x2="17" y1="2" y2="22"/><line x1="2" x2="22" y1="12" y2="12"/><line x1="2" x2="7" y1="7" y2="7"/><line x1="2" x2="7" y1="17" y2="17"/><line x1="17" x2="22" y1="17" y2="17"/><line x1="17" x2="22" y1="7" y2="7"/>`,
+    };
+  }
+
+  if (name.includes('health') || name.includes('medical') || name.includes('doctor') || name.includes('pharmacy') || name.includes('hospital')) {
+    return {
+      colorClass: 'pin-expense-health',
+      svgPath: `<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>`,
+    };
+  }
+
+  if (name.includes('travel') || name.includes('flight') || name.includes('hotel')) {
+    return {
+      colorClass: 'pin-expense-transport',
+      svgPath: `<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.7 5.2c.3.4.8.5 1.3.3l.5-.3c.4-.2.6-.6.5-1.1z"/>`,
+    };
+  }
+
+  return {
+    colorClass: 'pin-expense-general',
+    svgPath: `<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>`,
+  };
 }
 
 export const MapsView: React.FC = () => {
   const {
     transactions,
-    accounts,
     categories,
     settings,
     showToast,
-    editTransaction,
+    setCurrentView,
   } = useApp();
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
+  const hasInitialFitRef = useRef<boolean>(false);
 
-  // View & Filter State
+  // View, Zoom & Filter State
   const [viewMode, setViewMode] = useState<'MAP' | 'LIST'>('MAP');
+  const [currentZoom, setCurrentZoom] = useState<number>(12);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | TransactionType>('ALL');
   const [locationTypeFilter, setLocationTypeFilter] = useState<'ALL' | 'KNOWN' | 'UNKNOWN' | 'MANUAL'>('ALL');
@@ -44,30 +176,14 @@ export const MapsView: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('ALL');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('ALL');
   const [selectedGroup, setSelectedGroup] = useState<LocationGroup | null>(null);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState<boolean>(false);
+  const [isLegendOpen, setIsLegendOpen] = useState<boolean>(false);
+  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState<boolean>(false);
 
   // Near me filter
   const [isNearMeActive, setIsNearMeActive] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isGettingUserGPS, setIsGettingUserGPS] = useState(false);
-
-  // Edit / Manual Location Modal State
-  const [isEditLocationOpen, setIsEditLocationOpen] = useState(false);
-  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
-  const [mapPickerTarget, setMapPickerTarget] = useState<'edit' | 'manual'>('edit');
-  const [isGettingEditGPS, setIsGettingEditGPS] = useState(false);
-  const [editNameInput, setEditNameInput] = useState('');
-  const [editAddressInput, setEditAddressInput] = useState('');
-  const [editLatInput, setEditLatInput] = useState('');
-  const [editLngInput, setEditLngInput] = useState('');
-  const [isSavingLocationEdit, setIsSavingLocationEdit] = useState(false);
-
-  // Manual Add Location Modal State
-  const [isAddManualOpen, setIsAddManualOpen] = useState(false);
-  const [selectedTxForManualLoc, setSelectedTxForManualLoc] = useState<string>('');
-  const [manualNameInput, setManualNameInput] = useState('');
-  const [manualAddressInput, setManualAddressInput] = useState('');
-  const [manualLatInput, setManualLatInput] = useState('');
-  const [manualLngInput, setManualLngInput] = useState('');
 
   // 1. Filter Transactions based on controls
   const filteredTransactions = useMemo(() => {
@@ -79,42 +195,33 @@ export const MapsView: React.FC = () => {
       const hasCoords = tx.latitude !== undefined && tx.longitude !== undefined && !isNaN(tx.latitude) && !isNaN(tx.longitude);
       const hasLocationName = Boolean((tx.locationName && tx.locationName.trim()) || (tx.locationAddress && tx.locationAddress.trim()));
 
-      // Must have EITHER valid lat/lng OR a location name/address
       if (!hasCoords && !hasLocationName) {
         return false;
       }
 
-      // Location Type Filter
       if (locationTypeFilter === 'KNOWN' && (!hasLocationName || !hasCoords)) return false;
       if (locationTypeFilter === 'UNKNOWN' && (hasLocationName || !hasCoords)) return false;
       if (locationTypeFilter === 'MANUAL' && hasCoords) return false;
 
-      // Type Filter
       if (typeFilter !== 'ALL' && tx.type !== typeFilter) return false;
 
-      // Account Filter
       if (selectedAccountId !== 'ALL' && tx.accountId !== selectedAccountId && tx.toAccountId !== selectedAccountId) {
         return false;
       }
 
-      // Category Filter
       if (selectedCategoryId !== 'ALL' && tx.categoryId !== selectedCategoryId) return false;
 
-      // Date Filter
       if (dateFilter === 'TODAY' && tx.date !== todayStr) return false;
       if (dateFilter === 'MONTH' && !tx.date.startsWith(monthStr)) return false;
       if (dateFilter === '7DAYS') {
         const txDate = new Date(tx.date).getTime();
-        const past7 = now.getTime() - 7 * 84600000;
-        if (txDate < past7) return false;
+        if (txDate < now.getTime() - 7 * 86400000) return false;
       }
       if (dateFilter === '30DAYS') {
         const txDate = new Date(tx.date).getTime();
-        const past30 = now.getTime() - 30 * 84600000;
-        if (txDate < past30) return false;
+        if (txDate < now.getTime() - 30 * 86400000) return false;
       }
 
-      // Near Me Filter (~5km radius check)
       if (isNearMeActive && userCoords && hasCoords) {
         const distanceKm = getHaversineDistance(userCoords.lat, userCoords.lng, tx.latitude!, tx.longitude!);
         if (distanceKm > 5) return false;
@@ -124,7 +231,6 @@ export const MapsView: React.FC = () => {
     });
   }, [transactions, typeFilter, dateFilter, selectedCategoryId, selectedAccountId, locationTypeFilter, isNearMeActive, userCoords]);
 
-  // Haversine distance calculator
   function getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -132,8 +238,7 @@ export const MapsView: React.FC = () => {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
   // 2. Group transactions into LocationGroups
@@ -178,8 +283,11 @@ export const MapsView: React.FC = () => {
           isUnknown,
           isManual,
           totalSpent: 0,
+          totalIncome: 0,
           transactionCount: 0,
           transactions: [],
+          dominantCategory: catName,
+          dominantType: tx.type,
           categoryBreakdown: {},
         };
       }
@@ -189,12 +297,94 @@ export const MapsView: React.FC = () => {
       group.transactionCount += 1;
       if (tx.type === 'EXPENSE') {
         group.totalSpent += tx.amount;
+      } else if (tx.type === 'INCOME') {
+        group.totalIncome += tx.amount;
       }
+
       group.categoryBreakdown[catName] = (group.categoryBreakdown[catName] || 0) + tx.amount;
+    });
+
+    Object.values(groupsMap).forEach((group) => {
+      const types = new Set(group.transactions.map((t) => t.type));
+      if (types.size === 1) {
+        group.dominantType = Array.from(types)[0];
+      } else {
+        group.dominantType = 'MIXED';
+      }
+
+      let topCat = 'General';
+      let maxAmt = -1;
+      Object.entries(group.categoryBreakdown).forEach(([cName, amt]) => {
+        if (amt > maxAmt) {
+          maxAmt = amt;
+          topCat = cName;
+        }
+      });
+      group.dominantCategory = topCat;
     });
 
     return Object.values(groupsMap);
   }, [filteredTransactions, categories]);
+
+  // 3. Zoom-aware spatial clustering algorithm
+  const mapClusters = useMemo(() => {
+    const mapGroups = locationGroups.filter((g) => g.latitude !== undefined && g.longitude !== undefined);
+    if (mapGroups.length === 0) return [];
+
+    // Spatial clustering threshold in degrees depending on zoom
+    let clusterThreshold = 0.005; // ~500m for street zoom (>=13)
+    if (currentZoom < 10) {
+      clusterThreshold = 0.12; // ~12-15km for regional zoom (<10)
+    } else if (currentZoom <= 12) {
+      clusterThreshold = 0.035; // ~3.5km for district zoom (10-12)
+    }
+
+    const clusters: MapCluster[] = [];
+
+    mapGroups.forEach((group) => {
+      let addedToCluster = false;
+
+      for (const cluster of clusters) {
+        const distance = Math.hypot(cluster.latitude - group.latitude!, cluster.longitude - group.longitude!);
+        if (distance <= clusterThreshold) {
+          cluster.groups.push(group);
+          cluster.transactionCount += group.transactionCount;
+          cluster.totalSpent += group.totalSpent;
+          addedToCluster = true;
+          break;
+        }
+      }
+
+      if (!addedToCluster) {
+        clusters.push({
+          id: `cluster_${group.locationKey}`,
+          latitude: group.latitude!,
+          longitude: group.longitude!,
+          groups: [group],
+          totalSpent: group.totalSpent,
+          transactionCount: group.transactionCount,
+          dominantCategory: group.dominantCategory,
+          dominantType: group.dominantType,
+          isMultiCategory: false,
+        });
+      }
+    });
+
+    // Compute cluster multi-category & type metadata
+    clusters.forEach((cluster) => {
+      const categoriesSet = new Set(cluster.groups.map((g) => g.dominantCategory));
+      const typesSet = new Set(cluster.groups.map((g) => g.dominantType));
+      cluster.isMultiCategory = categoriesSet.size > 1;
+
+      if (typesSet.size === 1) {
+        cluster.dominantType = Array.from(typesSet)[0];
+      } else {
+        cluster.dominantType = 'MIXED';
+      }
+    });
+
+    return clusters;
+  }, [locationGroups, currentZoom]);
 
   // Filter location groups by search query
   const displayedLocationGroups = useMemo(() => {
@@ -205,34 +395,40 @@ export const MapsView: React.FC = () => {
     );
   }, [locationGroups, searchQuery]);
 
-  // Top Spending Locations sorted by totalSpent
+  // Top Spending Places
   const topLocations = useMemo(() => {
     return [...locationGroups].sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5);
   }, [locationGroups]);
 
-  // Real Location Statistics
-  const unknownLocationsCount = useMemo(() => locationGroups.filter((g) => g.isUnknown || g.isManual).length, [locationGroups]);
+  const maxTopSpent = useMemo(() => {
+    return Math.max(...topLocations.map((l) => l.totalSpent), 1);
+  }, [topLocations]);
+
+  // Summary Metrics
+  const mappedPlacesCount = useMemo(
+    () => locationGroups.filter((g) => g.latitude !== undefined && g.longitude !== undefined).length,
+    [locationGroups]
+  );
+  const unmappedPlacesCount = useMemo(
+    () => locationGroups.filter((g) => g.latitude === undefined || g.longitude === undefined).length,
+    [locationGroups]
+  );
   const totalLocationSpending = useMemo(() => {
     return filteredTransactions.filter((t) => t.type === 'EXPENSE').reduce((sum, t) => sum + t.amount, 0);
   }, [filteredTransactions]);
 
+  const activeFilterCount =
+    (typeFilter !== 'ALL' ? 1 : 0) +
+    (locationTypeFilter !== 'ALL' ? 1 : 0) +
+    (dateFilter !== 'MONTH' ? 1 : 0) +
+    (selectedCategoryId !== 'ALL' ? 1 : 0) +
+    (selectedAccountId !== 'ALL' ? 1 : 0) +
+    (isNearMeActive ? 1 : 0);
+
+  // 4A. Initialize Leaflet Map ONCE on component mount
   useEffect(() => {
-    if (viewMode !== 'MAP') {
-      if (leafletMapRef.current) {
-        leafletMapRef.current.remove();
-        leafletMapRef.current = null;
-        markersRef.current = [];
-      }
-      return;
-    }
-
     if (!mapContainerRef.current) return;
-
-    if (leafletMapRef.current) {
-      leafletMapRef.current.remove();
-      leafletMapRef.current = null;
-      markersRef.current = [];
-    }
+    if (leafletMapRef.current) return;
 
     if ((mapContainerRef.current as any)._leaflet_id) {
       (mapContainerRef.current as any)._leaflet_id = null;
@@ -247,93 +443,215 @@ export const MapsView: React.FC = () => {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19,
+      crossOrigin: true,
     }).addTo(map);
+
+    // Track zoom level changes for adaptive density & marker sizing (WITHOUT camera reset)
+    map.on('zoomend', () => {
+      setCurrentZoom(map.getZoom());
+    });
 
     leafletMapRef.current = map;
 
-    // Clear existing markers
-    markersRef.current.forEach((m) => m.remove());
-    markersRef.current = [];
-
-    // Add Markers for LocationGroups that have coordinates
-    const mapGroups = locationGroups.filter((g) => g.latitude !== undefined && g.longitude !== undefined);
-
-    if (mapGroups.length > 0) {
-      const bounds = L.latLngBounds([]);
-
-      mapGroups.forEach((group) => {
-        const point = L.latLng(group.latitude!, group.longitude!);
-        bounds.extend(point);
-
-        const isSelected = selectedGroup?.locationKey === group.locationKey;
-        const isUnknown = group.isUnknown;
-
-        const pinSvg = isUnknown
-          ? `<svg width="${isSelected ? 20 : 16}" height="${isSelected ? 20 : 16}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
-          : `<svg width="${isSelected ? 20 : 16}" height="${isSelected ? 20 : 16}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`;
-
-        const customIcon = L.divIcon({
-          className: 'custom-map-pin-container',
-          html: `
-            <div class="modern-pin-wrapper ${isUnknown ? 'unknown' : ''}">
-              <div class="modern-pin-body ${isUnknown ? 'unknown' : ''} ${isSelected ? 'selected' : ''}">
-                <div class="modern-pin-inner">
-                  ${group.transactionCount > 1 ? group.transactionCount : pinSvg}
-                </div>
-              </div>
-              <div class="modern-pin-pulse"></div>
-            </div>
-          `,
-          iconSize: [48, 56],
-          iconAnchor: [24, 52],
-        });
-
-        const marker = L.marker([group.latitude!, group.longitude!], { icon: customIcon }).addTo(map);
-
-        marker.on('click', () => {
-          setSelectedGroup(group);
-          map.panTo([group.latitude!, group.longitude!], { animate: true });
-          setTimeout(() => {
-            const panel = document.getElementById('selected-location-panel');
-            if (panel) {
-              panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-          }, 100);
-        });
-
-        markersRef.current.push(marker);
-      });
-
-      if (!selectedGroup && mapGroups.length > 0) {
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-      }
-    }
-
-    [50, 150, 300].forEach((delay) => {
-      setTimeout(() => {
-        if (leafletMapRef.current) {
-          leafletMapRef.current.invalidateSize();
-        }
-      }, delay);
-    });
+    setTimeout(() => {
+      if (leafletMapRef.current) leafletMapRef.current.invalidateSize();
+    }, 100);
 
     const handleResize = () => {
-      if (leafletMapRef.current) {
-        leafletMapRef.current.invalidateSize();
-      }
+      if (leafletMapRef.current) leafletMapRef.current.invalidateSize();
     };
     window.addEventListener('resize', handleResize);
+
     return () => {
       window.removeEventListener('resize', handleResize);
       if (leafletMapRef.current) {
         leafletMapRef.current.remove();
         leafletMapRef.current = null;
         markersRef.current = [];
+        hasInitialFitRef.current = false;
       }
     };
-  }, [locationGroups, selectedGroup, viewMode]);
+  }, []); // Empty dependency array — map persists across rerenders!
 
-  // Handle Near Me Toggle
+  // 4B. Handle Map invalidateSize when switching back from List view
+  useEffect(() => {
+    if (viewMode === 'MAP' && leafletMapRef.current) {
+      setTimeout(() => {
+        if (leafletMapRef.current) {
+          leafletMapRef.current.invalidateSize();
+        }
+      }, 50);
+    }
+  }, [viewMode]);
+
+  // 4C. Initial Map Fit ONCE when location groups first load
+  useEffect(() => {
+    if (!leafletMapRef.current) return;
+    if (hasInitialFitRef.current) return;
+
+    const mapGroups = locationGroups.filter((g) => g.latitude !== undefined && g.longitude !== undefined);
+    if (mapGroups.length > 0) {
+      const bounds = L.latLngBounds([]);
+      mapGroups.forEach((g) => bounds.extend([g.latitude!, g.longitude!]));
+      if (bounds.isValid()) {
+        leafletMapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+        hasInitialFitRef.current = true;
+      }
+    }
+
+    // Check for focus location requested from Calendar or Transactions list
+    const focusTxId = sessionStorage.getItem('spendly_map_focus_tx_id');
+    if (focusTxId) {
+      sessionStorage.removeItem('spendly_map_focus_tx_id');
+      const targetGroup = locationGroups.find((g) => g.transactions.some((t) => t.id === focusTxId));
+      if (targetGroup && targetGroup.latitude && targetGroup.longitude) {
+        setSelectedGroup(targetGroup);
+        leafletMapRef.current.flyTo([targetGroup.latitude, targetGroup.longitude], 15, { duration: 0.6 });
+      }
+    }
+  }, [locationGroups]);
+
+  // 4D. Dynamically update Leaflet Markers without modifying camera position
+  useEffect(() => {
+    const map = leafletMapRef.current;
+    if (!map) return;
+
+    // Clear previous markers
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    if (mapClusters.length === 0) return;
+
+    // Compute sizing density class based on zoom level
+    let sizeClass = 'size-medium';
+    let iconPx = 21;
+    if (currentZoom < 10) {
+      sizeClass = 'size-small';
+      iconPx = 17;
+    } else if (currentZoom >= 14) {
+      sizeClass = 'size-large';
+      iconPx = 25;
+    }
+
+    mapClusters.forEach((cluster) => {
+      const isSelected = selectedGroup && cluster.groups.some((g) => g.locationKey === selectedGroup.locationKey);
+      const isMultiLocationCluster = cluster.groups.length > 1;
+
+      let customIcon: L.DivIcon;
+
+      if (isMultiLocationCluster) {
+        // Distinct Geographic Cluster Pin (Circular Spendly Blue Badge)
+        const labelText = `${cluster.groups.length} places • ${cluster.transactionCount} txs`;
+        const showLabelPill = isSelected || currentZoom >= 11;
+
+        customIcon = L.divIcon({
+          className: 'custom-map-pin-container',
+          html: `
+            <div class="modern-pin-wrapper ${isSelected ? 'selected' : ''}">
+              <div class="modern-pin-body pin-cluster ${sizeClass} ${isSelected ? 'selected' : ''}">
+                <div class="modern-pin-inner">
+                  <span style="font-size: ${isSelected ? '1rem' : currentZoom < 10 ? '0.78rem' : '0.88rem'}; font-weight: 800;">${cluster.transactionCount}</span>
+                </div>
+              </div>
+              ${showLabelPill ? `<div class="spendly-marker-label">${labelText}</div>` : ''}
+            </div>
+          `,
+          iconSize: isSelected ? [54, 54] : currentZoom < 10 ? [32, 32] : currentZoom >= 14 ? [48, 48] : [40, 40],
+          iconAnchor: isSelected ? [27, 27] : currentZoom < 10 ? [16, 16] : currentZoom >= 14 ? [24, 24] : [20, 20],
+        });
+      } else {
+        // Single Location Group Pin (Teardrop Pin with Category Icon & attached Count Badge)
+        const primaryGroup = cluster.groups[0];
+        const markerInfo = getMarkerSVGDetails(primaryGroup.dominantCategory, primaryGroup.dominantType);
+
+        const currentIconPx = isSelected ? 28 : iconPx;
+        const svgInner = `<svg width="${currentIconPx}" height="${currentIconPx}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${markerInfo.svgPath}</svg>`;
+
+        const showLabelPill = isSelected || (currentZoom >= 11 && primaryGroup.totalSpent > 0);
+        const labelText = `${formatINRMasked(primaryGroup.totalSpent, settings.hideBalances)} • ${primaryGroup.transactionCount} tx${primaryGroup.transactionCount > 1 ? 's' : ''}`;
+
+        customIcon = L.divIcon({
+          className: 'custom-map-pin-container',
+          html: `
+            <div class="modern-pin-wrapper ${isSelected ? 'selected' : ''}">
+              <div class="modern-pin-body ${markerInfo.colorClass} ${sizeClass} ${isSelected ? 'selected' : ''}">
+                <div class="modern-pin-inner">
+                  ${svgInner}
+                </div>
+                ${primaryGroup.transactionCount > 1 ? `<div class="spendly-pin-badge">${primaryGroup.transactionCount}</div>` : ''}
+              </div>
+              ${showLabelPill ? `<div class="spendly-marker-label">${labelText}</div>` : ''}
+            </div>
+          `,
+          iconSize: isSelected ? [54, 60] : currentZoom < 10 ? [32, 38] : currentZoom >= 14 ? [48, 54] : [40, 46],
+          iconAnchor: isSelected ? [27, 58] : currentZoom < 10 ? [16, 36] : currentZoom >= 14 ? [24, 52] : [20, 44],
+        });
+      }
+
+      let zIndex = 100;
+      if (isSelected) zIndex = 1000;
+      else if (isMultiLocationCluster) zIndex = 300;
+
+      const marker = L.marker([cluster.latitude, cluster.longitude], {
+        icon: customIcon,
+        zIndexOffset: zIndex,
+      }).addTo(map);
+
+      marker.on('click', () => {
+        if (isMultiLocationCluster) {
+          if (currentZoom < 15) {
+            const clusterBounds = L.latLngBounds([]);
+            cluster.groups.forEach((g) => {
+              if (g.latitude && g.longitude) clusterBounds.extend([g.latitude, g.longitude]);
+            });
+
+            if (clusterBounds.isValid() && clusterBounds.getNorthEast().distanceTo(clusterBounds.getSouthWest()) > 10) {
+              map.fitBounds(clusterBounds, { padding: [60, 60], maxZoom: 16 });
+            } else {
+              map.flyTo([cluster.latitude, cluster.longitude], currentZoom + 2, { duration: 0.4 });
+            }
+          } else {
+            setSelectedGroup(cluster.groups[0]);
+            map.panTo([cluster.latitude, cluster.longitude], { animate: true });
+            if (window.innerWidth <= 768) {
+              setIsMobileSheetOpen(true);
+            }
+          }
+        } else {
+          setSelectedGroup(cluster.groups[0]);
+          map.panTo([cluster.latitude, cluster.longitude], { animate: true });
+          if (window.innerWidth <= 768) {
+            setIsMobileSheetOpen(true);
+          }
+        }
+      });
+
+      markersRef.current.push(marker);
+    });
+  }, [mapClusters, currentZoom, selectedGroup, settings.hideBalances]);
+
+  const handleSelectGroup = (group: LocationGroup) => {
+    setSelectedGroup(group);
+    if (group.latitude !== undefined && group.longitude !== undefined && leafletMapRef.current) {
+      leafletMapRef.current.flyTo([group.latitude, group.longitude], 15, { duration: 0.5 });
+    }
+    if (window.innerWidth <= 768) {
+      setIsMobileSheetOpen(true);
+    }
+  };
+
+  const handleFitTransactions = () => {
+    if (!leafletMapRef.current) return;
+    const mapGroups = locationGroups.filter((g) => g.latitude !== undefined && g.longitude !== undefined);
+    if (mapGroups.length === 0) return;
+
+    const bounds = L.latLngBounds([]);
+    mapGroups.forEach((g) => bounds.extend([g.latitude!, g.longitude!]));
+    if (bounds.isValid()) {
+      leafletMapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+    }
+  };
+
   const handleToggleNearMe = async () => {
     if (isNearMeActive) {
       setIsNearMeActive(false);
@@ -357,295 +675,157 @@ export const MapsView: React.FC = () => {
     }
   };
 
-  // Open Edit Location Modal for Selected Group
-  const handleOpenEditLocation = (group: LocationGroup) => {
-    setEditNameInput(group.isUnknown ? '' : group.name);
-    setEditAddressInput(group.address || '');
-    setEditLatInput(group.latitude !== undefined ? String(group.latitude) : '');
-    setEditLngInput(group.longitude !== undefined ? String(group.longitude) : '');
-    setIsEditLocationOpen(true);
-  };
-
-  // Save Edit Location
-  const handleSaveLocationEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedGroup || selectedGroup.transactions.length === 0) return;
-
-    const newName = editNameInput.trim();
-    const newAddress = editAddressInput.trim();
-    const parsedLat = editLatInput.trim() ? parseFloat(editLatInput.trim()) : undefined;
-    const parsedLng = editLngInput.trim() ? parseFloat(editLngInput.trim()) : undefined;
-
-    if (!newName && !newAddress) {
-      showToast('Please enter a location name or address', 'warning');
-      return;
-    }
-
-    setIsSavingLocationEdit(true);
-
-    try {
-      // Update all transactions in this group
-      for (const tx of selectedGroup.transactions) {
-        await editTransaction(tx.id, {
-          ...tx,
-          locationName: newName || undefined,
-          locationAddress: newAddress || undefined,
-          latitude: parsedLat !== undefined && !isNaN(parsedLat) ? parsedLat : undefined,
-          longitude: parsedLng !== undefined && !isNaN(parsedLng) ? parsedLng : undefined,
-        });
-      }
-
-      showToast(`Updated location for ${selectedGroup.transactions.length} transaction(s)`, 'success');
-      setIsEditLocationOpen(false);
-      setSelectedGroup(null);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to update location', 'danger');
-    } finally {
-      setIsSavingLocationEdit(false);
-    }
-  };
-
-  // Open Add Manual Location Modal
-  const handleOpenAddManualModal = () => {
-    setManualNameInput('');
-    setManualAddressInput('');
-    setManualLatInput('');
-    setManualLngInput('');
-    setSelectedTxForManualLoc(transactions.length > 0 ? transactions[0].id : '');
-    setIsAddManualOpen(true);
-  };
-
-  // Save Manual Location to Transaction
-  const handleSaveManualLocation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTxForManualLoc) {
-      showToast('Please select a transaction', 'warning');
-      return;
-    }
-
-    const name = manualNameInput.trim();
-    const address = manualAddressInput.trim();
-    const lat = manualLatInput.trim() ? parseFloat(manualLatInput.trim()) : undefined;
-    const lng = manualLngInput.trim() ? parseFloat(manualLngInput.trim()) : undefined;
-
-    if (!name && !address) {
-      showToast('Please enter a location name or address', 'warning');
-      return;
-    }
-
-    const targetTx = transactions.find((t) => t.id === selectedTxForManualLoc);
-    if (!targetTx) return;
-
-    await editTransaction(targetTx.id, {
-      ...targetTx,
-      locationName: name || undefined,
-      locationAddress: address || undefined,
-      latitude: lat !== undefined && !isNaN(lat) ? lat : undefined,
-      longitude: lng !== undefined && !isNaN(lng) ? lng : undefined,
-    });
-
-    showToast('Manual location saved successfully', 'success');
-    setIsAddManualOpen(false);
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* 1. Header Card */}
-      <div className="card-level-3 hero-emerald-glow" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+      <div className="card-level-3 hero-blue-glow" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MapPin size={22} color="var(--accent-cyan)" />
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>Transaction Maps & Locations</h2>
+            <MapPin size={24} color="var(--accent-cyan)" />
+            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)' }}>Locations</h2>
           </div>
           <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginTop: '3px' }}>
-            Tracked physical locations, unknown coordinates, and custom manual transaction places.
+            See where your money goes. Explore spending by place and transaction location.
           </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={handleFitTransactions}
+            className="btn btn-secondary"
+            style={{ padding: '8px 14px', fontSize: '0.82rem', gap: '6px' }}
+            title="Focus map on visible transactions"
+          >
+            <Maximize2 size={15} color="var(--accent-cyan)" />
+            <span>Fit Map</span>
+          </button>
+          <button
+            onClick={handleToggleNearMe}
+            className={`btn ${isNearMeActive ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ padding: '8px 16px', fontSize: '0.82rem', gap: '6px' }}
+          >
+            <Compass size={16} />
+            {isGettingUserGPS ? 'Locating...' : isNearMeActive ? 'Near Me (Active)' : 'Near Me (5km)'}
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Summary Metric Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '14px' }}>
+        <div className="card-level-2" style={{ padding: '14px 18px' }}>
+          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Location Spending
+          </span>
+          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent-cyan)', marginTop: '4px' }} className="tabular-nums">
+            {formatINRMasked(totalLocationSpending, settings.hideBalances)}
+          </div>
+        </div>
+
+        <div className="card-level-2" style={{ padding: '14px 18px' }}>
+          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Mapped Places
+          </span>
+          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }}>
+            {mappedPlacesCount}
+          </div>
+        </div>
+
+        <div className="card-level-2" style={{ padding: '14px 18px' }}>
+          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Unmapped / Manual
+          </span>
+          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: unmappedPlacesCount > 0 ? 'var(--status-warning)' : 'var(--text-primary)', marginTop: '4px' }}>
+            {unmappedPlacesCount}
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Search Bar, Filter Drawer Trigger, & Segmented Control */}
+      <div className="card-level-2" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ position: 'relative', flex: '1 1 240px', minWidth: 0 }}>
+          <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+          <input
+            type="text"
+            placeholder="Search locations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              paddingLeft: '36px',
+              paddingRight: '12px',
+              paddingTop: '8px',
+              paddingBottom: '8px',
+              fontSize: '0.84rem',
+              backgroundColor: 'var(--bg-main)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--text-primary)',
+            }}
+          />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button
             type="button"
-            onClick={handleOpenAddManualModal}
+            onClick={() => setIsFilterSheetOpen(true)}
             className="btn btn-secondary"
-            style={{ padding: '8px 16px', minHeight: '38px', fontSize: '0.84rem' }}
+            style={{ padding: '8px 14px', minHeight: '36px', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            <Plus size={15} color="var(--accent-cyan)" />
-            <span>Add Manual Location</span>
+            <Filter size={15} color="var(--accent-cyan)" />
+            <span>Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleToggleNearMe}
-            disabled={isGettingUserGPS}
-            className="btn"
-            style={{
-              padding: '8px 16px',
-              minHeight: '38px',
-              fontSize: '0.82rem',
-              borderRadius: 'var(--radius-md)',
-              backgroundColor: isNearMeActive ? 'var(--accent-cyan)' : 'var(--bg-surface)',
-              color: isNearMeActive ? '#000000' : 'var(--text-secondary)',
-              fontWeight: 700,
-              border: '1px solid var(--border-color)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <Compass size={15} style={{ animation: isGettingUserGPS ? 'spin 1.5s linear infinite' : 'none' }} />
-            <span>{isNearMeActive ? 'Near Me (Active)' : 'Transactions near me'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Real Location Statistics Banner */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
-        <div className="card-level-2" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
-            LOCATION SPENDING
-          </span>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }} className="tabular-nums">
-            {settings.hideBalances ? '₹•••••' : `₹${totalLocationSpending.toLocaleString()}`}
-          </div>
-          <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Total spent at tracked locations</span>
-        </div>
-
-        <div className="card-level-2" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
-            TOTAL LOCATIONS
-          </span>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-cyan)', marginTop: '4px' }}>
-            {locationGroups.length}
-          </div>
-          <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Unique place groups</span>
-        </div>
-
-        <div className="card-level-2" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
-            UNKNOWN / MANUAL
-          </span>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#F59E0B', marginTop: '4px' }}>
-            {unknownLocationsCount}
-          </div>
-          <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Coordinates or custom text</span>
-        </div>
-      </div>
-
-      {/* 3. Filter Bar & View Toggle */}
-      <div className="card-level-2 maps-filter-bar" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-            <Filter size={14} color="var(--accent-cyan)" />
-            <span>Filters:</span>
-          </div>
-
-          {/* Location Type Filter */}
-          <select value={locationTypeFilter} onChange={(e) => setLocationTypeFilter(e.target.value as any)} style={{ padding: '6px 10px', fontSize: '0.8rem', fontWeight: 600, backgroundColor: 'var(--bg-surface-elevated)' }}>
-            <option value="ALL">All Location Types</option>
-            <option value="KNOWN">Known Places Only</option>
-            <option value="UNKNOWN">Unknown Locations</option>
-            <option value="MANUAL">Manual / Text Only</option>
-          </select>
-
-          {/* Transaction Type Filter */}
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
-            <option value="ALL">All Types</option>
-            <option value="EXPENSE">Expenses</option>
-            <option value="INCOME">Income</option>
-            <option value="TRANSFER">Transfers</option>
-          </select>
-
-          {/* Date Filter */}
-          <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value as any)} style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
-            <option value="MONTH">This Month</option>
-            <option value="TODAY">Today</option>
-            <option value="7DAYS">Last 7 Days</option>
-            <option value="30DAYS">Last 30 Days</option>
-            <option value="ALL">All Time</option>
-          </select>
-
-          {/* Category Filter */}
-          <select value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
-            <option value="ALL">All Categories</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Account Filter */}
-          <select value={selectedAccountId} onChange={(e) => setSelectedAccountId(e.target.value)} style={{ padding: '6px 10px', fontSize: '0.8rem' }}>
-            <option value="ALL">All Accounts</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Search & View Mode Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', pointerEvents: 'none' }} />
-            <input
-              type="text"
-              placeholder="Search places..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ paddingLeft: '30px', paddingRight: '10px', height: '34px', fontSize: '0.8rem', width: '170px' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'rgba(10, 14, 22, 0.9)', padding: '3px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', backgroundColor: 'var(--bg-main)', padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
             <button
               type="button"
               onClick={() => setViewMode('MAP')}
               style={{
-                padding: '5px 12px',
-                fontSize: '0.78rem',
-                fontWeight: viewMode === 'MAP' ? 700 : 500,
-                backgroundColor: viewMode === 'MAP' ? 'var(--accent-violet-subtle)' : 'transparent',
-                color: viewMode === 'MAP' ? 'var(--accent-lavender)' : 'var(--text-muted)',
-                border: viewMode === 'MAP' ? '1px solid var(--accent-violet-border)' : 'none',
-                borderRadius: 'var(--radius-xs)',
-                cursor: 'pointer',
-                display: 'inline-flex',
+                display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                backgroundColor: viewMode === 'MAP' ? 'var(--accent-blue)' : 'transparent',
+                color: viewMode === 'MAP' ? '#FFFFFF' : 'var(--text-muted)',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
               }}
             >
-              <MapPin size={13} /> Map
+              <Compass size={15} />
+              <span>Map</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('LIST')}
               style={{
-                padding: '5px 12px',
-                fontSize: '0.78rem',
-                fontWeight: viewMode === 'LIST' ? 700 : 500,
-                backgroundColor: viewMode === 'LIST' ? 'var(--accent-violet-subtle)' : 'transparent',
-                color: viewMode === 'LIST' ? 'var(--accent-lavender)' : 'var(--text-muted)',
-                border: viewMode === 'LIST' ? '1px solid var(--accent-violet-border)' : 'none',
-                borderRadius: 'var(--radius-xs)',
-                cursor: 'pointer',
-                display: 'inline-flex',
+                display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                backgroundColor: viewMode === 'LIST' ? 'var(--accent-blue)' : 'transparent',
+                color: viewMode === 'LIST' ? '#FFFFFF' : 'var(--text-muted)',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
               }}
             >
-              <ListIcon size={13} /> List
+              <ListIcon size={15} />
+              <span>List</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* 4. Main Content Grid (Interactive Map / List + Right Details Panel) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 340px)', gap: '20px', flexWrap: 'wrap' }} className="maps-responsive-grid">
-        {/* Left Container Wrapper */}
+      {/* 4. Main Content: Map / List & Desktop Detail Sidebar */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 340px)', gap: '20px' }} className="maps-responsive-grid">
         <div style={{ position: 'relative', width: '100%', height: '520px' }}>
-          {/* LIST Container */}
+          {/* LIST View Container */}
           <div
             className="card-level-2"
             style={{
@@ -668,44 +848,31 @@ export const MapsView: React.FC = () => {
               displayedLocationGroups.map((loc) => (
                 <div
                   key={loc.locationKey}
-                  onClick={() => setSelectedGroup(loc)}
+                  onClick={() => handleSelectGroup(loc)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '14px 16px',
-                    backgroundColor: selectedGroup?.locationKey === loc.locationKey ? 'var(--accent-violet-subtle)' : 'rgba(255,255,255,0.03)',
+                    backgroundColor: selectedGroup?.locationKey === loc.locationKey ? 'rgba(86, 133, 255, 0.15)' : 'rgba(255,255,255,0.03)',
+                    border: selectedGroup?.locationKey === loc.locationKey ? '1px solid var(--accent-blue)' : '1px solid var(--border-glass)',
                     borderRadius: 'var(--radius-md)',
-                    border: selectedGroup?.locationKey === loc.locationKey ? '1px solid var(--accent-violet-border)' : '1px solid var(--border-color)',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
                   }}
                 >
-                  <div>
-                    <div style={{ fontWeight: 700, color: loc.isUnknown ? '#F59E0B' : 'var(--text-primary)', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>{loc.name}</span>
-                      {loc.isUnknown && (
-                        <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', fontWeight: 700 }}>
-                          Unknown
-                        </span>
-                      )}
-                      {loc.isManual && (
-                        <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', backgroundColor: 'rgba(96, 165, 250, 0.15)', color: 'var(--accent-blue)', fontWeight: 700 }}>
-                          Manual
-                        </span>
-                      )}
-                    </div>
-                    {loc.address && <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '2px' }}>{loc.address}</div>}
-                    <div style={{ fontSize: '0.74rem', color: 'var(--accent-cyan)', marginTop: '4px' }}>
-                      {loc.transactionCount} transaction{loc.transactionCount > 1 ? 's' : ''}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <CategoryIcon categoryName={loc.dominantCategory} size={18} />
+                    <div>
+                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>{loc.name}</h4>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                        {loc.transactionCount} transaction{loc.transactionCount > 1 ? 's' : ''} • {loc.dominantCategory}
+                      </span>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '1rem' }} className="tabular-nums">
-                      ₹{loc.totalSpent.toLocaleString()}
-                    </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>total spent</span>
-                  </div>
+
+                  <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--status-expense)' }} className="tabular-nums">
+                    {formatINRMasked(loc.totalSpent, settings.hideBalances)}
+                  </span>
                 </div>
               ))
             )}
@@ -713,556 +880,318 @@ export const MapsView: React.FC = () => {
 
           {/* MAP Container */}
           <div
-            className="card-level-2 maps-container-responsive"
+            ref={mapContainerRef}
             style={{
-              display: viewMode === 'MAP' ? 'block' : 'none',
-              padding: '0',
-              position: 'relative',
-              overflow: 'hidden',
+              width: '100%',
               height: '100%',
               borderRadius: 'var(--radius-lg)',
+              overflow: 'hidden',
+              display: viewMode === 'MAP' ? 'block' : 'none',
+              border: '1px solid var(--border-color)',
             }}
-          >
-            <div ref={mapContainerRef} style={{ width: '100%', height: '100%', borderRadius: 'var(--radius-lg)' }} />
+          />
 
-            {/* Overlay if zero map markers */}
-            {locationGroups.filter((g) => g.latitude !== undefined && g.longitude !== undefined).length === 0 && (
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  backgroundColor: 'rgba(10, 14, 26, 0.85)',
-                  backdropFilter: 'blur(8px)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '12px',
-                  padding: '24px',
-                  textAlign: 'center',
-                  zIndex: 400,
-                }}
+          {/* Map Floating Legend Toggle Button */}
+          {viewMode === 'MAP' && (
+            <div style={{ position: 'absolute', bottom: '16px', left: '16px', zIndex: 400 }}>
+              <button
+                type="button"
+                onClick={() => setIsLegendOpen(!isLegendOpen)}
+                className="btn btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '0.78rem', gap: '6px', borderRadius: '16px', backgroundColor: 'rgba(13, 17, 38, 0.9)', backdropFilter: 'blur(8px)' }}
               >
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'var(--accent-violet-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-lavender)' }}>
-                  <MapPin size={24} />
-                </div>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>No GPS Map Coordinates</h3>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: '340px' }}>
-                  Transactions with GPS coordinates render on this map. You can also view text-only manual locations in List mode.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+                <Layers size={14} color="var(--accent-cyan)" />
+                <span>Legend</span>
+              </button>
 
-        {/* Right Side Panel: Selected Group Details & Top Locations */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {selectedGroup ? (
-            <div id="selected-location-panel" className="card-level-3 hero-emerald-glow" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <MapPin size={16} color={selectedGroup.isUnknown ? '#F59E0B' : 'var(--accent-cyan)'} />
-                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>{selectedGroup.name}</h3>
-                  </div>
-                  {selectedGroup.address && (
-                    <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '2px' }}>{selectedGroup.address}</p>
-                  )}
-                  {selectedGroup.isUnknown && (
-                    <span style={{ fontSize: '0.7rem', color: '#F59E0B', display: 'inline-block', marginTop: '4px', fontWeight: 600 }}>
-                      ⚠️ Unknown location name - click Edit Location to assign a name
-                    </span>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedGroup(null)}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              {/* Collapsible Legend Drawer Overlay */}
+              {isLegendOpen && (
+                <div
+                  style={{
+                    marginTop: '8px',
+                    padding: '12px 14px',
+                    backgroundColor: 'rgba(13, 17, 38, 0.95)',
+                    backdropFilter: 'blur(12px)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-glass)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    fontSize: '0.75rem',
+                    minWidth: '180px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                  }}
                 >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: 'var(--radius-sm)' }}>
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Total Spent</span>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
-                    ₹{selectedGroup.totalSpent.toLocaleString()}
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-lavender)', textTransform: 'uppercase' }}>MAP LEGEND</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#F43F5E' }} /> Food & Dining
                   </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Transactions</span>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                    {selectedGroup.transactionCount}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#A855F7' }} /> Shopping
                   </div>
-                </div>
-              </div>
-
-              {/* Recent Transactions at this Location */}
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700 }}>Transactions at this Location</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px', maxHeight: '140px', overflowY: 'auto' }}>
-                  {selectedGroup.transactions.map((tx) => (
-                    <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', padding: '6px 8px', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: '4px' }}>
-                      <div>
-                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{tx.merchant || tx.note || 'Transaction'}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{tx.date} • {tx.time}</div>
-                      </div>
-                      <div style={{ fontWeight: 700, color: tx.type === 'EXPENSE' ? 'var(--status-expense)' : 'var(--accent-cyan)' }}>
-                        ₹{tx.amount.toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => handleOpenEditLocation(selectedGroup)}
-                  className="btn btn-primary"
-                  style={{ flex: 1, padding: '8px', fontSize: '0.78rem', justifyContent: 'center' }}
-                >
-                  <Pencil size={14} />
-                  <span>Edit Location</span>
-                </button>
-
-                {selectedGroup.latitude !== undefined && selectedGroup.longitude !== undefined ? (
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${selectedGroup.latitude},${selectedGroup.longitude}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-secondary"
-                    style={{ flex: 1, padding: '8px', fontSize: '0.78rem', justifyContent: 'center', textDecoration: 'none' }}
-                  >
-                    <ExternalLink size={14} color="var(--accent-cyan)" />
-                    <span>Open in Maps</span>
-                  </a>
-                ) : selectedGroup.address ? (
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedGroup.address)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-secondary"
-                    style={{ flex: 1, padding: '8px', fontSize: '0.78rem', justifyContent: 'center', textDecoration: 'none' }}
-                  >
-                    <ExternalLink size={14} color="var(--accent-cyan)" />
-                    <span>Search Maps</span>
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            /* Top Spending Locations Section */
-            <div className="card-level-2" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sparkles size={16} color="var(--accent-lavender)" />
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Top Spending Locations
-                </h3>
-              </div>
-
-              {topLocations.length === 0 ? (
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>No location spending data available yet.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {topLocations.map((loc, idx) => (
-                    <div
-                      key={loc.locationKey}
-                      onClick={() => {
-                        setSelectedGroup(loc);
-                        if (loc.latitude !== undefined && loc.longitude !== undefined && leafletMapRef.current) {
-                          leafletMapRef.current.panTo([loc.latitude, loc.longitude], { animate: true });
-                        }
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 12px',
-                        backgroundColor: 'rgba(255,255,255,0.03)',
-                        borderRadius: 'var(--radius-md)',
-                        border: '1px solid var(--border-color)',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-cyan)', width: '16px' }}>#{idx + 1}</span>
-                        <div>
-                          <div style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text-primary)' }}>{loc.name}</div>
-                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{loc.transactionCount} transactions</div>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                          ₹{loc.totalSpent.toLocaleString()}
-                        </span>
-                        <ChevronRight size={14} color="var(--text-muted)" />
-                      </div>
-                    </div>
-                  ))}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#F59E0B' }} /> Transport & Fuel
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#EC4899' }} /> Bills & Rent
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#6366F1' }} /> Education
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10B981' }} /> Income
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#06B6D4' }} /> Transfer
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#5685FF' }} /> Multi-Tx Cluster
+                  </div>
                 </div>
               )}
             </div>
           )}
         </div>
+
+        {/* Desktop Selected Location Sidebar Panel */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {selectedGroup ? (
+            <div className="card-level-2" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--accent-lavender)', textTransform: 'uppercase', fontWeight: 700 }}>SELECTED PLACE</span>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>{selectedGroup.name}</h3>
+                  {selectedGroup.address && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{selectedGroup.address}</span>
+                  )}
+                </div>
+                <button onClick={() => setSelectedGroup(null)} className="btn-icon btn-ghost" title="Close details">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', padding: '12px', backgroundColor: 'rgba(15, 19, 42, 0.6)', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Total Spent</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--status-expense)', display: 'block' }} className="tabular-nums">
+                    {formatINRMasked(selectedGroup.totalSpent, settings.hideBalances)}
+                  </span>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Transactions</span>
+                  <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'block' }}>
+                    {selectedGroup.transactionCount}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Top Category</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{selectedGroup.dominantCategory}</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--accent-lavender)', fontWeight: 700 }}>TRANSACTIONS HERE</span>
+                {selectedGroup.transactions.map((tx) => (
+                  <TransactionRow key={tx.id} transaction={tx} hideBalances={settings.hideBalances} />
+                ))}
+              </div>
+
+              <div style={{ marginTop: '6px' }}>
+                <button onClick={() => setCurrentView('transactions')} className="btn btn-primary" style={{ width: '100%', padding: '8px 12px', fontSize: '0.82rem' }}>
+                  View All Transactions
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="card-level-2" style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.84rem' }}>
+              <Compass size={28} color="var(--accent-cyan)" style={{ marginBottom: '8px' }} />
+              <p>Select a location pin or place from the list to view spending details.</p>
+            </div>
+          )}
+
+          {/* Unmapped Transactions Panel */}
+          {unmappedPlacesCount > 0 && (
+            <div className="card-level-2" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MapPin size={16} color="var(--status-warning)" />
+                <h4 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>Unmapped Places ({unmappedPlacesCount})</h4>
+              </div>
+              <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                Transactions with text-only locations or missing map coordinates.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto' }}>
+                {locationGroups.filter((g) => g.isManual || g.latitude === undefined).map((g) => (
+                  <div key={g.locationKey} onClick={() => handleSelectGroup(g)} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '0.78rem' }}>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{g.name}</span>
+                    <span style={{ color: 'var(--status-expense)' }} className="tabular-nums">{formatINR(g.totalSpent)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Modal 1: Edit Location Modal */}
-      {isEditLocationOpen && selectedGroup && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1000,
-            backgroundColor: 'rgba(8, 10, 24, 0.85)',
-            backdropFilter: 'blur(16px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-          }}
-          onClick={() => setIsEditLocationOpen(false)}
-        >
-          <div
-            className="card-level-3"
-            style={{ width: '100%', maxWidth: '440px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Pencil size={18} color="var(--accent-cyan)" />
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>Edit Location Information</h3>
+      {/* 5. Top Places Section */}
+      <div className="card-level-2" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Top Spending Places</h3>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {topLocations.length === 0 ? (
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>No location spending recorded yet.</div>
+          ) : (
+            topLocations.map((loc, idx) => {
+              const barPercent = Math.min(100, Math.round((loc.totalSpent / maxTopSpent) * 100));
+              return (
+                <div
+                  key={loc.locationKey}
+                  onClick={() => handleSelectGroup(loc)}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '32px 1fr auto',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px 16px',
+                    backgroundColor: 'rgba(15, 19, 42, 0.5)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-glass)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>0{idx + 1}</span>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>{loc.name}</span>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                        {loc.transactionCount} transaction{loc.transactionCount > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div style={{ height: '5px', width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
+                      <div style={{ width: `${barPercent}%`, height: '100%', backgroundColor: 'var(--accent-blue)', borderRadius: '3px' }} />
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.94rem', fontWeight: 800, color: 'var(--status-expense)' }} className="tabular-nums">
+                    {formatINRMasked(loc.totalSpent, settings.hideBalances)}
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Mobile Location Detail Bottom Sheet */}
+      <BottomSheet isOpen={isMobileSheetOpen} onClose={() => setIsMobileSheetOpen(false)} title={selectedGroup?.name || 'Location Details'}>
+        {selectedGroup && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '10px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px', backgroundColor: 'rgba(15, 19, 42, 0.6)', borderRadius: 'var(--radius-md)' }}>
+              <div>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Total Spent</span>
+                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--status-expense)', display: 'block' }} className="tabular-nums">
+                  {formatINRMasked(selectedGroup.totalSpent, settings.hideBalances)}
+                </span>
               </div>
-              <button type="button" onClick={() => setIsEditLocationOpen(false)} className="btn-icon">
-                <X size={18} />
-              </button>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Transactions</span>
+                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', display: 'block' }}>
+                  {selectedGroup.transactionCount} transaction{selectedGroup.transactionCount > 1 ? 's' : ''}
+                </span>
+              </div>
             </div>
 
-            <form onSubmit={handleSaveLocationEdit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Map Selection Action Bar */}
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsMapModalOpen(true)}
-                  className="btn btn-secondary"
-                  style={{ flex: 1, padding: '9px 12px', fontSize: '0.84rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                >
-                  <MapPin size={16} color="var(--accent-cyan)" />
-                  <span>Pick on Map</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setIsGettingEditGPS(true);
-                    try {
-                      const coords = await LocationService.getCurrentLocation();
-                      const details = await LocationService.reverseGeocode(coords.latitude, coords.longitude);
-                      setEditNameInput(details.name ? details.name : 'Unknown Location');
-                      setEditAddressInput(details.address || '');
-                      setEditLatInput(String(details.latitude));
-                      setEditLngInput(String(details.longitude));
-                      showToast(`Location set: ${details.name}`, 'info');
-                    } catch (err: any) {
-                      showToast(err.message || 'Location access unavailable.', 'warning');
-                    } finally {
-                      setIsGettingEditGPS(false);
-                    }
-                  }}
-                  disabled={isGettingEditGPS}
-                  className="btn btn-secondary"
-                  style={{ flex: 1, padding: '9px 12px', fontSize: '0.84rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                >
-                  <Compass size={16} color="var(--accent-cyan)" />
-                  <span>{isGettingEditGPS ? 'Locating...' : 'Current Location'}</span>
-                </button>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-                  Location Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. MVR College of Engineering"
-                  value={editNameInput}
-                  onChange={(e) => setEditNameInput(e.target.value)}
-                  className="input-field"
-                  style={{ width: '100%', padding: '9px 12px', fontSize: '0.88rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-                  Address / City
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Paritala, Kanchikacherla, AP"
-                  value={editAddressInput}
-                  onChange={(e) => setEditAddressInput(e.target.value)}
-                  className="input-field"
-                  style={{ width: '100%', padding: '9px 12px', fontSize: '0.88rem' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
-                    Latitude (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="16.5762"
-                    value={editLatInput}
-                    onChange={(e) => setEditLatInput(e.target.value)}
-                    className="input-field"
-                    style={{ width: '100%', padding: '8px 10px', fontSize: '0.82rem' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
-                    Longitude (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="80.4501"
-                    value={editLngInput}
-                    onChange={(e) => setEditLngInput(e.target.value)}
-                    className="input-field"
-                    style={{ width: '100%', padding: '8px 10px', fontSize: '0.82rem' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button type="button" onClick={() => setIsEditLocationOpen(false)} className="btn btn-secondary" style={{ padding: '8px 16px' }}>
-                  Cancel
-                </button>
-                <button type="submit" disabled={isSavingLocationEdit} className="btn btn-primary" style={{ padding: '8px 20px' }}>
-                  {isSavingLocationEdit ? 'Saving...' : 'Save Location'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 2: Add Manual Location Modal */}
-      {isAddManualOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1000,
-            backgroundColor: 'rgba(8, 10, 24, 0.85)',
-            backdropFilter: 'blur(16px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-          }}
-          onClick={() => setIsAddManualOpen(false)}
-        >
-          <div
-            className="card-level-3"
-            style={{ width: '100%', maxWidth: '460px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Plus size={18} color="var(--accent-cyan)" />
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>Add Manual Transaction Location</h3>
-              </div>
-              <button type="button" onClick={() => setIsAddManualOpen(false)} className="btn-icon">
-                <X size={18} />
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-lavender)' }}>TRANSACTIONS</span>
+              {selectedGroup.transactions.map((tx) => (
+                <TransactionRow key={tx.id} transaction={tx} hideBalances={settings.hideBalances} />
+              ))}
             </div>
 
-            <form onSubmit={handleSaveManualLocation} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Map Selection Action Bar */}
-              <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={() => { setIsMobileSheetOpen(false); setCurrentView('transactions'); }} className="btn btn-primary" style={{ padding: '10px', width: '100%' }}>
+              View All Transactions
+            </button>
+          </div>
+        )}
+      </BottomSheet>
+
+      {/* Filter Drawer Sheet */}
+      <BottomSheet isOpen={isFilterSheetOpen} onClose={() => setIsFilterSheetOpen(false)} title="Filter Locations">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', padding: '10px 0' }}>
+          <div>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-lavender)', display: 'block', marginBottom: '8px' }}>
+              TRANSACTION TYPE
+            </label>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {(['ALL', 'EXPENSE', 'INCOME', 'TRANSFER'] as const).map((t) => (
                 <button
-                  type="button"
-                  onClick={() => {
-                    setMapPickerTarget('manual');
-                    setIsMapModalOpen(true);
-                  }}
-                  className="btn btn-secondary"
-                  style={{ flex: 1, padding: '9px 12px', fontSize: '0.84rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  key={t}
+                  onClick={() => setTypeFilter(t)}
+                  className={`btn ${typeFilter === t ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ padding: '6px 14px', fontSize: '0.78rem' }}
                 >
-                  <MapPin size={16} color="var(--accent-cyan)" />
-                  <span>Pick on Map</span>
+                  {t}
                 </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-lavender)', display: 'block', marginBottom: '8px' }}>
+              LOCATION STATUS
+            </label>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {(['ALL', 'KNOWN', 'UNKNOWN', 'MANUAL'] as const).map((l) => (
                 <button
-                  type="button"
-                  onClick={async () => {
-                    setIsGettingEditGPS(true);
-                    try {
-                      const coords = await LocationService.getCurrentLocation();
-                      const details = await LocationService.reverseGeocode(coords.latitude, coords.longitude);
-                      setManualNameInput(details.name ? details.name : 'Unknown Location');
-                      setManualAddressInput(details.address || '');
-                      setManualLatInput(String(details.latitude));
-                      setManualLngInput(String(details.longitude));
-                      showToast(`Current location set: ${details.name}`, 'info');
-                    } catch (err: any) {
-                      showToast(err.message || 'Location access unavailable.', 'warning');
-                    } finally {
-                      setIsGettingEditGPS(false);
-                    }
-                  }}
-                  disabled={isGettingEditGPS}
-                  className="btn btn-secondary"
-                  style={{ flex: 1, padding: '9px 12px', fontSize: '0.84rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  key={l}
+                  onClick={() => setLocationTypeFilter(l)}
+                  className={`btn ${locationTypeFilter === l ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ padding: '6px 14px', fontSize: '0.78rem' }}
                 >
-                  <Compass size={16} color="var(--accent-cyan)" />
-                  <span>{isGettingEditGPS ? 'Locating...' : 'Current Location'}</span>
+                  {l}
                 </button>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-                  Target Transaction *
-                </label>
-                <select
-                  value={selectedTxForManualLoc}
-                  onChange={(e) => setSelectedTxForManualLoc(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', fontSize: '0.88rem' }}
+          <div>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-lavender)', display: 'block', marginBottom: '8px' }}>
+              DATE RANGE
+            </label>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {(['TODAY', '7DAYS', '30DAYS', 'MONTH', 'ALL'] as const).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDateFilter(d)}
+                  className={`btn ${dateFilter === d ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ padding: '6px 12px', fontSize: '0.76rem' }}
                 >
-                  {transactions.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.merchant || t.note || 'Tx'} — ₹{t.amount.toLocaleString()} ({t.date})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-                  Location Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Hostel Paritala, Local Shop"
-                  value={manualNameInput}
-                  onChange={(e) => setManualNameInput(e.target.value)}
-                  className="input-field"
-                  style={{ width: '100%', padding: '9px 12px', fontSize: '0.88rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-                  Address / Locality (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Near College Gate, Paritala"
-                  value={manualAddressInput}
-                  onChange={(e) => setManualAddressInput(e.target.value)}
-                  className="input-field"
-                  style={{ width: '100%', padding: '9px 12px', fontSize: '0.88rem' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
-                    Latitude (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="e.g. 16.5762"
-                    value={manualLatInput}
-                    onChange={(e) => setManualLatInput(e.target.value)}
-                    className="input-field"
-                    style={{ width: '100%', padding: '8px 10px', fontSize: '0.82rem' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
-                    Longitude (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="e.g. 80.4501"
-                    value={manualLngInput}
-                    onChange={(e) => setManualLngInput(e.target.value)}
-                    className="input-field"
-                    style={{ width: '100%', padding: '8px 10px', fontSize: '0.82rem' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button type="button" onClick={() => setIsAddManualOpen(false)} className="btn btn-secondary" style={{ padding: '8px 16px' }}>
-                  Cancel
+                  {d}
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ padding: '8px 20px' }}>
-                  Save Location
-                </button>
-              </div>
-            </form>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+            <button
+              onClick={() => {
+                setTypeFilter('ALL');
+                setLocationTypeFilter('ALL');
+                setDateFilter('ALL');
+                setSelectedCategoryId('ALL');
+                setSelectedAccountId('ALL');
+                setIsNearMeActive(false);
+              }}
+              className="btn btn-secondary"
+              style={{ flex: 1, padding: '10px' }}
+            >
+              Reset
+            </button>
+            <button onClick={() => setIsFilterSheetOpen(false)} className="btn btn-primary" style={{ flex: 1, padding: '10px' }}>
+              Apply Filters
+            </button>
           </div>
         </div>
-      )}
-
-      {/* Modal 3: Map Picker Modal for Location Editing */}
-      <SelectLocationMapModal
-        isOpen={isMapModalOpen}
-        onClose={() => setIsMapModalOpen(false)}
-        initialLocation={
-          mapPickerTarget === 'manual'
-            ? manualLatInput && manualLngInput && !isNaN(parseFloat(manualLatInput)) && !isNaN(parseFloat(manualLngInput))
-              ? {
-                  name: manualNameInput,
-                  address: manualAddressInput,
-                  latitude: parseFloat(manualLatInput),
-                  longitude: parseFloat(manualLngInput),
-                }
-              : undefined
-            : editLatInput && editLngInput && !isNaN(parseFloat(editLatInput)) && !isNaN(parseFloat(editLngInput))
-            ? {
-                name: editNameInput,
-                address: editAddressInput,
-                latitude: parseFloat(editLatInput),
-                longitude: parseFloat(editLngInput),
-              }
-            : selectedGroup?.latitude && selectedGroup?.longitude
-            ? {
-                name: selectedGroup.name,
-                address: selectedGroup.address || '',
-                latitude: selectedGroup.latitude,
-                longitude: selectedGroup.longitude,
-              }
-            : undefined
-        }
-        onSelectLocation={(loc) => {
-          if (mapPickerTarget === 'manual') {
-            setManualNameInput(loc.name ? loc.name : 'Unknown Location');
-            setManualAddressInput(loc.address || '');
-            setManualLatInput(loc.latitude !== undefined ? String(loc.latitude) : '');
-            setManualLngInput(loc.longitude !== undefined ? String(loc.longitude) : '');
-          } else {
-            setEditNameInput(loc.name ? loc.name : 'Unknown Location');
-            setEditAddressInput(loc.address || '');
-            setEditLatInput(loc.latitude !== undefined ? String(loc.latitude) : '');
-            setEditLngInput(loc.longitude !== undefined ? String(loc.longitude) : '');
-          }
-          setIsMapModalOpen(false);
-        }}
-      />
+      </BottomSheet>
     </div>
   );
 };

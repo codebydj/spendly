@@ -17,7 +17,7 @@ export const InsightCard: React.FC<InsightCardProps> = ({ insights }) => {
   if (!insights || insights.length === 0) {
     return (
       <GlassCard style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px' }}>
-        <Sparkles size={18} color="var(--accent-emerald)" />
+        <Sparkles size={18} color="var(--accent-cyan)" />
         <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
           Add a few transactions to unlock spending insights and savings suggestions.
         </p>

@@ -1,4 +1,6 @@
 import type { Account, Transaction, Budget, Category } from '../types/finance';
+import { formatINR } from './currency.ts';
+import { sumTransactionType } from './financialTotals.ts';
 
 export const calculateAccountBalance = (account: Account, transactions: Transaction[]): number => {
   let balance = account.openingBalance;
@@ -111,15 +113,11 @@ export const calculateNetWorthBreakdown = (
 };
 
 export const calculateIncome = (transactions: Transaction[], monthPrefix?: string): number => {
-  return transactions
-    .filter((t) => t.type === 'INCOME' && (!monthPrefix || t.date.startsWith(monthPrefix)))
-    .reduce((sum, t) => sum + t.amount, 0);
+  return sumTransactionType(transactions, 'INCOME', monthPrefix);
 };
 
 export const calculateExpenses = (transactions: Transaction[], monthPrefix?: string): number => {
-  return transactions
-    .filter((t) => t.type === 'EXPENSE' && (!monthPrefix || t.date.startsWith(monthPrefix)))
-    .reduce((sum, t) => sum + t.amount, 0);
+  return sumTransactionType(transactions, 'EXPENSE', monthPrefix);
 };
 
 export interface CashFlowPeriod {
@@ -200,6 +198,12 @@ export const calculateBudgetStatus = (
   return { spent, limit, remaining, percentage, status };
 };
 
+export interface DeterministicInsight {
+  title: string;
+  message: string;
+  type: 'POSITIVE' | 'NEUTRAL' | 'WARNING';
+}
+
 /**
  * Deterministic Local Spending Insights (No AI, No Fake Data)
  */
@@ -207,8 +211,8 @@ export const generateDeterministicInsights = (
   transactions: Transaction[],
   categories: Category[],
   budgets: Budget[]
-): string[] => {
-  const insights: string[] = [];
+): DeterministicInsight[] => {
+  const insights: DeterministicInsight[] = [];
   const now = new Date();
   const currentMonthStr = now.toISOString().slice(0, 7);
 
@@ -223,9 +227,17 @@ export const generateDeterministicInsights = (
   if (currentTotal > 0 && prevTotal > 0) {
     const diffPct = Math.round(((currentTotal - prevTotal) / prevTotal) * 100);
     if (diffPct > 0) {
-      insights.push(`Overall spending is ${diffPct}% higher than last month.`);
+      insights.push({
+        title: 'Monthly spending trend',
+        message: `Overall spending is ${diffPct}% higher than last month.`,
+        type: 'WARNING',
+      });
     } else if (diffPct < 0) {
-      insights.push(`Overall spending is ${Math.abs(diffPct)}% lower than last month.`);
+      insights.push({
+        title: 'Monthly spending trend',
+        message: `Overall spending is ${Math.abs(diffPct)}% lower than last month.`,
+        type: 'POSITIVE',
+      });
     }
   }
 
@@ -249,7 +261,11 @@ export const generateDeterministicInsights = (
 
   if (topCatId && topAmount > 0) {
     const catName = categories.find((c) => c.id === topCatId)?.name || 'Categories';
-    insights.push(`Your largest spending category this month is ${catName} (₹${topAmount.toLocaleString()}).`);
+    insights.push({
+      title: 'Largest spending category',
+      message: `${catName} is your highest expense category this month (${formatINR(topAmount)}).`,
+      type: 'NEUTRAL',
+    });
   }
 
   // Budget status insight
@@ -258,9 +274,17 @@ export const generateDeterministicInsights = (
     const catName = categories.find((c) => c.id === b.categoryId)?.name || 'Category';
 
     if (status === 'OVER BUDGET') {
-      insights.push(`Budget exceeded for ${catName} by ₹${Math.abs(remaining).toLocaleString()}.`);
+      insights.push({
+        title: 'Budget limit exceeded',
+        message: `Budget exceeded for ${catName} by ${formatINR(Math.abs(remaining))}.`,
+        type: 'WARNING',
+      });
     } else if (percentage >= 80) {
-      insights.push(`You have ₹${remaining.toLocaleString()} remaining in your ${catName} budget.`);
+      insights.push({
+        title: 'Budget threshold alert',
+        message: `You have ${formatINR(remaining)} remaining in your ${catName} budget (${percentage}% spent).`,
+        type: 'WARNING',
+      });
     }
   });
 
@@ -305,7 +329,7 @@ export const generateFinancialHealthSummary = (
   if (ccAccounts.length > 0) {
     const ccDebt = ccAccounts.reduce((sum, a) => sum + calculateAccountBalance(a, transactions), 0);
     if (ccDebt > 0) {
-      statements.push(`Active credit card debt: ₹${ccDebt.toLocaleString()}`);
+      statements.push(`Active credit card debt: ${formatINR(ccDebt)}`);
     }
   }
 

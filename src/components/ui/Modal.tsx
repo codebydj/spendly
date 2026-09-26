@@ -45,6 +45,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, subtitle, 
         alignItems: isMobile ? 'flex-end' : 'center',
         justifyContent: 'center',
         padding: isMobile ? 0 : '16px',
+        animation: 'backdropFadeIn var(--motion-fast) var(--ease-enter) forwards',
       }}
       onClick={onClose}
     >
@@ -52,8 +53,8 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, subtitle, 
         style={{
           width: '100%',
           maxWidth: isMobile ? '100%' : '520px',
-          maxHeight: isMobile ? '92vh' : '90vh',
-          overflowY: 'auto',
+          maxHeight: isMobile ? '92dvh' : '90dvh',
+          overflow: 'hidden',
           backgroundColor: 'var(--bg-surface-elevated)',
           border: '1px solid var(--border-color)',
           borderTopLeftRadius: 'var(--radius-xl)',
@@ -64,6 +65,9 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, subtitle, 
           display: 'flex',
           flexDirection: 'column',
           paddingBottom: isMobile ? 'calc(env(safe-area-inset-bottom, 0px) + 16px)' : 0,
+          animation: isMobile
+            ? 'mobileSheetSlideUp var(--motion-normal) var(--ease-spring) forwards'
+            : 'desktopModalEntrance var(--motion-normal) var(--ease-enter) forwards',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -101,7 +105,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, subtitle, 
         </div>
 
         {/* Body */}
-        <div style={{ padding: '20px' }}>{children}</div>
+        <div className="modal-body" style={{ padding: '20px', overflowY: 'auto', minHeight: 0 }}>{children}</div>
       </div>
     </div>
   );

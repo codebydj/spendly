@@ -39,13 +39,13 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           width: '48px',
           height: '48px',
           borderRadius: 'var(--radius-md)',
-          backgroundColor: 'var(--accent-emerald-subtle)',
-          color: 'var(--accent-emerald)',
+          backgroundColor: 'var(--accent-blue-subtle)',
+          color: 'var(--accent-cyan)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: '4px',
-          border: '1px solid var(--accent-emerald-border)',
+          border: '1px solid var(--accent-blue-border)',
         }}
       >
         {icon}

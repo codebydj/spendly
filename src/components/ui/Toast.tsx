@@ -35,6 +35,7 @@ export const ToastContainer: React.FC = () => {
         return (
           <div
             key={toast.id}
+            className="toast-enter"
             style={{
               display: 'flex',
               alignItems: 'center',

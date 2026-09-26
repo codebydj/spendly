@@ -34,6 +34,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ isOpen, onClose, title
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-end',
+        animation: 'backdropFadeIn var(--motion-fast) var(--ease-enter) forwards',
       }}
       onClick={onClose}
     >
@@ -48,6 +49,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ isOpen, onClose, title
           padding: '16px 20px calc(env(safe-area-inset-bottom, 0px) + 24px) 20px',
           overflowY: 'auto',
           boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.6)',
+          animation: 'mobileSheetSlideUp var(--motion-normal) var(--ease-spring) forwards',
         }}
         onClick={(e) => e.stopPropagation()}
       >

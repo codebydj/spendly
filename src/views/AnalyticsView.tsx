@@ -5,6 +5,7 @@ import type { CategoryData } from '../components/ui/Charts';
 import { StatCard } from '../components/ui/StatCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Filter, PieChart as PieChartIcon, TrendingUp, TrendingDown, Wallet, BarChart3, PiggyBank, Layers } from 'lucide-react';
+import { formatINR } from '../utils/currency';
 
 export const AnalyticsView: React.FC = () => {
   const { transactions, accounts, categories, settings, setIsAddTransactionOpen } = useApp();
@@ -126,7 +127,7 @@ export const AnalyticsView: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Top Filter Toolbar */}
       <div className="card-level-2" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', padding: '16px 20px' }}>
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', maxWidth: '100%', padding: '4px', backgroundColor: 'rgba(10, 14, 22, 0.8)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+        <div className="analytics-period-tabs" style={{ display: 'flex', gap: '6px', maxWidth: '100%', padding: '4px', backgroundColor: 'rgba(10, 14, 22, 0.8)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
           {[
             { id: 'WEEK', label: 'Week' },
             { id: 'MONTH', label: 'Month' },
@@ -207,7 +208,7 @@ export const AnalyticsView: React.FC = () => {
       </div>
 
       {/* Charts Grid Row 1: Income vs Expense & Category Distribution */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '20px' }}>
         {/* Income vs Expense Bar Chart */}
         <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -228,7 +229,7 @@ export const AnalyticsView: React.FC = () => {
       </div>
 
       {/* Charts Grid Row 2: Account Distribution & Monthly Savings Trend */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '20px' }}>
         {/* Account Balance Distribution */}
         <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -273,7 +274,7 @@ export const AnalyticsView: React.FC = () => {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block' }} className="tabular-nums">
-                    {settings.hideBalances ? '₹•••••' : `₹${cat.amount.toLocaleString()}`}
+                    {settings.hideBalances ? '₹•••••' : formatINR(cat.amount)}
                   </span>
                   <span style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)' }}>{cat.percentage}%</span>
                 </div>

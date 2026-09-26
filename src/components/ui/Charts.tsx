@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatINR } from '../../utils/currency';
 
 export interface CategoryData {
   categoryId: string;
@@ -101,7 +102,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data, totalAmount, curre
           <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }} className="tabular-nums">
             {hideBalances
               ? '•••••'
-              : `${currency}${(activeCategory ? activeCategory.amount : totalAmount).toLocaleString()}`}
+              : currency === '₹' ? formatINR(activeCategory ? activeCategory.amount : totalAmount) : `${currency}${(activeCategory ? activeCategory.amount : totalAmount).toLocaleString()}`}
           </span>
           <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
             {activeCategory ? `${activeCategory.percentage}%` : `${data.length} categories`}
@@ -142,7 +143,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({ data, totalAmount, curre
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ color: 'var(--text-muted)' }}>{cat.percentage}%</span>
               <span style={{ fontWeight: 600, color: 'var(--text-primary)' }} className="tabular-nums">
-                {hideBalances ? '•••••' : `${currency}${cat.amount.toLocaleString()}`}
+                {hideBalances ? '•••••' : currency === '₹' ? formatINR(cat.amount) : `${currency}${cat.amount.toLocaleString()}`}
               </span>
             </div>
           </div>
@@ -213,7 +214,7 @@ export const IncomeExpenseBarChart: React.FC<BarChartProps> = ({ items, currency
                     borderRadius: '2px 2px 0 0',
                     transition: 'height 0.3s ease',
                   }}
-                  title={`Income: ${currency}${item.income.toLocaleString()}`}
+                  title={`Income: ${currency === '₹' ? formatINR(item.income) : `${currency}${item.income.toLocaleString()}`}`}
                 />
                 {/* Expense Bar */}
                 <div
@@ -225,7 +226,7 @@ export const IncomeExpenseBarChart: React.FC<BarChartProps> = ({ items, currency
                     borderRadius: '2px 2px 0 0',
                     transition: 'height 0.3s ease',
                   }}
-                  title={`Expenses: ${currency}${item.expense.toLocaleString()}`}
+                  title={`Expenses: ${currency === '₹' ? formatINR(item.expense) : `${currency}${item.expense.toLocaleString()}`}`}
                 />
               </div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{item.label}</span>
@@ -262,7 +263,7 @@ export const AccountDistributionBarChart: React.FC<AccountDistributionProps> = (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
               <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{acc.name}</span>
               <span style={{ color: 'var(--text-secondary)', fontWeight: 700 }} className="tabular-nums">
-                {hideBalances ? '₹•••••' : `${currency}${acc.balance.toLocaleString()}`}
+                {hideBalances ? '₹•••••' : currency === '₹' ? formatINR(acc.balance) : `${currency}${acc.balance.toLocaleString()}`}
               </span>
             </div>
             <div style={{ height: '7px', width: '100%', backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', overflow: 'hidden' }}>
@@ -302,7 +303,7 @@ export const SavingsTrendChart: React.FC<SavingsTrendProps> = ({ items, currency
                   borderRadius: '3px 3px 0 0',
                   transition: 'height 0.3s ease',
                 }}
-                title={`Savings: ${hideBalances ? '•••••' : `${currency}${item.savings.toLocaleString()}`}`}
+                title={`Savings: ${hideBalances ? '•••••' : currency === '₹' ? formatINR(item.savings) : `${currency}${item.savings.toLocaleString()}`}`}
               />
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{item.label}</span>
             </div>

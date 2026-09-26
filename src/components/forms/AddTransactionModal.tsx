@@ -5,9 +5,12 @@ import type { TransactionType } from '../../types/finance';
 import { ArrowLeftRight, Check, Sparkles, CheckCircle2, MapPin, Navigation, X, Loader2, Plus } from 'lucide-react';
 import { LocationService, type LocationResult } from '../../services/locationService';
 import { SelectLocationMapModal } from '../modals/SelectLocationMapModal';
+import { formatINR } from '../../utils/currency';
 import { suggestCategoryForMerchant } from '../../utils/calculations';
+import { useFeatures } from '../../context/FeatureContext';
 
 export const AddTransactionModal: React.FC = () => {
+  const { pendingTemplate, clearPendingTemplate, saveTemplate } = useFeatures();
   const {
     isAddTransactionOpen,
     setIsAddTransactionOpen,
@@ -31,6 +34,8 @@ export const AddTransactionModal: React.FC = () => {
   const [customPaymentMethod, setCustomPaymentMethod] = useState<string>('');
   const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
+  const [isDuplicated, setIsDuplicated] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Location State
   const [locationName, setLocationName] = useState<string>('');
@@ -67,6 +72,8 @@ export const AddTransactionModal: React.FC = () => {
     setShowSuggestions(false);
     setSuggestedCatId(null);
     setIsSuccess(false);
+    setIsDuplicated(false);
+    setIsSubmitting(false);
 
     if (accounts.length > 0) {
       setAccountId(accounts[0].id);
@@ -84,7 +91,54 @@ export const AddTransactionModal: React.FC = () => {
   useEffect(() => {
     if (isAddTransactionOpen) {
       resetFormState();
+      const duplicateJson = sessionStorage.getItem('spendly_duplicate_transaction');
+      const quickType = sessionStorage.getItem('spendly_new_transaction_type') as TransactionType | null;
+      sessionStorage.removeItem('spendly_new_transaction_type');
+
+      const quickDate = sessionStorage.getItem('spendly_new_transaction_date');
+      sessionStorage.removeItem('spendly_new_transaction_date');
+
+      if (duplicateJson) {
+        try {
+          const dup = JSON.parse(duplicateJson);
+          setType(dup.type);
+          setAmount(String(dup.amount || ''));
+          if (dup.accountId) setAccountId(dup.accountId);
+          if (dup.toAccountId) setToAccountId(dup.toAccountId);
+          if (dup.categoryId) setCategoryId(dup.categoryId);
+          if (dup.note || dup.merchant) setNote(dup.note || dup.merchant || '');
+          if (dup.paymentMethod) setPaymentMethod(dup.paymentMethod);
+          if (dup.locationName) setLocationName(dup.locationName);
+          if (dup.locationAddress) setLocationAddress(dup.locationAddress);
+          if (dup.latitude) setLatitude(dup.latitude);
+          if (dup.longitude) setLongitude(dup.longitude);
+          setIsDuplicated(true);
+          sessionStorage.removeItem('spendly_duplicate_transaction');
+        } catch {
+          sessionStorage.removeItem('spendly_duplicate_transaction');
+        }
+      } else if (pendingTemplate) {
+        setType(pendingTemplate.type);
+        if (pendingTemplate.amount) setAmount(String(pendingTemplate.amount));
+        if (pendingTemplate.accountId) setAccountId(pendingTemplate.accountId);
+        if (pendingTemplate.toAccountId) setToAccountId(pendingTemplate.toAccountId);
+        if (pendingTemplate.categoryId) setCategoryId(pendingTemplate.categoryId);
+        if (pendingTemplate.note) setNote(pendingTemplate.note);
+        if (pendingTemplate.paymentMethod) setPaymentMethod(pendingTemplate.paymentMethod);
+        clearPendingTemplate();
+      } else if (quickType) {
+        setType(quickType);
+        if (quickType !== 'TRANSFER') {
+          const matchingCategory = categories.find((category) => category.type === quickType);
+          if (matchingCategory) setCategoryId(matchingCategory.id);
+        }
+      }
+
+      if (quickDate) {
+        setDate(quickDate);
+      }
     }
+  // The modal intentionally initializes once per open; clearing the consumed template must not reset the form.
   }, [isAddTransactionOpen]);
 
   // Debounced Place Search with Loading & Abort Control
@@ -173,6 +227,8 @@ export const AddTransactionModal: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       showToast('Please enter a valid amount', 'warning');
@@ -184,6 +240,8 @@ export const AddTransactionModal: React.FC = () => {
       showToast('Source and Destination accounts must be different for transfers', 'warning');
       return;
     }
+
+    setIsSubmitting(true);
 
     let finalCategoryId = categoryId;
     if (type === 'TRANSFER') {
@@ -222,6 +280,7 @@ export const AddTransactionModal: React.FC = () => {
     setIsSuccess(true);
     setTimeout(() => {
       setIsSuccess(false);
+      setIsSubmitting(false);
       setAmount('');
       setNote('');
       handleClearLocation();
@@ -231,6 +290,12 @@ export const AddTransactionModal: React.FC = () => {
   };
 
   const handleCloseModal = () => {
+    const isDirty = Boolean(amount || note || customCategoryName);
+    if (isDirty && !isSuccess) {
+      if (!confirm('You have unsaved changes in this form. Are you sure you want to discard them?')) {
+        return;
+      }
+    }
     resetFormState();
     setIsAddTransactionOpen(false);
   };
@@ -241,28 +306,47 @@ export const AddTransactionModal: React.FC = () => {
     <Modal
       isOpen={isAddTransactionOpen}
       onClose={handleCloseModal}
-      title="Add Transaction"
-      subtitle="Fast transaction entry for your accounts."
+      title={isDuplicated ? 'Duplicate Transaction' : 'Add Transaction'}
+      subtitle={isDuplicated ? 'Review duplicated details before saving to your records.' : 'Fast transaction entry for your accounts.'}
     >
       {isSuccess ? (
         <div style={{ padding: '32px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', textAlign: 'center' }}>
-          <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--accent-emerald-subtle)', color: 'var(--accent-emerald)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'rgba(32, 196, 232, 0.14)', color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <CheckCircle2 size={36} />
           </div>
           <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>Transaction Saved</h3>
           <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-            {type === 'EXPENSE' ? '-' : type === 'INCOME' ? '+' : ''}₹{parseFloat(amount || '0').toLocaleString()}
+            {type === 'EXPENSE' ? '-' : type === 'INCOME' ? '+' : ''}{formatINR(parseFloat(amount || '0'))}
           </p>
         </div>
       ) : (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {isDuplicated && (
+            <div
+              style={{
+                backgroundColor: 'rgba(32, 196, 232, 0.12)',
+                border: '1px solid var(--accent-cyan-border)',
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.82rem',
+                color: 'var(--accent-cyan)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <ArrowLeftRight size={16} style={{ transform: 'rotate(90deg)', flexShrink: 0 }} />
+              <span>Duplicating transaction — Date & time set to now. Review details before saving.</span>
+            </div>
+          )}
+
           {/* Transaction Type Tabs */}
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr 1fr',
               gap: '6px',
-              backgroundColor: 'rgba(10, 14, 22, 0.9)',
+              backgroundColor: 'rgba(15, 21, 42, 0.9)',
               padding: '4px',
               borderRadius: 'var(--radius-md)',
               border: '1px solid var(--border-color)',
@@ -271,7 +355,7 @@ export const AddTransactionModal: React.FC = () => {
             {(['EXPENSE', 'INCOME', 'TRANSFER'] as TransactionType[]).map((t) => {
               const isActive = type === t;
               let activeBg = 'var(--bg-surface-elevated)';
-              let activeColor = 'var(--accent-emerald)';
+              let activeColor = 'var(--accent-cyan)';
               if (t === 'EXPENSE' && isActive) activeColor = 'var(--status-expense)';
               if (t === 'TRANSFER' && isActive) activeColor = 'var(--accent-blue)';
 
@@ -308,7 +392,7 @@ export const AddTransactionModal: React.FC = () => {
 
           {/* Amount Input */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            <label htmlFor="transaction-amount" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
               Amount (₹)
             </label>
             <div style={{ position: 'relative' }}>
@@ -326,6 +410,7 @@ export const AddTransactionModal: React.FC = () => {
                 ₹
               </span>
               <input
+                id="transaction-amount"
                 type="number"
                 step="any"
                 placeholder="0.00"
@@ -348,10 +433,11 @@ export const AddTransactionModal: React.FC = () => {
 
           {/* Note / Merchant Input */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            <label htmlFor="transaction-note" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
               Note / Merchant Name
             </label>
             <input
+              id="transaction-note"
               type="text"
               placeholder="e.g. Swiggy, Amazon, Salary, Rent..."
               value={note}
@@ -404,51 +490,51 @@ export const AddTransactionModal: React.FC = () => {
 
           {/* Account Pickers */}
           {type === 'TRANSFER' ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                <label htmlFor="transaction-from-account" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   From Account
                 </label>
-                <select value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '100%' }}>
+                <select id="transaction-from-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '100%' }}>
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.name} (₹{acc.balance.toLocaleString()})
+                      {acc.name} ({formatINR(acc.balance)})
                     </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                <label htmlFor="transaction-to-account" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   To Account
                 </label>
-                <select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} style={{ width: '100%' }}>
+                <select id="transaction-to-account" value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} style={{ width: '100%' }}>
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.name} (₹{acc.balance.toLocaleString()})
+                      {acc.name} ({formatINR(acc.balance)})
                     </option>
                   ))}
                 </select>
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                <label htmlFor="transaction-account" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   Account
                 </label>
-                <select value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '100%' }}>
+                <select id="transaction-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '100%' }}>
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.name} (₹{acc.balance.toLocaleString()})
+                      {acc.name} ({formatINR(acc.balance)})
                     </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                <label htmlFor="transaction-category" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   Category
                 </label>
-                <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={{ width: '100%' }}>
+                <select id="transaction-category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={{ width: '100%' }}>
                   {categories
                     .filter((c) => (type === 'INCOME' ? c.type === 'INCOME' : c.type === 'EXPENSE'))
                     .map((cat) => (
@@ -473,24 +559,24 @@ export const AddTransactionModal: React.FC = () => {
           )}
 
           {/* Date, Time & Payment Method */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+          <div className="form-grid-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <label htmlFor="transaction-date" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                 Date
               </label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }} />
+              <input id="transaction-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <label htmlFor="transaction-time" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                 Time
               </label>
-              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }} />
+              <input id="transaction-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <label htmlFor="transaction-payment-method" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                 Payment Method
               </label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }}>
+              <select id="transaction-payment-method" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }}>
                 <option value="UPI">UPI</option>
                 <option value="Net Banking">Net Banking</option>
                 <option value="Debit Card">Debit Card</option>
@@ -515,7 +601,7 @@ export const AddTransactionModal: React.FC = () => {
           {/* Location Field (Optional) */}
           <div style={{ position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <label htmlFor="transaction-location" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                 Location <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span>
               </label>
               <div style={{ display: 'flex', gap: '6px' }}>
@@ -560,6 +646,7 @@ export const AddTransactionModal: React.FC = () => {
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <MapPin size={16} color="var(--accent-cyan)" style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }} />
               <input
+                id="transaction-location"
                 type="text"
                 placeholder="Search a place (e.g. Starbucks, Benz Circle)..."
                 value={locationQuery}
@@ -581,6 +668,7 @@ export const AddTransactionModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleClearLocation}
+                  aria-label="Clear transaction location"
                   style={{
                     position: 'absolute',
                     right: '10px',
@@ -739,8 +827,13 @@ export const AddTransactionModal: React.FC = () => {
             )}
           </div>
 
-          {/* Save Action Button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+          {/* Always-visible action footer keeps save accessible on short screens. */}
+          <div className="transaction-form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => {
+              const templateName = window.prompt('Template name', note.trim() || `${type.charAt(0)}${type.slice(1).toLowerCase()} template`);
+              if (!templateName?.trim()) return;
+              saveTemplate({ name: templateName.trim(), type, accountId, toAccountId: type === 'TRANSFER' ? toAccountId : undefined, categoryId: type === 'TRANSFER' ? undefined : categoryId, note: note.trim() || undefined, amount: Number(amount) > 0 ? Number(amount) : undefined, paymentMethod });
+            }}>Save as template</button>
             <button
               type="button"
               onClick={handleCloseModal}

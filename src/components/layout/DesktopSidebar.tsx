@@ -43,7 +43,7 @@ export const DesktopSidebar: React.FC = () => {
     { id: 'analytics', label: 'Analytics', icon: <PieChart size={22} /> },
     { id: 'recurring', label: 'Reminders', icon: <Bell size={22} /> },
     { id: 'calendar', label: 'Calendar', icon: <CalendarIcon size={22} /> },
-    { id: 'maps', label: 'Maps', icon: <MapPin size={22} /> },
+    { id: 'maps', label: 'Locations', icon: <MapPin size={22} /> },
   ];
 
   const userInitial = user?.email ? user.email.charAt(0).toUpperCase() : 'U';
@@ -81,7 +81,7 @@ export const DesktopSidebar: React.FC = () => {
           style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '0.94rem' }}
         >
           <Plus size={22} strokeWidth={2.8} />
-          <span>Add Transaction</span>
+          <span>New transaction</span>
         </button>
 
         {/* Main Navigation Links */}
@@ -98,9 +98,9 @@ export const DesktopSidebar: React.FC = () => {
                   justifyContent: 'space-between',
                   padding: '11px 16px',
                   borderRadius: 'var(--radius-md)',
-                  backgroundColor: isActive ? 'rgba(139, 92, 246, 0.18)' : 'transparent',
+                  backgroundColor: isActive ? 'rgba(86, 133, 255, 0.18)' : 'transparent',
                   color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-                  border: isActive ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid transparent',
+                  border: isActive ? '1px solid rgba(86, 133, 255, 0.38)' : '1px solid transparent',
                   fontWeight: isActive ? 700 : 500,
                   fontSize: '0.95rem',
                   transition: 'all 0.15s ease',
@@ -114,7 +114,7 @@ export const DesktopSidebar: React.FC = () => {
                 {item.badge !== undefined && (
                   <span
                     style={{
-                      backgroundColor: 'rgba(139, 92, 246, 0.28)',
+                      backgroundColor: 'rgba(86, 133, 255, 0.28)',
                       color: 'var(--accent-lavender)',
                       fontSize: '0.74rem',
                       fontWeight: 800,
@@ -150,8 +150,9 @@ export const DesktopSidebar: React.FC = () => {
             gap: '14px',
             padding: '10px 14px',
             borderRadius: 'var(--radius-md)',
-            backgroundColor: currentView === 'settings' ? 'var(--bg-surface-elevated)' : 'transparent',
-            color: currentView === 'settings' ? 'var(--accent-emerald)' : 'var(--text-secondary)',
+            backgroundColor: currentView === 'settings' ? 'rgba(86, 133, 255, 0.18)' : 'transparent',
+            color: currentView === 'settings' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+            border: currentView === 'settings' ? '1px solid rgba(86, 133, 255, 0.38)' : '1px solid transparent',
             fontSize: '0.95rem',
             textAlign: 'left',
           }}
@@ -178,8 +179,8 @@ export const DesktopSidebar: React.FC = () => {
                 width: '30px',
                 height: '30px',
                 borderRadius: '6px',
-                backgroundColor: 'var(--accent-emerald-subtle)',
-                color: 'var(--accent-emerald)',
+                backgroundColor: 'var(--accent-blue-subtle)',
+                color: 'var(--accent-cyan)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -212,15 +213,17 @@ export const DesktopSidebar: React.FC = () => {
                 onClick={() => setIsPinLocked(true)}
                 className="btn-icon"
                 title="Lock Spendly"
+                aria-label="Lock Spendly"
                 style={{ padding: '6px', color: 'var(--text-muted)' }}
               >
                 <Lock size={16} />
               </button>
             )}
-            <button
+              <button
               onClick={logout}
               className="btn-icon"
-              title="Sign Out"
+                title="Sign Out"
+                aria-label="Sign out"
               style={{ padding: '6px', color: 'var(--status-danger)' }}
             >
               <LogOut size={16} />

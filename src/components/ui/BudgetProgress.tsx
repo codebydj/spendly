@@ -1,5 +1,6 @@
-import React from 'react';
+import { ProgressBar } from '../feedback/ProgressBar';
 import { Trash2 } from 'lucide-react';
+import { formatINR } from '../../utils/currency';
 
 interface BudgetProgressProps {
   categoryName: string;
@@ -73,34 +74,14 @@ export const BudgetProgress: React.FC<BudgetProgressProps> = ({
       </div>
 
       {/* Progress Bar Container */}
-      <div
-        style={{
-          width: '100%',
-          height: '8px',
-          borderRadius: '4px',
-          backgroundColor: 'var(--bg-main)',
-          border: '1px solid var(--border-glass)',
-          overflow: 'hidden',
-          position: 'relative',
-        }}
-      >
-        <div
-          style={{
-            width: `${percentage}%`,
-            height: '100%',
-            backgroundColor: barColor,
-            borderRadius: '4px',
-            transition: 'width 0.3s ease',
-          }}
-        />
-      </div>
+      <ProgressBar percentage={percentage} customColor={barColor} height="8px" />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)' }} className="tabular-nums">
         <span>
-          Spent: <strong style={{ color: isOver ? 'var(--status-danger)' : 'var(--text-primary)' }}>{hideBalances ? '₹•••••' : `₹${spent.toLocaleString()}`}</strong>
+          Spent: <strong style={{ color: isOver ? 'var(--status-danger)' : 'var(--text-primary)' }}>{hideBalances ? '₹•••••' : formatINR(spent)}</strong>
         </span>
         <span>
-          Limit: {hideBalances ? '₹•••••' : `₹${limit.toLocaleString()}`} ({hideBalances ? '•••' : `₹${Math.abs(remaining).toLocaleString()}`} {isOver ? 'over' : 'left'})
+          Limit: {hideBalances ? '₹•••••' : formatINR(limit)} ({hideBalances ? '•••' : formatINR(Math.abs(remaining))} {isOver ? 'over' : 'left'})
         </span>
       </div>
     </div>

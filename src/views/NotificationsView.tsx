@@ -17,7 +17,7 @@ export const NotificationsView: React.FC = () => {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 700 }}>Notifications & Alerts</h2>
-            {unreadCount > 0 && <span className="badge badge-emerald">{unreadCount} UNREAD</span>}
+            {unreadCount > 0 && <span className="badge badge-cyan">{unreadCount} UNREAD</span>}
           </div>
           <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
             System messages, app updates, budget threshold warnings, and recurring bill payment reminders.
@@ -54,11 +54,12 @@ export const NotificationsView: React.FC = () => {
                   alignItems: 'flex-start',
                   justifyContent: 'space-between',
                   gap: '16px',
+                  flexWrap: 'wrap',
                   backgroundColor: n.isRead ? 'var(--glass-bg)' : 'var(--glass-bg-elevated)',
-                  borderColor: n.isRead ? 'var(--border-glass)' : 'var(--accent-emerald-border)',
+                  borderColor: n.isRead ? 'var(--border-glass)' : 'var(--border-active)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', minWidth: 0, flex: '1 1 240px' }}>
                   <div
                     style={{
                       width: '36px',
@@ -75,7 +76,7 @@ export const NotificationsView: React.FC = () => {
                     {icon}
                   </div>
 
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>{n.title}</h4>
                     <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>
                       {n.message}

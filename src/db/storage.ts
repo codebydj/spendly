@@ -1,4 +1,4 @@
-import type { Account, Category, Transaction, Budget, RecurringPayment, NotificationItem, AppSettings, BackupData } from '../types/finance';
+import type { Account, Category, Transaction, Budget, RecurringPayment, NotificationItem, AppSettings, BackupData, SavingsGoal, TransactionTemplate, DashboardWidget } from '../types/finance';
 import { IndexedDBService, STORES } from './indexedDB';
 import { APP_VERSION } from '../config/appVersion';
 import {
@@ -24,6 +24,9 @@ const BASE_KEYS = {
   RECURRING: 'recurring_v2',
   NOTIFICATIONS: 'notifications_v2',
   SETTINGS: 'settings_v2',
+  GOALS: 'goals_v1',
+  TEMPLATES: 'templates_v1',
+  DASHBOARD_WIDGETS: 'dashboard_widgets_v1',
 };
 
 export class StorageEngine {
@@ -198,6 +201,13 @@ export class StorageEngine {
     }
   }
 
+  public static loadGoals(userId?: string): SavingsGoal[] { try { return JSON.parse(localStorage.getItem(this.getKey(BASE_KEYS.GOALS, userId)) || '[]'); } catch { return []; } }
+  public static saveGoals(items: SavingsGoal[], userId?: string): void { localStorage.setItem(this.getKey(BASE_KEYS.GOALS, userId), JSON.stringify(items)); }
+  public static loadTemplates(userId?: string): TransactionTemplate[] { try { return JSON.parse(localStorage.getItem(this.getKey(BASE_KEYS.TEMPLATES, userId)) || '[]'); } catch { return []; } }
+  public static saveTemplates(items: TransactionTemplate[], userId?: string): void { localStorage.setItem(this.getKey(BASE_KEYS.TEMPLATES, userId), JSON.stringify(items)); }
+  public static loadDashboardWidgets(userId?: string): DashboardWidget[] | undefined { try { const raw = localStorage.getItem(this.getKey(BASE_KEYS.DASHBOARD_WIDGETS, userId)); return raw ? JSON.parse(raw) : undefined; } catch { return undefined; } }
+  public static saveDashboardWidgets(items: DashboardWidget[], userId?: string): void { localStorage.setItem(this.getKey(BASE_KEYS.DASHBOARD_WIDGETS, userId), JSON.stringify(items)); }
+
   // --- DEMO DATA ---
   public static loadDemoData(userId?: string): void {
     this.saveAccounts(DEMO_ACCOUNTS, userId);
@@ -221,6 +231,9 @@ export class StorageEngine {
       recurringPayments: this.loadRecurring(userId),
       notifications: this.loadNotifications(userId),
       settings: this.loadSettings(userId),
+      goals: this.loadGoals(userId),
+      transactionTemplates: this.loadTemplates(userId),
+      dashboardWidgets: this.loadDashboardWidgets(userId),
     };
   }
 
@@ -235,6 +248,9 @@ export class StorageEngine {
     this.saveRecurring(data.recurringPayments || [], userId);
     this.saveNotifications(data.notifications || [], userId);
     this.saveSettings(data.settings || INITIAL_SETTINGS, userId);
+    if (data.goals) this.saveGoals(data.goals, userId);
+    if (data.transactionTemplates) this.saveTemplates(data.transactionTemplates, userId);
+    if (data.dashboardWidgets) this.saveDashboardWidgets(data.dashboardWidgets, userId);
     return true;
   }
 
@@ -247,6 +263,9 @@ export class StorageEngine {
     const keyRec = this.getKey(BASE_KEYS.RECURRING, userId);
     const keyNotif = this.getKey(BASE_KEYS.NOTIFICATIONS, userId);
     const keySet = this.getKey(BASE_KEYS.SETTINGS, userId);
+    const keyGoals = this.getKey(BASE_KEYS.GOALS, userId);
+    const keyTemplates = this.getKey(BASE_KEYS.TEMPLATES, userId);
+    const keyWidgets = this.getKey(BASE_KEYS.DASHBOARD_WIDGETS, userId);
 
     localStorage.removeItem(keyAcc);
     localStorage.removeItem(keyCat);
@@ -255,6 +274,9 @@ export class StorageEngine {
     localStorage.removeItem(keyRec);
     localStorage.removeItem(keyNotif);
     localStorage.removeItem(keySet);
+    localStorage.removeItem(keyGoals);
+    localStorage.removeItem(keyTemplates);
+    localStorage.removeItem(keyWidgets);
 
     if (userId) {
       IndexedDBService.clearUserData(userId);

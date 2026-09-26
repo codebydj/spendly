@@ -9,6 +9,7 @@ import { supabase } from '../services/supabase';
 import { SyncService } from '../services/syncService';
 import { soundService } from '../services/soundService';
 import { hashPin, verifyPin } from '../utils/crypto';
+import { formatINR } from '../utils/currency';
 import { scheduleReminderNotification, cancelReminderNotification, scheduleUpdateNotification } from '../services/nativeNotifications';
 import {
   checkForAppUpdate,
@@ -35,6 +36,7 @@ export type ViewType =
   | 'transactions'
   | 'accounts'
   | 'budgets'
+  | 'goals'
   | 'analytics'
   | 'recurring'
   | 'calendar'
@@ -584,7 +586,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }, 300);
       }
     },
-    [updateAccountBalances, refreshPendingOpsCount]
+    [updateAccountBalances, refreshPendingOpsCount, setIsPinLocked]
   );
 
   // Sync state back to local storage whenever in-memory data changes for active user
@@ -647,7 +649,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch {
       setSyncStatus('SYNC_FAILED');
     }
-  }, [user?.id, refreshPendingOpsCount]);
+  }, [user, refreshPendingOpsCount]);
 
   // Explicit Manual Supabase Cloud Synchronization Control
   const triggerManualSync = async (): Promise<boolean> => {
@@ -741,9 +743,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const path = window.location.pathname || '';
 
       if (hash.includes('error=access_denied') || hash.includes('otp_expired') || search.includes('otp_expired')) {
-        setCurrentView('link-expired');
+        setTimeout(() => setCurrentView('link-expired'), 0);
       } else if (path.includes('update-password') || hash.includes('type=recovery')) {
-        setCurrentView('update-password');
+        setTimeout(() => setCurrentView('update-password'), 0);
       }
     }
 
@@ -1014,7 +1016,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     window.addEventListener('offline', handleOffline);
 
     if (navigator.onLine) {
-      checkAppUpdates();
+      setTimeout(() => checkAppUpdates(), 0);
     }
 
     return () => {
@@ -1073,7 +1075,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             id: 'notif-' + Date.now(),
             type: 'BUDGET_ALERT',
             title: status === 'OVER BUDGET' ? 'Budget Exceeded' : 'Budget Warning',
-            message: `Category ${catObj?.name || ''} spending is ₹${spent.toLocaleString()} / Limit ₹${limit.toLocaleString()} (${status}).`,
+            message: `Category ${catObj?.name || ''} spending is ${formatINR(spent)} / Limit ${formatINR(limit)} (${status}).`,
             date: new Date().toISOString(),
             isRead: false,
           };
@@ -1090,8 +1092,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const catName = categories.find((c) => c.id === newTx.categoryId)?.name || '';
     showToast(
       newTx.type === 'TRANSFER'
-        ? `Transferred ₹${newTx.amount.toLocaleString()} between accounts`
-        : `Added ${newTx.type.toLowerCase()}: ₹${newTx.amount.toLocaleString()} (${catName})`,
+        ? `Transferred ${formatINR(newTx.amount)} between accounts`
+        : `Added ${newTx.type.toLowerCase()}: ${formatINR(newTx.amount)} (${catName})`,
       'success'
     );
 

@@ -2,6 +2,8 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import type { Transaction, Account, Category, BackupData } from '../types/finance';
+import { escapeCSVField } from './csv';
+export { escapeCSVField } from './csv';
 
 /**
  * Clean, robust, offline-first CSV and File Export engine for Spendly V3.1.6.
@@ -19,11 +21,6 @@ export interface ExportResult {
  * Escapes CSV field values strictly according to RFC 4180 standard.
  * Handles double quotes, commas, and line breaks in notes, descriptions, or merchants.
  */
-function escapeCSVField(val: string | number | undefined | null): string {
-  if (val === undefined || val === null) return '""';
-  const str = String(val);
-  return `"${str.replace(/"/g, '""')}"`;
-}
 
 /**
  * Helper to write and share file on Android Capacitor native runtime
@@ -158,6 +155,9 @@ export async function exportJSONBackup(backupData: BackupData): Promise<ExportRe
       categories: backupData.categories || [],
       notifications: backupData.notifications || [],
       settings: backupData.settings || ({} as any),
+      goals: backupData.goals || [],
+      transactionTemplates: backupData.transactionTemplates || [],
+      dashboardWidgets: backupData.dashboardWidgets,
     };
 
     const jsonStr = JSON.stringify(cleanBackup, null, 2);

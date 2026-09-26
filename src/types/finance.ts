@@ -88,6 +88,39 @@ export interface AppSettings {
   notifyAppUpdates?: boolean;
 }
 
+export interface GoalContribution {
+  id: string;
+  amount: number;
+  date: string;
+  note?: string;
+}
+
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  targetDate?: string;
+  color: string;
+  contributions: GoalContribution[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TransactionTemplate {
+  id: string;
+  name: string;
+  type: TransactionType;
+  accountId?: string;
+  toAccountId?: string;
+  categoryId?: string;
+  note?: string;
+  amount?: number;
+  paymentMethod?: string;
+  updatedAt: string;
+}
+
+export type DashboardWidget = 'accounts' | 'spending' | 'budgets' | 'bills' | 'goals' | 'insights' | 'activity';
+
 export interface BackupData {
   version: string;
   exportedAt: string;
@@ -98,6 +131,9 @@ export interface BackupData {
   categories: Category[];
   notifications: NotificationItem[];
   settings: AppSettings;
+  goals?: SavingsGoal[];
+  transactionTemplates?: TransactionTemplate[];
+  dashboardWidgets?: DashboardWidget[];
 }
 
 export interface PendingSyncOperation {

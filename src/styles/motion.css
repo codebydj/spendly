@@ -1,0 +1,263 @@
+/* ==========================================
+   Spendly Central Motion & Animation System
+   ========================================== */
+
+/* Page & Section Entrance Transitions */
+.page-enter {
+  animation: pageFadeIn var(--motion-slow) var(--ease-enter) forwards;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Staggered Item Entrance (Limit max delay to keep entrance fast) */
+.stagger-item-1 { animation: itemFadeIn var(--motion-slow) var(--ease-enter) 0ms forwards; }
+.stagger-item-2 { animation: itemFadeIn var(--motion-slow) var(--ease-enter) 35ms forwards; }
+.stagger-item-3 { animation: itemFadeIn var(--motion-slow) var(--ease-enter) 70ms forwards; }
+.stagger-item-4 { animation: itemFadeIn var(--motion-slow) var(--ease-enter) 105ms forwards; }
+.stagger-item-5 { animation: itemFadeIn var(--motion-slow) var(--ease-enter) 140ms forwards; }
+
+@keyframes itemFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Modal & Dialog Animations */
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes desktopModalEntrance {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes mobileSheetSlideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Shimmer Loading Animation for Navy Skeletons */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(19, 26, 52, 0.75) 0%,
+    rgba(86, 133, 255, 0.12) 50%,
+    rgba(19, 26, 52, 0.75) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerSweep 1.8s ease-in-out infinite;
+}
+
+@keyframes shimmerSweep {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Micro Interactions: Buttons & Cards */
+.btn-micro {
+  transition: transform var(--motion-fast) var(--ease-standard),
+              background-color var(--motion-fast) var(--ease-standard),
+              box-shadow var(--motion-fast) var(--ease-standard),
+              opacity var(--motion-fast) var(--ease-standard);
+}
+
+.btn-micro:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-micro:active:not(:disabled) {
+  transform: scale(0.98) translateY(0);
+}
+
+.card-interactive {
+  transition: transform var(--motion-normal) var(--ease-standard),
+              border-color var(--motion-normal) var(--ease-standard),
+              box-shadow var(--motion-normal) var(--ease-standard),
+              background-color var(--motion-normal) var(--ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card-interactive:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-glass);
+    box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.35);
+  }
+}
+
+.card-interactive:active {
+  transform: scale(0.99) translateY(0);
+}
+
+/* Accordion Smooth Transitions */
+.accordion-chevron {
+  transition: transform var(--motion-normal) var(--ease-standard);
+}
+
+.accordion-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.accordion-body {
+  transition: opacity var(--motion-normal) var(--ease-enter),
+              max-height var(--motion-normal) var(--ease-enter);
+}
+
+/* Rotating Sync Indicator */
+.spin-slow {
+  animation: spinRotate 1.4s linear infinite;
+}
+
+@keyframes spinRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Breathing Pulse Loader */
+.pulse-subtle {
+  animation: logoPulse 2s var(--ease-standard) infinite alternate;
+}
+
+@keyframes logoPulse {
+  from {
+    opacity: 0.85;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+/* Success Checkmark Animating Line */
+.stroke-draw {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: drawCheck 400ms var(--ease-spring) forwards;
+}
+
+@keyframes drawCheck {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Newly added transaction flash highlight */
+.transaction-row-added {
+  animation: rowHighlight 1.5s var(--ease-enter) forwards;
+}
+
+@keyframes rowHighlight {
+  0% {
+    background-color: rgba(86, 133, 255, 0.25);
+    border-color: var(--accent-blue);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Row Deletion Slide & Fade Out */
+.row-deleting {
+  animation: rowDelete 240ms var(--ease-exit) forwards;
+  pointer-events: none;
+}
+
+@keyframes rowDelete {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 100px;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-16px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    border: 0;
+  }
+}
+
+/* Toast Slide Entrance & Exit */
+.toast-enter {
+  animation: toastIn var(--motion-normal) var(--ease-spring) forwards;
+}
+
+.toast-exit {
+  animation: toastOut var(--motion-fast) var(--ease-exit) forwards;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+}
+
+/* Reduced Motion Accessibility Overrides */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .skeleton-shimmer {
+    animation: none !important;
+    background: rgba(19, 26, 52, 0.85) !important;
+  }
+
+  .spin-slow, .pulse-subtle {
+    animation: none !important;
+  }
+}

@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { BudgetProgress } from '../components/ui/BudgetProgress';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Plus, PiggyBank, X } from 'lucide-react';
+import { formatINR } from '../utils/currency';
 
 export const BudgetsView: React.FC = () => {
   const {
@@ -39,27 +40,29 @@ export const BudgetsView: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Top Overview Banner */}
-      <div className="card-level-3 hero-emerald-glow" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '22px 26px' }}>
+      <div className="card-level-3 hero-blue-glow" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '22px 26px' }}>
         <div>
           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
             MONTHLY BUDGET OVERVIEW
           </span>
           <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }} className="tabular-nums">
-            {settings.hideBalances ? '₹•••••' : `₹${totalMonthlySpentInBudgets.toLocaleString()} / ₹${totalMonthlyBudgetLimit.toLocaleString()}`}
+            {settings.hideBalances ? '₹•••••' : `${formatINR(totalMonthlySpentInBudgets)} / ${formatINR(totalMonthlyBudgetLimit)}`}
           </div>
-          <span style={{ fontSize: '0.84rem', color: remainingMonthlyBudget >= 0 ? 'var(--accent-emerald)' : 'var(--status-expense)', marginTop: '4px', display: 'block', fontWeight: 600 }}>
+          <span style={{ fontSize: '0.84rem', color: remainingMonthlyBudget >= 0 ? 'var(--accent-cyan)' : 'var(--status-expense)', marginTop: '4px', display: 'block', fontWeight: 600 }}>
             {settings.hideBalances
               ? 'Remaining: ₹•••••'
               : remainingMonthlyBudget >= 0
-              ? `₹${remainingMonthlyBudget.toLocaleString()} remaining for current month`
-              : `Over total budget limit by ₹${Math.abs(remainingMonthlyBudget).toLocaleString()}`}
+              ? `${formatINR(remainingMonthlyBudget)} remaining for current month`
+              : `Over total budget limit by ${formatINR(Math.abs(remainingMonthlyBudget))}`}
           </span>
         </div>
 
-        <button onClick={() => setIsAddBudgetOpen(true)} className="btn btn-primary" style={{ padding: '10px 18px' }}>
-          <Plus size={16} strokeWidth={2.5} />
-          <span>Create Budget Limit</span>
-        </button>
+        {budgets.length > 0 && (
+          <button onClick={() => setIsAddBudgetOpen(true)} className="btn btn-primary" style={{ padding: '10px 18px' }}>
+            <Plus size={16} strokeWidth={2.5} />
+            <span>Create Budget Limit</span>
+          </button>
+        )}
       </div>
 
       {/* Category Budget Tabs & Grid */}
@@ -75,9 +78,9 @@ export const BudgetsView: React.FC = () => {
                 style={{
                   padding: '5px 12px',
                   borderRadius: 'var(--radius-sm)',
-                  backgroundColor: selectedCatId === null ? 'var(--accent-emerald-subtle)' : 'var(--bg-surface)',
-                  border: selectedCatId === null ? '1px solid var(--accent-emerald-border)' : '1px solid var(--border-color)',
-                  color: selectedCatId === null ? 'var(--accent-emerald)' : 'var(--text-secondary)',
+                  backgroundColor: selectedCatId === null ? 'var(--accent-blue-subtle)' : 'var(--bg-surface)',
+                  border: selectedCatId === null ? '1px solid var(--accent-blue-border)' : '1px solid var(--border-color)',
+                  color: selectedCatId === null ? 'var(--accent-cyan)' : 'var(--text-secondary)',
                   fontSize: '0.8rem',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -101,17 +104,17 @@ export const BudgetsView: React.FC = () => {
                       gap: '6px',
                       padding: '4px 10px',
                       borderRadius: 'var(--radius-sm)',
-                      backgroundColor: isSelected ? 'var(--accent-emerald-subtle)' : 'var(--bg-surface)',
-                      border: isSelected ? '1px solid var(--accent-emerald-border)' : '1px solid var(--border-color)',
+                      backgroundColor: isSelected ? 'var(--accent-blue-subtle)' : 'var(--bg-surface)',
+                      border: isSelected ? '1px solid var(--accent-blue-border)' : '1px solid var(--border-color)',
                       cursor: 'pointer',
                       whiteSpace: 'nowrap',
                       fontSize: '0.8rem',
                       fontWeight: 600,
-                      color: isSelected ? 'var(--accent-emerald)' : 'var(--text-secondary)',
+                      color: isSelected ? 'var(--accent-cyan)' : 'var(--text-secondary)',
                       transition: 'all 0.15s ease',
                     }}
                   >
-                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: cat?.color || 'var(--accent-emerald)' }} />
+                    <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: cat?.color || 'var(--accent-cyan)' }} />
                     <span>{cat?.name || 'Category'}</span>
                     <button
                       onClick={(e) => {
@@ -155,7 +158,7 @@ export const BudgetsView: React.FC = () => {
             onAction={() => setIsAddBudgetOpen(true)}
           />
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '16px' }}>
             {filteredBudgets.map((b) => {
               const cat = categories.find((c) => c.id === b.categoryId);
               const spent = categorySpentMap[b.categoryId] || 0;

@@ -65,8 +65,8 @@ export const MobileNav: React.FC = () => {
     },
     {
       id: 'maps' as ViewType,
-      title: 'Maps',
-      description: 'Transaction locations & spend map',
+      title: 'Locations',
+      description: 'Transaction locations & place map',
       icon: <MapPin size={24} color="var(--accent-cyan)" />,
     },
     {
@@ -100,7 +100,7 @@ export const MobileNav: React.FC = () => {
 
   return (
     <>
-      {/* Mobile Floating Add Transaction Action Button */}
+      {/* One focused mobile primary action, offset above navigation and page content. */}
       <div
         style={{
           position: 'fixed',
@@ -116,12 +116,12 @@ export const MobileNav: React.FC = () => {
             width: '60px',
             height: '60px',
             borderRadius: '20px',
-            background: 'linear-gradient(135deg, #8B5CF6 0%, #3B82F6 50%, #22D3EE 100%)',
+            background: 'linear-gradient(135deg, #5685FF 0%, #20C4E8 55%, #8664F5 100%)',
             color: '#FFFFFF',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 12px 32px rgba(139, 92, 246, 0.5), 0 2px 10px rgba(0, 0, 0, 0.6)',
+            boxShadow: '0 12px 32px rgba(86, 133, 255, 0.4), 0 2px 10px rgba(0, 0, 0, 0.6)',
             border: '1px solid rgba(255, 255, 255, 0.3)',
             transition: 'transform 0.15s ease, box-shadow 0.15s ease',
           }}
@@ -139,7 +139,7 @@ export const MobileNav: React.FC = () => {
           left: 0,
           right: 0,
           zIndex: 900,
-          backgroundColor: 'rgba(17, 21, 46, 0.95)',
+          backgroundColor: 'rgba(13, 17, 38, 0.96)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
           borderTop: '1px solid rgba(255, 255, 255, 0.12)',
@@ -204,6 +204,7 @@ export const MobileNav: React.FC = () => {
             border: isMoreOpen || isSecondaryActive ? '1px solid rgba(139, 92, 246, 0.35)' : '1px solid transparent',
             transition: 'all 0.15s ease',
           }}
+          aria-label="More navigation options"
         >
           <MoreHorizontal size={24} />
           <span>More</span>
@@ -228,7 +229,7 @@ export const MobileNav: React.FC = () => {
         >
           <div
             style={{
-              backgroundColor: 'rgba(27, 32, 66, 0.96)',
+              backgroundColor: 'rgba(13, 17, 38, 0.98)',
               backdropFilter: 'blur(28px)',
               WebkitBackdropFilter: 'blur(28px)',
               borderTop: '1px solid var(--border-light)',
@@ -240,6 +241,7 @@ export const MobileNav: React.FC = () => {
               gap: '16px',
               maxHeight: '80vh',
               overflowY: 'auto',
+              animation: 'mobileSheetSlideUp var(--motion-normal) var(--ease-spring) forwards',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -258,7 +260,7 @@ export const MobileNav: React.FC = () => {
                   <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{user.email}</p>
                 )}
               </div>
-              <button onClick={() => setIsMoreOpen(false)} className="btn-icon">
+              <button onClick={() => setIsMoreOpen(false)} className="btn-icon" aria-label="Close navigation menu">
                 <X size={20} />
               </button>
             </div>

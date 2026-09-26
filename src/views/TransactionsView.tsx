@@ -1,30 +1,93 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Transaction, TransactionType } from '../types/finance';
 import { TransactionRow } from '../components/ui/TransactionRow';
 import { EditTransactionModal } from '../components/forms/EditTransactionModal';
 import { EmptyState } from '../components/ui/EmptyState';
-import { Search, Download, Trash2, Filter, Receipt, Plus } from 'lucide-react';
+import { Search, Download, Filter, Receipt, Copy, X } from 'lucide-react';
 import { exportTransactionsCSV } from '../utils/exportUtils';
+import { formatINR } from '../utils/currency';
+import { useFeatures } from '../context/FeatureContext';
 
 export const TransactionsView: React.FC = () => {
+  const { templates, applyTemplate, deleteTemplate, saveTemplate } = useFeatures();
   const {
     transactions,
     accounts,
     categories,
-    deleteTransaction,
     monthlyExpenses,
     searchQuery,
     setSearchQuery,
     settings,
     showToast,
     setIsAddTransactionOpen,
+    user,
   } = useApp();
+
+  const filterStorageKey = `spendly_tx_filters_${user?.id || 'guest'}`;
 
   const [typeFilter, setTypeFilter] = useState<'ALL' | TransactionType>('ALL');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('ALL');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+
+  // Restore saved filter preferences for the current user
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(filterStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.typeFilter) setTypeFilter(parsed.typeFilter);
+        if (parsed.selectedAccountId && (parsed.selectedAccountId === 'ALL' || accounts.some((a) => a.id === parsed.selectedAccountId))) {
+          setSelectedAccountId(parsed.selectedAccountId);
+        }
+        if (parsed.selectedCategoryId && (parsed.selectedCategoryId === 'ALL' || categories.some((c) => c.id === parsed.selectedCategoryId))) {
+          setSelectedCategoryId(parsed.selectedCategoryId);
+        }
+        if (parsed.dateFrom) setDateFrom(parsed.dateFrom);
+        if (parsed.dateTo) setDateTo(parsed.dateTo);
+      }
+    } catch {
+      // Ignore storage read error
+    }
+  }, [filterStorageKey, accounts, categories]);
+
+  // Persist filter preferences whenever they change
+  useEffect(() => {
+    try {
+      const toSave = {
+        typeFilter,
+        selectedAccountId,
+        selectedCategoryId,
+        dateFrom,
+        dateTo,
+      };
+      localStorage.setItem(filterStorageKey, JSON.stringify(toSave));
+    } catch {
+      // Ignore quota error
+    }
+  }, [typeFilter, selectedAccountId, selectedCategoryId, dateFrom, dateTo, filterStorageKey]);
+
+  const handleDuplicate = (tx: Transaction) => {
+    sessionStorage.setItem('spendly_duplicate_transaction', JSON.stringify(tx));
+    setIsAddTransactionOpen(true);
+  };
+
+  const handleResetFilters = () => {
+    setTypeFilter('ALL');
+    setSelectedAccountId('ALL');
+    setSelectedCategoryId('ALL');
+    setDateFrom('');
+    setDateTo('');
+    setSearchQuery('');
+    try {
+      localStorage.removeItem(filterStorageKey);
+    } catch {
+      // Ignore
+    }
+  };
 
   // Filtered transactions calculation
   const filteredTransactions = transactions.filter((tx) => {
@@ -38,6 +101,8 @@ export const TransactionsView: React.FC = () => {
 
     // Category Filter
     if (selectedCategoryId !== 'ALL' && tx.categoryId !== selectedCategoryId) return false;
+    if (dateFrom && tx.date < dateFrom) return false;
+    if (dateTo && tx.date > dateTo) return false;
 
     // Search query
     if (searchQuery.trim()) {
@@ -83,16 +148,18 @@ export const TransactionsView: React.FC = () => {
     }
   };
 
+  const hasActiveFilters = typeFilter !== 'ALL' || selectedAccountId !== 'ALL' || selectedCategoryId !== 'ALL' || Boolean(dateFrom) || Boolean(dateTo) || Boolean(searchQuery);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Summary Banner */}
-      <div className="card-level-3 hero-emerald-glow" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '22px 26px' }}>
+      <div className="card-level-3 hero-blue-glow" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '22px 26px' }}>
         <div>
           <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
             MONTHLY SPENDING SUMMARY
           </span>
           <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }} className="tabular-nums">
-            {settings.hideBalances ? '₹••••• spent this month' : `₹${monthlyExpenses.toLocaleString()} spent this month`}
+            {settings.hideBalances ? '₹••••• spent this month' : `${formatINR(monthlyExpenses)} spent this month`}
           </div>
           <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
             Showing {filteredTransactions.length} of {transactions.length} total entries
@@ -100,10 +167,6 @@ export const TransactionsView: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button onClick={() => setIsAddTransactionOpen(true)} className="btn btn-primary" style={{ padding: '10px 18px' }}>
-            <Plus size={16} strokeWidth={2.5} />
-            <span>Add transaction</span>
-          </button>
           <button onClick={handleExportCSV} className="btn btn-secondary" style={{ padding: '10px 16px' }}>
             <Download size={16} /> Export CSV
           </button>
@@ -114,7 +177,7 @@ export const TransactionsView: React.FC = () => {
       <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '18px 20px' }}>
         {/* Top Type Filter Tabs */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
-          <div style={{ display: 'flex', gap: '6px', backgroundColor: 'rgba(10, 14, 22, 0.8)', padding: '4px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', gap: '6px', backgroundColor: 'rgba(15, 21, 42, 0.8)', padding: '4px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
             {(['ALL', 'EXPENSE', 'INCOME', 'TRANSFER'] as const).map((t) => {
               const isActive = typeFilter === t;
               return (
@@ -125,7 +188,7 @@ export const TransactionsView: React.FC = () => {
                     padding: '6px 14px',
                     borderRadius: 'var(--radius-sm)',
                     backgroundColor: isActive ? 'var(--bg-surface-elevated)' : 'transparent',
-                    color: isActive ? 'var(--accent-emerald)' : 'var(--text-secondary)',
+                    color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
                     fontWeight: isActive ? 700 : 500,
                     fontSize: '0.84rem',
                     border: isActive ? '1px solid var(--border-strong)' : 'none',
@@ -138,7 +201,7 @@ export const TransactionsView: React.FC = () => {
           </div>
 
           {/* Search Box */}
-          <div style={{ position: 'relative', width: '260px' }}>
+          <div style={{ position: 'relative', width: 'min(100%, 260px)', flex: '1 1 220px' }}>
             <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
@@ -175,14 +238,12 @@ export const TransactionsView: React.FC = () => {
             ))}
           </select>
 
-          {(typeFilter !== 'ALL' || selectedAccountId !== 'ALL' || selectedCategoryId !== 'ALL' || searchQuery) && (
+          <label className="compact-field">From<input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
+          <label className="compact-field">To<input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></label>
+
+          {hasActiveFilters && (
             <button
-              onClick={() => {
-                setTypeFilter('ALL');
-                setSelectedAccountId('ALL');
-                setSelectedCategoryId('ALL');
-                setSearchQuery('');
-              }}
+              onClick={handleResetFilters}
               style={{ fontSize: '0.8rem', color: 'var(--status-expense)', padding: '4px 8px', fontWeight: 600 }}
             >
               Reset Filters
@@ -190,6 +251,14 @@ export const TransactionsView: React.FC = () => {
           )}
         </div>
       </div>
+
+      {templates.length > 0 && (
+        <section className="template-strip card-level-1" aria-labelledby="templates-title">
+          <div><h2 id="templates-title">Transaction templates</h2><p>Selecting one only prefills the form for review.</p></div>
+          <div className="template-list">{templates.map((template) => <div className="template-chip" key={template.id}><button onClick={() => applyTemplate(template)}><Copy size={15} /><span>{template.name}</span>{template.amount ? <small>{formatINR(template.amount)}</small> : null}</button><button className="template-edit" onClick={() => { const name = prompt('Rename template', template.name); if (name?.trim()) saveTemplate({ ...template, name: name.trim() }); }} aria-label={`Edit template ${template.name}`}>Edit</button><button className="btn-icon" aria-label={`Delete template ${template.name}`} onClick={() => { if (confirm(`Delete template “${template.name}”?`)) deleteTemplate(template.id); }}><X size={14} /></button></div>)}</div>
+          <small className="local-only-note">Stored on this device</small>
+        </section>
+      )}
 
       {/* Grouped Transactions List */}
       {sortedDates.length === 0 ? (
@@ -231,26 +300,8 @@ export const TransactionsView: React.FC = () => {
                         category={cat}
                         hideBalances={settings.hideBalances}
                         onEdit={(t) => setEditingTx(t)}
+                        onDuplicate={handleDuplicate}
                       />
-                      <button
-                        onClick={() => {
-                          if (confirm(`Delete transaction "${tx.note}"?`)) {
-                            deleteTransaction(tx.id);
-                          }
-                        }}
-                        className="btn-icon"
-                        style={{
-                          position: 'absolute',
-                          right: '12px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          color: 'var(--text-muted)',
-                          display: 'none',
-                        }}
-                        title="Delete transaction"
-                      >
-                        <Trash2 size={15} />
-                      </button>
                     </div>
                   );
                 })}

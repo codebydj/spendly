@@ -1,5 +1,6 @@
 import React from 'react';
 import { GlassCard } from './GlassCard';
+import { AnimatedNumber } from '../motion/AnimatedNumber';
 
 interface StatCardProps {
   label: string;
@@ -17,11 +18,10 @@ export const StatCard: React.FC<StatCardProps> = ({
   icon,
   accentColor = 'var(--text-primary)',
   hideBalances = false,
-  currency = '₹',
   subtext,
 }) => {
   return (
-    <GlassCard style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <GlassCard className="card-interactive" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
           {label}
@@ -38,7 +38,7 @@ export const StatCard: React.FC<StatCardProps> = ({
         }}
         className="tabular-nums"
       >
-        {hideBalances ? `${currency}•••••` : `${currency}${amount.toLocaleString()}`}
+        <AnimatedNumber value={amount} isMasked={hideBalances} />
       </div>
 
       {subtext && (

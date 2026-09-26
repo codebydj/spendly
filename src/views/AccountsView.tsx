@@ -6,6 +6,7 @@ import { AccountCard } from '../components/ui/AccountCard';
 import { TransactionRow } from '../components/ui/TransactionRow';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Plus, Wallet, Building2, CreditCard, Banknote, Archive, Search, X } from 'lucide-react';
+import { formatINR, formatINRMasked } from '../utils/currency';
 
 export const AccountsView: React.FC = () => {
   const {
@@ -86,7 +87,7 @@ export const AccountsView: React.FC = () => {
           <span>{title}</span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: '16px' }}>
           {groupAccounts.map((acc) => (
             <AccountCard
               key={acc.id}
@@ -109,13 +110,15 @@ export const AccountsView: React.FC = () => {
             TOTAL NET WORTH
           </span>
           <div style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }} className="tabular-nums">
-            {settings.hideBalances ? '₹•••••' : `₹${totalBalance.toLocaleString()}`}
+            {formatINRMasked(totalBalance, settings.hideBalances)}
           </div>
         </div>
 
-        <button onClick={() => setIsAddAccountOpen(true)} className="btn btn-primary" style={{ padding: '11px 20px' }}>
-          <Plus size={18} /> Add Account
-        </button>
+        {activeAccounts.length > 0 && (
+          <button onClick={() => setIsAddAccountOpen(true)} className="btn btn-primary" style={{ padding: '11px 20px' }}>
+            <Plus size={18} /> Add Account
+          </button>
+        )}
       </GlassCard>
 
       {/* Account Groups / Empty State */}
@@ -143,7 +146,7 @@ export const AccountsView: React.FC = () => {
           elevated
           style={{
             marginTop: '12px',
-            borderColor: 'var(--accent-emerald-border)',
+            borderColor: 'var(--accent-blue-border)',
             display: 'flex',
             flexDirection: 'column',
             gap: '24px',
@@ -195,21 +198,21 @@ export const AccountsView: React.FC = () => {
             <div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Current Balance</span>
               <span style={{ fontSize: '1.3rem', fontWeight: 700, display: 'block', marginTop: '2px' }} className="tabular-nums">
-                {settings.hideBalances ? '₹•••••' : `₹${selectedAccount.balance.toLocaleString()}`}
+                {formatINRMasked(selectedAccount.balance, settings.hideBalances)}
               </span>
             </div>
 
             <div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Income this Month</span>
-              <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--accent-emerald)', display: 'block', marginTop: '2px' }} className="tabular-nums">
-                {settings.hideBalances ? '₹•••••' : `₹${accIncomeThisMonth.toLocaleString()}`}
+              <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--accent-cyan)', display: 'block', marginTop: '2px' }} className="tabular-nums">
+                {formatINRMasked(accIncomeThisMonth, settings.hideBalances)}
               </span>
             </div>
 
             <div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Expenses this Month</span>
               <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--status-danger)', display: 'block', marginTop: '2px' }} className="tabular-nums">
-                {settings.hideBalances ? '₹•••••' : `₹${accExpensesThisMonth.toLocaleString()}`}
+                {formatINRMasked(accExpensesThisMonth, settings.hideBalances)}
               </span>
             </div>
 
@@ -219,7 +222,7 @@ export const AccountsView: React.FC = () => {
                 style={{
                   fontSize: '1.15rem',
                   fontWeight: 700,
-                  color: accNetChange >= 0 ? 'var(--accent-emerald)' : 'var(--status-danger)',
+                  color: accNetChange >= 0 ? 'var(--accent-cyan)' : 'var(--status-danger)',
                   display: 'block',
                   marginTop: '2px',
                 }}
@@ -227,7 +230,7 @@ export const AccountsView: React.FC = () => {
               >
                 {settings.hideBalances
                   ? '₹•••••'
-                  : `${accNetChange >= 0 ? '+' : ''}₹${accNetChange.toLocaleString()}`}
+                  : `${accNetChange >= 0 ? '+' : ''}${formatINR(accNetChange)}`}
               </span>
             </div>
           </div>
@@ -236,7 +239,7 @@ export const AccountsView: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <h4 style={{ fontSize: '1rem', fontWeight: 700 }}>Account Activity</h4>
-              <div style={{ position: 'relative', width: '240px' }}>
+              <div style={{ position: 'relative', width: 'min(100%, 240px)' }}>
                 <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type="text"

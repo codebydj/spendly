@@ -1,19 +1,20 @@
 {
-  "version": "3.1.6",
-  "versionName": "Spendly V3.1.6",
-  "buildDate": "2026-09-16",
-  "releaseDate": "2026-09-16",
-  "title": "Spendly V3.1.6 Available",
-  "message": "Spendly V3.1.6 is now available.",
-  "downloadUrl": "https://drive.google.com/file/d/1W9LOJKdCLvvkOVjbW9Q-8lhGUtt5f7lw/view?usp=sharing",
+  "version": "3.2.2",
+  "versionName": "Spendly V3.2.2",
+  "buildDate": "2026-09-27",
+  "releaseDate": "2026-09-27",
+  "title": "Spendly V3.2.2 Available",
+  "message": "Spendly V3.2.2 is now available.",
+  "downloadUrl": "https://drive.google.com/file/d/1-ltBFI8SRQjOzJ_TbOa7j4AVn3D4HtxX/view?usp=sharing",
   "minimumSupportedVersion": "1.0.0",
   "releaseNotes": [
-    "Fixed same-version update comparison reporting up to date without popups",
-    "Native Android CSV & JSON file export with system file saving and share sheet",
-    "Interactive Spendly SVG map markers with Unknown Location details panel",
-    "Cleaned and deduplicated complete release version history",
-    "Redesigned App Lock settings UI with secure 4-digit PIN setup, removal, and recovery",
-    "Consolidated single-badge top header network and cloud sync indicator"
+    "Redesigned transaction list rows with category-first vector icons and clean typography",
+    "Enhanced transaction type indicators (+Income green, -Expense red, ⇄ Transfer neutral blue)",
+    "Completely redesigned Locations tab with classic teardrop map pins and perfectly upright category icons",
+    "Resolved map camera reset issues with persistent Leaflet map container and single-execution fitBounds",
+    "Enhanced bank branding component and distinct account type recognition icons",
+    "Redesigned Financial Calendar with daily totals, date transaction panel, and bill reminders",
+    "Streamlined navigation with Savings Goal hidden from UI while preserving data compatibility"
   ]
 }
 

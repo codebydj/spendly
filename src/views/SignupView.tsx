@@ -148,7 +148,7 @@ export const SignupView: React.FC = () => {
         <form onSubmit={handleSignup} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Full Name Input */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+            <label htmlFor="signup-name" style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
               Full Name
             </label>
             <div style={{ position: 'relative' }}>
@@ -158,6 +158,7 @@ export const SignupView: React.FC = () => {
                 style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
               />
               <input
+                id="signup-name"
                 type="text"
                 placeholder="John Doe"
                 value={fullName}
@@ -170,7 +171,7 @@ export const SignupView: React.FC = () => {
 
           {/* Email Input */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+            <label htmlFor="signup-email" style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
               Email Address
             </label>
             <div style={{ position: 'relative' }}>
@@ -180,6 +181,7 @@ export const SignupView: React.FC = () => {
                 style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
               />
               <input
+                id="signup-email"
                 type="email"
                 required
                 placeholder="name@example.com"
@@ -193,7 +195,7 @@ export const SignupView: React.FC = () => {
 
           {/* Password Input */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+            <label htmlFor="signup-password" style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
               Password
             </label>
             <div style={{ position: 'relative' }}>
@@ -203,6 +205,7 @@ export const SignupView: React.FC = () => {
                 style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
               />
               <input
+                id="signup-password"
                 type={showPassword ? 'text' : 'password'}
                 required
                 placeholder="At least 6 characters"
@@ -215,6 +218,7 @@ export const SignupView: React.FC = () => {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="btn-icon"
+                aria-label={showPassword ? 'Hide passwords' : 'Show passwords'}
                 style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', padding: '4px' }}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -224,7 +228,7 @@ export const SignupView: React.FC = () => {
 
           {/* Confirm Password Input */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+            <label htmlFor="signup-confirm-password" style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
               Confirm Password
             </label>
             <div style={{ position: 'relative' }}>
@@ -234,6 +238,7 @@ export const SignupView: React.FC = () => {
                 style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
               />
               <input
+                id="signup-confirm-password"
                 type={showPassword ? 'text' : 'password'}
                 required
                 placeholder="Re-enter password"
