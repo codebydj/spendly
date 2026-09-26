@@ -5,7 +5,7 @@
   "releaseDate": "2026-09-27",
   "title": "Spendly V3.2.3 Available",
   "message": "Spendly V3.2.3 is now available with Mobile Maps stability and responsive UI fixes.",
-  "downloadUrl": "https://drive.google.com/file/d/1-ltBFI8SRQjOzJ_TbOa7j4AVn3D4HtxX/view?usp=sharing",
+  "downloadUrl": "https://drive.google.com/file/d/1b0GKChliFIj01UyvPOkA_AY782YPeH7_/view?usp=sharing",
   "minimumSupportedVersion": "1.0.0",
   "releaseNotes": [
     "Fixed Maps zoom resetting in the Android Capacitor application",

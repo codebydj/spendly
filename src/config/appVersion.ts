@@ -10,7 +10,7 @@ export const APP_NAME = 'Spendly';
 export const APP_PACKAGE_ID = 'com.spendly.finance';
 
 export const ANDROID_APK_DOWNLOAD_URL =
-  'https://drive.google.com/file/d/1-ltBFI8SRQjOzJ_TbOa7j4AVn3D4HtxX/view?usp=sharing';
+  'https://drive.google.com/file/d/1b0GKChliFIj01UyvPOkA_AY782YPeH7_/view?usp=sharing';
 
 export const APP_RELEASE_NOTES = [
   'Redesigned transaction list rows with category-first vector icons and clean typography',
