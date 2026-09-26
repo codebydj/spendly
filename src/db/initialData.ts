@@ -286,4 +286,5 @@ export const INITIAL_SETTINGS: AppSettings = {
   currency: '₹',
   lastSyncedAt: new Date().toISOString(),
   demoModeLoaded: false,
+  timeFormat: '12',
 };

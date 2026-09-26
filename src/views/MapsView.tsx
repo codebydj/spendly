@@ -425,7 +425,7 @@ export const MapsView: React.FC = () => {
     (selectedAccountId !== 'ALL' ? 1 : 0) +
     (isNearMeActive ? 1 : 0);
 
-  // 4A. Initialize Leaflet Map ONCE on component mount
+  // 4A. Initialize Leaflet Map ONCE on component mount with Mobile/Capacitor WebView protection
   useEffect(() => {
     if (!mapContainerRef.current) return;
     if (leafletMapRef.current) return;
@@ -436,7 +436,9 @@ export const MapsView: React.FC = () => {
 
     const map = L.map(mapContainerRef.current, {
       zoomControl: false,
-    }).setView([16.5062, 80.648], 12);
+      tap: true,
+      bounceAtZoomLimits: false,
+    } as any).setView([16.5062, 80.648], 12);
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -451,19 +453,55 @@ export const MapsView: React.FC = () => {
       setCurrentZoom(map.getZoom());
     });
 
+    // Track camera position for session preservation (Map -> List -> Map or Tab Switch)
+    map.on('moveend zoomend', () => {
+      if (leafletMapRef.current) {
+        const center = leafletMapRef.current.getCenter();
+        const zoom = leafletMapRef.current.getZoom();
+        sessionStorage.setItem('spendly_map_last_camera', JSON.stringify({ lat: center.lat, lng: center.lng, zoom }));
+      }
+    });
+
     leafletMapRef.current = map;
+
+    // Use ResizeObserver for responsive container dimension changes (keyboard, drawer, orientation)
+    let resizeObserver: ResizeObserver | null = null;
+    if (window.ResizeObserver && mapContainerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        if (leafletMapRef.current) {
+          requestAnimationFrame(() => {
+            if (leafletMapRef.current) leafletMapRef.current.invalidateSize();
+          });
+        }
+      });
+      resizeObserver.observe(mapContainerRef.current);
+    }
+
+    // Capacitor Native Android App Resume Listener
+    let capacitorListener: any = null;
+    try {
+      import('@capacitor/app').then(({ App }) => {
+        App.addListener('appStateChange', (state) => {
+          if (state.isActive && leafletMapRef.current) {
+            setTimeout(() => {
+              if (leafletMapRef.current) leafletMapRef.current.invalidateSize();
+            }, 100);
+          }
+        }).then((l) => {
+          capacitorListener = l;
+        });
+      }).catch(() => {});
+    } catch (e) {}
 
     setTimeout(() => {
       if (leafletMapRef.current) leafletMapRef.current.invalidateSize();
     }, 100);
 
-    const handleResize = () => {
-      if (leafletMapRef.current) leafletMapRef.current.invalidateSize();
-    };
-    window.addEventListener('resize', handleResize);
-
     return () => {
-      window.removeEventListener('resize', handleResize);
+      if (resizeObserver) resizeObserver.disconnect();
+      if (capacitorListener && typeof capacitorListener.remove === 'function') {
+        capacitorListener.remove();
+      }
       if (leafletMapRef.current) {
         leafletMapRef.current.remove();
         leafletMapRef.current = null;
@@ -484,10 +522,38 @@ export const MapsView: React.FC = () => {
     }
   }, [viewMode]);
 
-  // 4C. Initial Map Fit ONCE when location groups first load
+  // 4C. Initial Map Fit ONCE when location groups first load (or restore session camera)
   useEffect(() => {
     if (!leafletMapRef.current) return;
     if (hasInitialFitRef.current) return;
+
+    // Check for focus location requested from Calendar or Transactions list FIRST
+    const focusTxId = sessionStorage.getItem('spendly_map_focus_tx_id');
+    if (focusTxId) {
+      sessionStorage.removeItem('spendly_map_focus_tx_id');
+      const targetGroup = locationGroups.find((g) => g.transactions.some((t) => t.id === focusTxId));
+      if (targetGroup && targetGroup.latitude && targetGroup.longitude) {
+        setSelectedGroup(targetGroup);
+        leafletMapRef.current.flyTo([targetGroup.latitude, targetGroup.longitude], 15, { duration: 0.6 });
+        hasInitialFitRef.current = true;
+        return;
+      }
+    }
+
+    // Check if session camera state exists from previous navigation
+    const savedCamera = sessionStorage.getItem('spendly_map_last_camera');
+    if (savedCamera) {
+      try {
+        const { lat, lng, zoom } = JSON.parse(savedCamera);
+        if (lat && lng && zoom) {
+          leafletMapRef.current.setView([lat, lng], zoom, { animate: false });
+          hasInitialFitRef.current = true;
+          return;
+        }
+      } catch (e) {
+        // Fallthrough to bounds fit
+      }
+    }
 
     const mapGroups = locationGroups.filter((g) => g.latitude !== undefined && g.longitude !== undefined);
     if (mapGroups.length > 0) {
@@ -496,17 +562,6 @@ export const MapsView: React.FC = () => {
       if (bounds.isValid()) {
         leafletMapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
         hasInitialFitRef.current = true;
-      }
-    }
-
-    // Check for focus location requested from Calendar or Transactions list
-    const focusTxId = sessionStorage.getItem('spendly_map_focus_tx_id');
-    if (focusTxId) {
-      sessionStorage.removeItem('spendly_map_focus_tx_id');
-      const targetGroup = locationGroups.find((g) => g.transactions.some((t) => t.id === focusTxId));
-      if (targetGroup && targetGroup.latitude && targetGroup.longitude) {
-        setSelectedGroup(targetGroup);
-        leafletMapRef.current.flyTo([targetGroup.latitude, targetGroup.longitude], 15, { duration: 0.6 });
       }
     }
   }, [locationGroups]);

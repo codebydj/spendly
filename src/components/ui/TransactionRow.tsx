@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import type { Transaction, Account, Category } from '../../types/finance';
+import { useApp } from '../../context/AppContext';
 import { CategoryIcon } from './CategoryIcon';
 import { formatINRMasked, formatINR } from '../../utils/currency';
+import { formatDisplayTime } from '../../utils/dateUtils';
 import { ArrowLeftRight, MapPin, MoreVertical, Pencil, Copy, Trash2, Map } from 'lucide-react';
 import { BottomSheet } from './BottomSheet';
 
@@ -28,6 +30,7 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
   onDelete,
   onViewLocationOnMap,
 }) => {
+  const { settings } = useApp();
   const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
   const isIncome = transaction.type === 'INCOME';
   const isTransfer = transaction.type === 'TRANSFER';
@@ -149,7 +152,7 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
               {hideBalances ? '₹•••••' : `${sign}${formatINRMasked(transaction.amount)}`}
             </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
-              {transaction.time || transaction.date}
+              {formatDisplayTime(transaction.time, settings?.timeFormat) || transaction.date}
             </span>
           </div>
 

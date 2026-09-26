@@ -1,20 +1,20 @@
 {
-  "version": "3.2.2",
-  "versionName": "Spendly V3.2.2",
+  "version": "3.2.3",
+  "versionName": "Spendly V3.2.3",
   "buildDate": "2026-09-27",
   "releaseDate": "2026-09-27",
-  "title": "Spendly V3.2.2 Available",
-  "message": "Spendly V3.2.2 is now available.",
+  "title": "Spendly V3.2.3 Available",
+  "message": "Spendly V3.2.3 is now available with Mobile Maps stability and responsive UI fixes.",
   "downloadUrl": "https://drive.google.com/file/d/1-ltBFI8SRQjOzJ_TbOa7j4AVn3D4HtxX/view?usp=sharing",
   "minimumSupportedVersion": "1.0.0",
   "releaseNotes": [
-    "Redesigned transaction list rows with category-first vector icons and clean typography",
-    "Enhanced transaction type indicators (+Income green, -Expense red, ⇄ Transfer neutral blue)",
-    "Completely redesigned Locations tab with classic teardrop map pins and perfectly upright category icons",
-    "Resolved map camera reset issues with persistent Leaflet map container and single-execution fitBounds",
-    "Enhanced bank branding component and distinct account type recognition icons",
-    "Redesigned Financial Calendar with daily totals, date transaction panel, and bill reminders",
-    "Streamlined navigation with Savings Goal hidden from UI while preserving data compatibility"
+    "Fixed Maps zoom resetting in the Android Capacitor application",
+    "Improved pinch-to-zoom, touch gestures, and WebView map lifecycle handling",
+    "Improved mobile marker clustering and narrow-viewport collision handling",
+    "Preserved map camera position during navigation, view switches, and resize events",
+    "Enhanced mobile Maps responsive layout, compact summary metrics, and touch targets",
+    "Improved mobile bottom sheet interaction without blocking Leaflet touch gestures",
+    "App state resume and orientation change map invalidation without camera resets"
   ]
 }
 

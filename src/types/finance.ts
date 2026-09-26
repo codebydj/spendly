@@ -86,6 +86,7 @@ export interface AppSettings {
   lastSyncedAt: string;
   demoModeLoaded?: boolean;
   notifyAppUpdates?: boolean;
+  timeFormat?: '12' | '24';
 }
 
 export interface GoalContribution {

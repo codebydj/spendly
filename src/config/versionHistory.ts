@@ -8,8 +8,22 @@ export interface VersionHistoryItem {
 
 export const VERSION_HISTORY: VersionHistoryItem[] = [
   {
-    version: 'V3.2.2',
+    version: 'V3.2.3',
     isCurrent: true,
+    date: '27 September 2026',
+    title: 'Spendly V3.2.3 Mobile Maps & Stability Update',
+    highlights: [
+      'Fixed Maps zoom resetting in the Android Capacitor application',
+      'Improved pinch-to-zoom, touch gestures, and WebView map lifecycle handling',
+      'Improved mobile marker clustering and narrow-viewport collision handling',
+      'Preserved map camera position during navigation, view switches, and resize events',
+      'Enhanced mobile Maps responsive layout, compact summary metrics, and touch targets',
+      'Improved mobile bottom sheet interaction without blocking Leaflet touch gestures',
+      'App state resume and orientation change map invalidation without camera resets',
+    ],
+  },
+  {
+    version: 'V3.2.2',
     date: '27 September 2026',
     title: 'Spendly V3.2.2 UI & Feature Upgrade',
     highlights: [

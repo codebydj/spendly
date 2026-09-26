@@ -72,6 +72,7 @@ export const SettingsView: React.FC = () => {
     deleteCategory,
     toggleHideBalances,
     toggleNotifyAppUpdates,
+    setTimeFormat,
     installedVersion,
     lastCheckResult,
     isCheckingUpdates,
@@ -822,6 +823,31 @@ export const SettingsView: React.FC = () => {
                       <span className="badge badge-neutral" style={{ fontSize: '0.82rem', padding: '6px 12px' }}>
                         ₹ (INR)
                       </span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                      <div>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>Time Display Format</span>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>Display transaction timestamps in 12-hour (AM/PM) or 24-hour clock.</p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', backgroundColor: 'var(--bg-main)', padding: '4px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                        <button
+                          type="button"
+                          onClick={() => setTimeFormat('12')}
+                          className={`btn ${settings.timeFormat === '12' || !settings.timeFormat ? 'btn-primary' : 'btn-secondary'}`}
+                          style={{ padding: '4px 12px', fontSize: '0.78rem', minHeight: '32px' }}
+                        >
+                          12hr (AM/PM)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTimeFormat('24')}
+                          className={`btn ${settings.timeFormat === '24' ? 'btn-primary' : 'btn-secondary'}`}
+                          style={{ padding: '4px 12px', fontSize: '0.78rem', minHeight: '32px' }}
+                        >
+                          24hr
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -72,3 +72,14 @@ test('detectDuplicateTransaction identifies matching candidate', () => {
   assert.ok(duplicate, 'Should find duplicate transaction');
   assert.equal(duplicate?.id, 'tx1');
 });
+
+import { formatDisplayTime } from '../src/utils/dateUtils.ts';
+
+test('formatDisplayTime correctly converts 24hr strings to 12hr AM/PM and 24hr formats', () => {
+  assert.equal(formatDisplayTime('14:30', '12'), '02:30 PM');
+  assert.equal(formatDisplayTime('09:05', '12'), '09:05 AM');
+  assert.equal(formatDisplayTime('00:15', '12'), '12:15 AM');
+  assert.equal(formatDisplayTime('12:00', '12'), '12:00 PM');
+  assert.equal(formatDisplayTime('14:30', '24'), '14:30');
+  assert.equal(formatDisplayTime('09:05', '24'), '09:05');
+});

@@ -140,6 +140,7 @@ interface AppContextType {
   // Settings & Profile Actions
   toggleHideBalances: () => void;
   toggleNotifyAppUpdates: () => void;
+  setTimeFormat: (format: '12' | '24') => void;
   setPinCode: (pin: string) => Promise<void>;
   validatePin: (pin: string) => Promise<boolean>;
   updateProfileName: (fullName: string) => Promise<boolean>;
@@ -1462,6 +1463,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const setTimeFormat = (format: '12' | '24') => {
+    const updated = { ...settings, timeFormat: format };
+    setSettings(updated);
+    showToast(`Time format set to ${format === '12' ? '12-hour (AM/PM)' : '24-hour'}`, 'info');
+    if (user?.id) {
+      IndexedDBService.saveSettings(updated, user.id);
+      if (navigator.onLine) {
+        SyncService.upsertSettings(updated, user.id);
+      }
+    }
+  };
+
   const setPinCode = async (pin: string) => {
     let updated: AppSettings;
     if (!pin) {
@@ -1695,6 +1708,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         clearNotifications,
         toggleHideBalances,
         toggleNotifyAppUpdates,
+        setTimeFormat,
         setPinCode,
         validatePin,
         updateProfileName,
