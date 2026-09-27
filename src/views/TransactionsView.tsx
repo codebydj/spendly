@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import type { Transaction, TransactionType } from '../types/finance';
+import type { Transaction, TransactionType, Account, Category } from '../types/finance';
 import { TransactionRow } from '../components/ui/TransactionRow';
 import { EditTransactionModal } from '../components/forms/EditTransactionModal';
 import { EmptyState } from '../components/ui/EmptyState';
-import { Search, Download, Filter, Receipt, Copy, X } from 'lucide-react';
+import { ErrorBoundary } from '../components/ui/ErrorBoundary';
+import { BottomSheet } from '../components/ui/BottomSheet';
+import { SkeletonList } from '../components/ui/SkeletonLoader';
+import { Search, Download, Receipt, Copy, X, SlidersHorizontal } from 'lucide-react';
 import { exportTransactionsCSV } from '../utils/exportUtils';
 import { formatINR } from '../utils/currency';
 import { useFeatures } from '../context/FeatureContext';
+import { PageTransition } from '../components/motion/PageTransition';
 
 export const TransactionsView: React.FC = () => {
   const { templates, applyTemplate, deleteTemplate, saveTemplate } = useFeatures();
@@ -22,16 +26,24 @@ export const TransactionsView: React.FC = () => {
     showToast,
     setIsAddTransactionOpen,
     user,
+    authLoading,
   } = useApp();
 
   const filterStorageKey = `spendly_tx_filters_${user?.id || 'guest'}`;
 
+  // Filter States
   const [typeFilter, setTypeFilter] = useState<'ALL' | TransactionType>('ALL');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('ALL');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('ALL');
+  const [dateRangeOption, setDateRangeOption] = useState<'ALL' | 'TODAY' | '7DAYS' | '30DAYS' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+
+  // UI States
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
   // Restore saved filter preferences for the current user
   useEffect(() => {
@@ -46,29 +58,64 @@ export const TransactionsView: React.FC = () => {
         if (parsed.selectedCategoryId && (parsed.selectedCategoryId === 'ALL' || categories.some((c) => c.id === parsed.selectedCategoryId))) {
           setSelectedCategoryId(parsed.selectedCategoryId);
         }
+        if (parsed.dateRangeOption) setDateRangeOption(parsed.dateRangeOption);
         if (parsed.dateFrom) setDateFrom(parsed.dateFrom);
         if (parsed.dateTo) setDateTo(parsed.dateTo);
+        if (parsed.minAmount) setMinAmount(parsed.minAmount);
+        if (parsed.maxAmount) setMaxAmount(parsed.maxAmount);
       }
     } catch {
       // Ignore storage read error
     }
   }, [filterStorageKey, accounts, categories]);
 
-  // Persist filter preferences whenever they change
+  // Persist filter preferences
   useEffect(() => {
     try {
       const toSave = {
         typeFilter,
         selectedAccountId,
         selectedCategoryId,
+        dateRangeOption,
         dateFrom,
         dateTo,
+        minAmount,
+        maxAmount,
       };
       localStorage.setItem(filterStorageKey, JSON.stringify(toSave));
     } catch {
-      // Ignore quota error
+      // Ignore storage write error
     }
-  }, [typeFilter, selectedAccountId, selectedCategoryId, dateFrom, dateTo, filterStorageKey]);
+  }, [typeFilter, selectedAccountId, selectedCategoryId, dateRangeOption, dateFrom, dateTo, minAmount, maxAmount, filterStorageKey]);
+
+  // Handle Date Preset Selection
+  const handleDatePresetChange = (preset: 'ALL' | 'TODAY' | '7DAYS' | '30DAYS' | 'THIS_MONTH' | 'CUSTOM') => {
+    setDateRangeOption(preset);
+    const now = new Date();
+
+    if (preset === 'ALL') {
+      setDateFrom('');
+      setDateTo('');
+    } else if (preset === 'TODAY') {
+      const todayStr = now.toISOString().slice(0, 10);
+      setDateFrom(todayStr);
+      setDateTo(todayStr);
+    } else if (preset === '7DAYS') {
+      const past = new Date(now.getTime() - 7 * 86400000);
+      setDateFrom(past.toISOString().slice(0, 10));
+      setDateTo(now.toISOString().slice(0, 10));
+    } else if (preset === '30DAYS') {
+      const past = new Date(now.getTime() - 30 * 86400000);
+      setDateFrom(past.toISOString().slice(0, 10));
+      setDateTo(now.toISOString().slice(0, 10));
+    } else if (preset === 'THIS_MONTH') {
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+      setDateFrom(`${y}-${m}-01`);
+      setDateTo(`${y}-${m}-${String(lastDay).padStart(2, '0')}`);
+    }
+  };
 
   const handleDuplicate = (tx: Transaction) => {
     sessionStorage.setItem('spendly_duplicate_transaction', JSON.stringify(tx));
@@ -79,8 +126,11 @@ export const TransactionsView: React.FC = () => {
     setTypeFilter('ALL');
     setSelectedAccountId('ALL');
     setSelectedCategoryId('ALL');
+    setDateRangeOption('ALL');
     setDateFrom('');
     setDateTo('');
+    setMinAmount('');
+    setMaxAmount('');
     setSearchQuery('');
     try {
       localStorage.removeItem(filterStorageKey);
@@ -89,50 +139,103 @@ export const TransactionsView: React.FC = () => {
     }
   };
 
-  // Filtered transactions calculation
-  const filteredTransactions = transactions.filter((tx) => {
-    // Type Filter
-    if (typeFilter !== 'ALL' && tx.type !== typeFilter) return false;
+  // Deduplicate and Label Accounts with Duplicate Names (Req 60)
+  const uniqueAccountOptions = useMemo(() => {
+    return accounts.map((acc) => {
+      const sameNameCount = accounts.filter((a) => a.name.toLowerCase() === acc.name.toLowerCase()).length;
+      let displayName = acc.name;
+      if (sameNameCount > 1) {
+        displayName = `${acc.name} (${acc.type || 'Account'})`;
+      }
+      return { id: acc.id, name: displayName };
+    });
+  }, [accounts]);
 
-    // Account Filter
-    if (selectedAccountId !== 'ALL' && tx.accountId !== selectedAccountId && tx.toAccountId !== selectedAccountId) {
-      return false;
+  // Active Filter Count calculation
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (typeFilter !== 'ALL') count++;
+    if (selectedAccountId !== 'ALL') count++;
+    if (selectedCategoryId !== 'ALL') count++;
+    if (dateRangeOption !== 'ALL' || Boolean(dateFrom) || Boolean(dateTo)) count++;
+    if (Boolean(minAmount) || Boolean(maxAmount)) count++;
+    return count;
+  }, [typeFilter, selectedAccountId, selectedCategoryId, dateRangeOption, dateFrom, dateTo, minAmount, maxAmount]);
+
+  // Filtered Transactions calculation with full error protection
+  const filteredTransactions = useMemo(() => {
+    try {
+      return transactions.filter((tx) => {
+        if (!tx) return false;
+
+        // Type Filter
+        if (typeFilter !== 'ALL' && tx.type !== typeFilter) return false;
+
+        // Account Filter
+        if (selectedAccountId !== 'ALL' && tx.accountId !== selectedAccountId && tx.toAccountId !== selectedAccountId) {
+          return false;
+        }
+
+        // Category Filter
+        if (selectedCategoryId !== 'ALL' && tx.categoryId !== selectedCategoryId) return false;
+
+        // Date Filter
+        const txDate = tx.date || '';
+        if (dateFrom && txDate < dateFrom) return false;
+        if (dateTo && txDate > dateTo) return false;
+
+        // Amount Filter
+        const txAmt = Number.isFinite(tx.amount) ? tx.amount : 0;
+        if (minAmount && txAmt < parseFloat(minAmount)) return false;
+        if (maxAmount && txAmt > parseFloat(maxAmount)) return false;
+
+        // Search Query
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          const noteText = (tx.note || '').toLowerCase();
+          const merchantText = (tx.merchant || '').toLowerCase();
+          const catName = (categories.find((c) => c.id === tx.categoryId)?.name || '').toLowerCase();
+          const accName = (accounts.find((a) => a.id === tx.accountId)?.name || '').toLowerCase();
+          const toAccName = (accounts.find((a) => a.id === tx.toAccountId)?.name || '').toLowerCase();
+          const locName = (tx.locationName || '').toLowerCase();
+          const amtStr = String(txAmt);
+
+          return (
+            noteText.includes(q) ||
+            merchantText.includes(q) ||
+            catName.includes(q) ||
+            accName.includes(q) ||
+            toAccName.includes(q) ||
+            locName.includes(q) ||
+            amtStr.includes(q) ||
+            txDate.includes(q)
+          );
+        }
+
+        return true;
+      });
+    } catch (err) {
+      console.error('Filter transaction exception:', err);
+      return [];
     }
+  }, [transactions, typeFilter, selectedAccountId, selectedCategoryId, dateFrom, dateTo, minAmount, maxAmount, searchQuery, categories, accounts]);
 
-    // Category Filter
-    if (selectedCategoryId !== 'ALL' && tx.categoryId !== selectedCategoryId) return false;
-    if (dateFrom && tx.date < dateFrom) return false;
-    if (dateTo && tx.date > dateTo) return false;
+  // Group transactions safely by Date
+  const groupedByDate = useMemo(() => {
+    const map: { [key: string]: Transaction[] } = {};
+    filteredTransactions.forEach((tx) => {
+      const d = tx.date || 'Unknown Date';
+      if (!map[d]) {
+        map[d] = [];
+      }
+      map[d].push(tx);
+    });
+    return map;
+  }, [filteredTransactions]);
 
-    // Search query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const catName = categories.find((c) => c.id === tx.categoryId)?.name || '';
-      const accName = accounts.find((a) => a.id === tx.accountId)?.name || '';
-      const toAccName = accounts.find((a) => a.id === tx.toAccountId)?.name || '';
-      return (
-        tx.note.toLowerCase().includes(q) ||
-        catName.toLowerCase().includes(q) ||
-        accName.toLowerCase().includes(q) ||
-        toAccName.toLowerCase().includes(q) ||
-        tx.amount.toString().includes(q) ||
-        tx.date.includes(q)
-      );
-    }
-
-    return true;
-  });
-
-  // Group transactions by Date
-  const groupedByDate: { [key: string]: typeof transactions } = {};
-  filteredTransactions.forEach((tx) => {
-    if (!groupedByDate[tx.date]) {
-      groupedByDate[tx.date] = [];
-    }
-    groupedByDate[tx.date].push(tx);
-  });
-
-  const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
+  const sortedDates = useMemo(() => {
+    return Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
+  }, [groupedByDate]);
 
   // Export CSV Action
   const handleExportCSV = async () => {
@@ -148,175 +251,455 @@ export const TransactionsView: React.FC = () => {
     }
   };
 
-  const hasActiveFilters = typeFilter !== 'ALL' || selectedAccountId !== 'ALL' || selectedCategoryId !== 'ALL' || Boolean(dateFrom) || Boolean(dateTo) || Boolean(searchQuery);
+  const selectedAccountName = accounts.find((a) => a.id === selectedAccountId)?.name;
+  const selectedCategoryName = categories.find((c) => c.id === selectedCategoryId)?.name;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Summary Banner */}
-      <div className="card-level-3 hero-blue-glow" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '22px 26px' }}>
-        <div>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
-            MONTHLY SPENDING SUMMARY
-          </span>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }} className="tabular-nums">
-            {settings.hideBalances ? '₹••••• spent this month' : `${formatINR(monthlyExpenses)} spent this month`}
-          </div>
-          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-            Showing {filteredTransactions.length} of {transactions.length} total entries
-          </span>
-        </div>
+    <ErrorBoundary
+      fallbackTitle="Couldn't load transactions"
+      fallbackMessage="Your transaction data could not be displayed. Tap below to retry loading."
+      onRetry={() => {
+        handleResetFilters();
+      }}
+    >
+      <PageTransition>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Summary Banner */}
+          <div className="card-level-3 hero-blue-glow" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '20px 24px' }}>
+            <div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
+                MONTHLY SPENDING SUMMARY
+              </span>
+              <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }} className="tabular-nums">
+                {settings.hideBalances ? '₹••••• spent this month' : `${formatINR(monthlyExpenses)} spent this month`}
+              </div>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                Showing {filteredTransactions.length} of {transactions.length} entries
+              </span>
+            </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button onClick={handleExportCSV} className="btn btn-secondary" style={{ padding: '10px 16px' }}>
-            <Download size={16} /> Export CSV
-          </button>
-        </div>
-      </div>
-
-      {/* Filters Toolbar */}
-      <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '18px 20px' }}>
-        {/* Top Type Filter Tabs */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
-          <div style={{ display: 'flex', gap: '6px', backgroundColor: 'rgba(15, 21, 42, 0.8)', padding: '4px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-            {(['ALL', 'EXPENSE', 'INCOME', 'TRANSFER'] as const).map((t) => {
-              const isActive = typeFilter === t;
-              return (
-                <button
-                  key={t}
-                  onClick={() => setTypeFilter(t)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 'var(--radius-sm)',
-                    backgroundColor: isActive ? 'var(--bg-surface-elevated)' : 'transparent',
-                    color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-                    fontWeight: isActive ? 700 : 500,
-                    fontSize: '0.84rem',
-                    border: isActive ? '1px solid var(--border-strong)' : 'none',
-                  }}
-                >
-                  {t === 'ALL' ? 'All' : t.charAt(0) + t.slice(1).toLowerCase() + 's'}
-                </button>
-              );
-            })}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button onClick={handleExportCSV} className="btn btn-secondary" style={{ padding: '9px 16px', fontSize: '0.84rem' }}>
+                <Download size={15} /> Export CSV
+              </button>
+            </div>
           </div>
 
-          {/* Search Box */}
-          <div style={{ position: 'relative', width: 'min(100%, 260px)', flex: '1 1 220px' }}>
-            <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text"
-              placeholder="Search merchant, note, amount..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: '100%', paddingLeft: '32px', fontSize: '0.84rem', padding: '7px 10px 7px 32px' }}
-            />
-          </div>
-        </div>
-
-        {/* Dropdown Filters */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', paddingTop: '14px', borderTop: '1px solid var(--border-color)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600 }}>
-            <Filter size={14} />
-            <span>Filter by:</span>
-          </div>
-
-          <select value={selectedAccountId} onChange={(e) => setSelectedAccountId(e.target.value)} style={{ padding: '6px 12px', fontSize: '0.82rem' }}>
-            <option value="ALL">All Accounts</option>
-            {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id}>
-                {acc.name}
-              </option>
-            ))}
-          </select>
-
-          <select value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)} style={{ padding: '6px 12px', fontSize: '0.82rem' }}>
-            <option value="ALL">All Categories</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-
-          <label className="compact-field">From<input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
-          <label className="compact-field">To<input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></label>
-
-          {hasActiveFilters && (
-            <button
-              onClick={handleResetFilters}
-              style={{ fontSize: '0.8rem', color: 'var(--status-expense)', padding: '4px 8px', fontWeight: 600 }}
-            >
-              Reset Filters
-            </button>
-          )}
-        </div>
-      </div>
-
-      {templates.length > 0 && (
-        <section className="template-strip card-level-1" aria-labelledby="templates-title">
-          <div><h2 id="templates-title">Transaction templates</h2><p>Selecting one only prefills the form for review.</p></div>
-          <div className="template-list">{templates.map((template) => <div className="template-chip" key={template.id}><button onClick={() => applyTemplate(template)}><Copy size={15} /><span>{template.name}</span>{template.amount ? <small>{formatINR(template.amount)}</small> : null}</button><button className="template-edit" onClick={() => { const name = prompt('Rename template', template.name); if (name?.trim()) saveTemplate({ ...template, name: name.trim() }); }} aria-label={`Edit template ${template.name}`}>Edit</button><button className="btn-icon" aria-label={`Delete template ${template.name}`} onClick={() => { if (confirm(`Delete template “${template.name}”?`)) deleteTemplate(template.id); }}><X size={14} /></button></div>)}</div>
-          <small className="local-only-note">Stored on this device</small>
-        </section>
-      )}
-
-      {/* Grouped Transactions List */}
-      {sortedDates.length === 0 ? (
-        <EmptyState
-          icon={<Receipt size={24} />}
-          title="No Transactions Found"
-          description="No financial entries match your filter or search criteria. Try resetting filters or log a new transaction."
-          actionText="Add Transaction"
-          onAction={() => setIsAddTransactionOpen(true)}
-        />
-      ) : (
-        sortedDates.map((dateStr) => {
-          const dateTxs = groupedByDate[dateStr];
-          const formattedDate = new Date(dateStr).toLocaleDateString('en-IN', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          });
-
-          return (
-            <div key={dateStr} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', paddingLeft: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {formattedDate}
+          {/* Compact Mobile Top Bar & Filter Controls (Reqs 3, 4, 6) */}
+          <div className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '16px' }}>
+            {/* Row 1: Search Box & Filter Toggle Button */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  placeholder="Search merchant, note, amount..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ width: '100%', paddingLeft: '36px', fontSize: '0.86rem', padding: '9px 12px 9px 36px', height: '40px' }}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {dateTxs.map((tx) => {
-                  const acc = accounts.find((a) => a.id === tx.accountId);
-                  const toAcc = accounts.find((a) => a.id === tx.toAccountId);
-                  const cat = categories.find((c) => c.id === tx.categoryId);
+              {/* Mobile Filter Button with Badge (Req 4) */}
+              <button
+                type="button"
+                onClick={() => setIsFilterSheetOpen(true)}
+                className="btn btn-secondary"
+                style={{
+                  padding: '9px 14px',
+                  height: '40px',
+                  fontSize: '0.84rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap',
+                  position: 'relative',
+                  borderColor: activeFilterCount > 0 ? 'var(--accent-cyan)' : 'var(--border-color)',
+                  color: activeFilterCount > 0 ? 'var(--accent-cyan)' : 'var(--text-primary)',
+                }}
+              >
+                <SlidersHorizontal size={15} />
+                <span>Filters</span>
+                {activeFilterCount > 0 && (
+                  <span
+                    style={{
+                      backgroundColor: 'var(--accent-cyan)',
+                      color: '#000000',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      borderRadius: '10px',
+                      padding: '1px 6px',
+                      marginLeft: '2px',
+                    }}
+                  >
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            </div>
 
+            {/* Row 2: Compact Transaction Type Selector Pills */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }}>
+              <div style={{ display: 'flex', gap: '4px', backgroundColor: 'rgba(15, 21, 42, 0.8)', padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                {(['ALL', 'EXPENSE', 'INCOME', 'TRANSFER'] as const).map((t) => {
+                  const isActive = typeFilter === t;
                   return (
-                    <div key={tx.id} style={{ position: 'relative' }}>
-                      <TransactionRow
-                        transaction={tx}
-                        account={acc}
-                        toAccount={toAcc}
-                        category={cat}
-                        hideBalances={settings.hideBalances}
-                        onEdit={(t) => setEditingTx(t)}
-                        onDuplicate={handleDuplicate}
-                      />
-                    </div>
+                    <button
+                      key={t}
+                      onClick={() => setTypeFilter(t)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: isActive ? 'var(--bg-surface-elevated)' : 'transparent',
+                        color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                        fontWeight: isActive ? 700 : 500,
+                        fontSize: '0.82rem',
+                        border: isActive ? '1px solid var(--border-strong)' : 'none',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {t === 'ALL' ? 'All' : t.charAt(0) + t.slice(1).toLowerCase() + 's'}
+                    </button>
                   );
                 })}
               </div>
-            </div>
-          );
-        })
-      )}
 
-      {/* Edit Transaction Modal */}
-      <EditTransactionModal
-        isOpen={!!editingTx}
-        onClose={() => setEditingTx(null)}
-        transaction={editingTx}
-      />
-    </div>
+              {/* Desktop Compact Dropdown Filters (Req 6) */}
+              <div className="desktop-only" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <select
+                  value={selectedAccountId}
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  style={{ padding: '6px 10px', fontSize: '0.8rem', height: '34px' }}
+                >
+                  <option value="ALL">All Accounts</option>
+                  {uniqueAccountOptions.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedCategoryId}
+                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  style={{ padding: '6px 10px', fontSize: '0.8rem', height: '34px' }}
+                >
+                  <option value="ALL">All Categories</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Row 3: Removable Active Filter Chips ONLY when active (Req 4) */}
+            {activeFilterCount > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>Active filters:</span>
+                
+                {typeFilter !== 'ALL' && (
+                  <span className="badge badge-cyan" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', padding: '3px 8px' }}>
+                    Type: {typeFilter}
+                    <X size={12} style={{ cursor: 'pointer' }} onClick={() => setTypeFilter('ALL')} />
+                  </span>
+                )}
+
+                {selectedAccountId !== 'ALL' && selectedAccountName && (
+                  <span className="badge badge-blue" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', padding: '3px 8px' }}>
+                    {selectedAccountName}
+                    <X size={12} style={{ cursor: 'pointer' }} onClick={() => setSelectedAccountId('ALL')} />
+                  </span>
+                )}
+
+                {selectedCategoryId !== 'ALL' && selectedCategoryName && (
+                  <span className="badge badge-violet" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', padding: '3px 8px' }}>
+                    {selectedCategoryName}
+                    <X size={12} style={{ cursor: 'pointer' }} onClick={() => setSelectedCategoryId('ALL')} />
+                  </span>
+                )}
+
+                {dateRangeOption !== 'ALL' && (
+                  <span className="badge badge-neutral" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', padding: '3px 8px' }}>
+                    {dateRangeOption.replace('_', ' ')}
+                    <X size={12} style={{ cursor: 'pointer' }} onClick={() => handleDatePresetChange('ALL')} />
+                  </span>
+                )}
+
+                {(minAmount || maxAmount) && (
+                  <span className="badge badge-neutral" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', padding: '3px 8px' }}>
+                    ₹{minAmount || '0'}–₹{maxAmount || '∞'}
+                    <X size={12} style={{ cursor: 'pointer' }} onClick={() => { setMinAmount(''); setMaxAmount(''); }} />
+                  </span>
+                )}
+
+                <button
+                  onClick={handleResetFilters}
+                  style={{ fontSize: '0.74rem', color: 'var(--status-expense)', background: 'none', border: 'none', padding: '2px 6px', fontWeight: 700, cursor: 'pointer', marginLeft: 'auto' }}
+                >
+                  Reset all
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Template Strip */}
+          {templates.length > 0 && (
+            <section className="template-strip card-level-1" aria-labelledby="templates-title">
+              <div><h2 id="templates-title">Transaction templates</h2><p>Selecting one prefills the form for quick entry.</p></div>
+              <div className="template-list">{templates.map((template) => <div className="template-chip" key={template.id}><button onClick={() => applyTemplate(template)}><Copy size={15} /><span>{template.name}</span>{template.amount ? <small>{formatINR(template.amount)}</small> : null}</button><button className="template-edit" onClick={() => { const name = prompt('Rename template', template.name); if (name?.trim()) saveTemplate({ ...template, name: name.trim() }); }} aria-label={`Edit template ${template.name}`}>Edit</button><button className="btn-icon" aria-label={`Delete template ${template.name}`} onClick={() => { if (confirm(`Delete template “${template.name}”?`)) deleteTemplate(template.id); }}><X size={14} /></button></div>)}</div>
+            </section>
+          )}
+
+          {/* Grouped Transactions List with Loading & Error States */}
+          {authLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <SkeletonList count={5} />
+            </div>
+          ) : sortedDates.length === 0 ? (
+            <EmptyState
+              icon={<Receipt size={24} />}
+              title="No Transactions Found"
+              description="No financial entries match your filter or search criteria. Try resetting filters or log a new transaction."
+              actionText="Add Transaction"
+              onAction={() => setIsAddTransactionOpen(true)}
+            />
+          ) : (
+            sortedDates.map((dateStr) => {
+              const dateTxs = groupedByDate[dateStr] || [];
+              let formattedDate = dateStr;
+              try {
+                if (dateStr && dateStr !== 'Unknown Date') {
+                  const d = new Date(dateStr);
+                  if (!isNaN(d.getTime())) {
+                    formattedDate = d.toLocaleDateString('en-IN', {
+                      weekday: 'short',
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    });
+                  }
+                }
+              } catch {
+                formattedDate = dateStr;
+              }
+
+              return (
+                <div key={dateStr} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', paddingLeft: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {formattedDate}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {dateTxs.map((tx) => {
+                      const acc = accounts.find((a) => a.id === tx.accountId);
+                      const toAcc = accounts.find((a) => a.id === tx.toAccountId);
+                      const cat = categories.find((c) => c.id === tx.categoryId);
+
+                      return (
+                        <div key={tx.id} style={{ position: 'relative' }}>
+                          <TransactionRow
+                            transaction={tx}
+                            account={acc || ({ name: 'Deleted account' } as Account)}
+                            toAccount={toAcc}
+                            category={cat || ({ name: 'Unknown category' } as Category)}
+                            hideBalances={settings.hideBalances}
+                            onEdit={(t) => setEditingTx(t)}
+                            onDuplicate={handleDuplicate}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          )}
+
+          {/* Edit Transaction Modal */}
+          <EditTransactionModal
+            isOpen={!!editingTx}
+            onClose={() => setEditingTx(null)}
+            transaction={editingTx}
+          />
+
+          {/* Mobile Filter BottomSheet (Req 5) */}
+          <BottomSheet
+            isOpen={isFilterSheetOpen}
+            onClose={() => setIsFilterSheetOpen(false)}
+            title="Filter Transactions"
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {/* 1. Transaction Type */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                  TRANSACTION TYPE
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {(['ALL', 'EXPENSE', 'INCOME', 'TRANSFER'] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTypeFilter(t)}
+                      style={{
+                        padding: '9px 12px',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: typeFilter === t ? 'var(--accent-cyan-subtle)' : 'var(--bg-solid-dark)',
+                        border: typeFilter === t ? '1px solid var(--accent-cyan)' : '1px solid var(--border-color)',
+                        color: typeFilter === t ? 'var(--accent-cyan)' : 'var(--text-primary)',
+                        fontSize: '0.84rem',
+                        fontWeight: typeFilter === t ? 700 : 500,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {t === 'ALL' ? 'All Types' : t.charAt(0) + t.slice(1).toLowerCase() + 's'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Account */}
+              <div>
+                <label htmlFor="filter-account-select" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                  ACCOUNT
+                </label>
+                <select
+                  id="filter-account-select"
+                  value={selectedAccountId}
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: '0.86rem' }}
+                >
+                  <option value="ALL">All Accounts</option>
+                  {uniqueAccountOptions.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. Category */}
+              <div>
+                <label htmlFor="filter-category-select" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                  CATEGORY
+                </label>
+                <select
+                  id="filter-category-select"
+                  value={selectedCategoryId}
+                  onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: '0.86rem' }}
+                >
+                  <option value="ALL">All Categories</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name} ({cat.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 4. Date Range */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                  DATE RANGE
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '10px' }}>
+                  {[
+                    { id: 'ALL', label: 'All Time' },
+                    { id: 'TODAY', label: 'Today' },
+                    { id: '7DAYS', label: 'Last 7 Days' },
+                    { id: '30DAYS', label: 'Last 30 Days' },
+                    { id: 'THIS_MONTH', label: 'This Month' },
+                    { id: 'CUSTOM', label: 'Custom' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleDatePresetChange(preset.id as any)}
+                      style={{
+                        padding: '7px 8px',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: dateRangeOption === preset.id ? 'var(--accent-blue-subtle)' : 'var(--bg-solid-dark)',
+                        border: dateRangeOption === preset.id ? '1px solid var(--accent-blue)' : '1px solid var(--border-color)',
+                        color: dateRangeOption === preset.id ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                        fontSize: '0.78rem',
+                        fontWeight: dateRangeOption === preset.id ? 700 : 500,
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {dateRangeOption === 'CUSTOM' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>From</label>
+                      <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>To</label>
+                      <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 5. Amount Range */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                  AMOUNT (₹)
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <input
+                    type="number"
+                    placeholder="Min amount"
+                    value={minAmount}
+                    onChange={(e) => setMinAmount(e.target.value)}
+                    style={{ width: '100%', fontSize: '0.84rem' }}
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max amount"
+                    value={maxAmount}
+                    onChange={(e) => setMaxAmount(e.target.value)}
+                    style={{ width: '100%', fontSize: '0.84rem' }}
+                  />
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="btn btn-secondary"
+                  style={{ padding: '10px 18px', fontSize: '0.86rem' }}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsFilterSheetOpen(false)}
+                  className="btn btn-primary"
+                  style={{ padding: '10px 24px', fontSize: '0.86rem', flex: 1 }}
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          </BottomSheet>
+        </div>
+      </PageTransition>
+    </ErrorBoundary>
   );
 };

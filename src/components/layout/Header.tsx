@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Eye, EyeOff, Search, WifiOff, RefreshCw, AlertTriangle, User, CloudCheck, Bell, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Search, WifiOff, RefreshCw, AlertTriangle, CloudCheck, Bell, Sparkles } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
+import { SyncBottomSheet } from '../modals/SyncBottomSheet';
 
 export const Header: React.FC = () => {
   const {
@@ -11,14 +12,16 @@ export const Header: React.FC = () => {
     isOffline,
     syncStatus,
     pendingOpsCount,
-    triggerManualSync,
     setCurrentView,
     user,
+    userProfile,
     unreadNotificationCount,
     updateStatus,
     latestManifest,
     setIsUpdateModalOpen,
   } = useApp();
+
+  const [isSyncSheetOpen, setIsSyncSheetOpen] = useState(false);
 
   const getPageMeta = () => {
     switch (currentView) {
@@ -55,108 +58,183 @@ export const Header: React.FC = () => {
 
   const { title, subtitle } = getPageMeta();
 
+  const handleSyncClick = () => {
+    setIsSyncSheetOpen(true);
+  };
+
   const renderSyncBadge = () => {
-    if (isOffline || syncStatus === 'OFFLINE') {
-      const pendingText = pendingOpsCount > 0 ? ` (${pendingOpsCount})` : '';
+    // Mobile Compact Icon Badge
+    const renderMobileIcon = () => {
+      if (isOffline || syncStatus === 'OFFLINE') {
+        return (
+          <button
+            onClick={handleSyncClick}
+            className="btn-icon mobile-only"
+            title="Working offline - tap for sync details"
+            aria-label="Offline sync status"
+            style={{ padding: '6px', color: 'var(--status-warning)', minHeight: '38px', minWidth: '38px' }}
+          >
+            <WifiOff size={19} />
+          </button>
+        );
+      }
+      if (syncStatus === 'SYNCING') {
+        return (
+          <button
+            onClick={handleSyncClick}
+            className="btn-icon mobile-only"
+            title="Syncing..."
+            aria-label="Syncing status"
+            style={{ padding: '6px', color: 'var(--accent-blue)', minHeight: '38px', minWidth: '38px' }}
+          >
+            <RefreshCw size={19} style={{ animation: 'spin 1.5s linear infinite' }} />
+          </button>
+        );
+      }
+      if (syncStatus === 'SYNC_FAILED') {
+        return (
+          <button
+            onClick={handleSyncClick}
+            className="btn-icon mobile-only"
+            title="Sync issue - tap to retry"
+            aria-label="Sync error"
+            style={{ padding: '6px', color: 'var(--status-danger)', minHeight: '38px', minWidth: '38px' }}
+          >
+            <AlertTriangle size={19} />
+          </button>
+        );
+      }
       return (
         <button
-          onClick={triggerManualSync}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '5px 12px',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: 'var(--status-warning-subtle)',
-            color: 'var(--status-warning)',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            border: '1px solid rgba(245, 158, 11, 0.25)',
-            cursor: 'pointer',
-          }}
-          title={pendingOpsCount > 0 ? `Working offline (${pendingOpsCount} changes pending sync) - tap to sync` : 'Working offline - tap to try syncing'}
+          onClick={handleSyncClick}
+          className="btn-icon mobile-only"
+          title="Online Synced"
+          aria-label="Online synced"
+          style={{ padding: '6px', color: 'var(--accent-cyan)', minHeight: '38px', minWidth: '38px' }}
         >
-          <WifiOff size={16} />
-          <span>Offline{pendingText}</span>
+          <CloudCheck size={20} />
         </button>
       );
-    }
+    };
 
-    if (syncStatus === 'SYNCING') {
-      return (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '5px 12px',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: 'rgba(96, 165, 250, 0.15)',
-            color: 'var(--accent-blue)',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            border: '1px solid rgba(96, 165, 250, 0.3)',
-          }}
-        >
-          <RefreshCw size={16} style={{ animation: 'spin 1.5s linear infinite' }} />
-          <span>Syncing</span>
-        </div>
-      );
-    }
+    // Desktop Pill Button
+    const renderDesktopButton = () => {
+      if (isOffline || syncStatus === 'OFFLINE') {
+        const pendingText = pendingOpsCount > 0 ? ` (${pendingOpsCount})` : '';
+        return (
+          <button
+            onClick={handleSyncClick}
+            className="desktop-only"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '5px 12px',
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: 'var(--status-warning-subtle)',
+              color: 'var(--status-warning)',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              border: '1px solid rgba(245, 158, 11, 0.25)',
+              cursor: 'pointer',
+            }}
+            title={pendingOpsCount > 0 ? `Working offline (${pendingOpsCount} changes pending sync) - tap to sync` : 'Working offline - tap for sync status'}
+          >
+            <WifiOff size={16} />
+            <span>Offline{pendingText}</span>
+          </button>
+        );
+      }
 
-    if (syncStatus === 'SYNC_FAILED') {
+      if (syncStatus === 'SYNCING') {
+        return (
+          <div
+            className="desktop-only"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '5px 12px',
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: 'rgba(96, 165, 250, 0.15)',
+              color: 'var(--accent-blue)',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              border: '1px solid rgba(96, 165, 250, 0.3)',
+            }}
+          >
+            <RefreshCw size={16} style={{ animation: 'spin 1.5s linear infinite' }} />
+            <span>Syncing</span>
+          </div>
+        );
+      }
+
+      if (syncStatus === 'SYNC_FAILED') {
+        return (
+          <button
+            onClick={handleSyncClick}
+            className="desktop-only"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '5px 12px',
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: 'var(--status-danger-subtle)',
+              color: 'var(--status-danger)',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              border: '1px solid rgba(244, 63, 94, 0.25)',
+              cursor: 'pointer',
+            }}
+            title="Sync issue - tap Sync Now to retry"
+          >
+            <AlertTriangle size={16} />
+            <span>Sync Error</span>
+          </button>
+        );
+      }
+
       return (
         <button
-          onClick={triggerManualSync}
+          onClick={handleSyncClick}
+          className="desktop-only"
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
             padding: '5px 12px',
             borderRadius: 'var(--radius-sm)',
-            backgroundColor: 'var(--status-danger-subtle)',
-            color: 'var(--status-danger)',
+            backgroundColor: 'var(--accent-cyan-subtle)',
+            color: 'var(--accent-cyan)',
             fontSize: '0.78rem',
             fontWeight: 700,
-            border: '1px solid rgba(244, 63, 94, 0.25)',
+            border: '1px solid var(--accent-cyan-border)',
             cursor: 'pointer',
           }}
-          title="Sync issue - tap Sync Now to retry"
+          title={`Synced at ${settings.lastSyncedAt ? new Date(settings.lastSyncedAt).toLocaleTimeString() : 'now'}. Tap for details`}
         >
-          <AlertTriangle size={16} />
-          <span>Sync Error</span>
+          <CloudCheck size={16} />
+          <span>Online Synced</span>
         </button>
       );
-    }
+    };
 
     return (
-      <button
-        onClick={triggerManualSync}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '5px 12px',
-          borderRadius: 'var(--radius-sm)',
-          backgroundColor: 'var(--accent-cyan-subtle)',
-          color: 'var(--accent-cyan)',
-          fontSize: '0.78rem',
-          fontWeight: 700,
-          border: '1px solid var(--accent-cyan-border)',
-          cursor: 'pointer',
-        }}
-        title={`Synced at ${settings.lastSyncedAt ? new Date(settings.lastSyncedAt).toLocaleTimeString() : 'now'}. Tap to Sync Now`}
-      >
-        <CloudCheck size={16} />
-        <span>Online Synced</span>
-      </button>
+      <>
+        {renderMobileIcon()}
+        {renderDesktopButton()}
+      </>
     );
   };
 
   const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
   const isUpdateAvailable = isNative && updateStatus === 'UPDATE_AVAILABLE' && Boolean(latestManifest?.version);
-
-  console.log(`[Header Update Diagnostic] updateStatus: ${updateStatus}, isNative: ${isNative}, isUpdateAvailable: ${isUpdateAvailable}`);
+  const initials = userProfile?.fullName
+    ? userProfile.fullName.slice(0, 2).toUpperCase()
+    : user?.email
+    ? user.email.slice(0, 2).toUpperCase()
+    : 'DJ';
 
   return (
     <>
@@ -170,7 +248,7 @@ export const Header: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 24px',
+          padding: '0 20px',
           position: 'sticky',
           top: 0,
           zIndex: 100,
@@ -187,7 +265,7 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, flexWrap: 'nowrap' }}>
           {/* New App Update Badge Button */}
           {isUpdateAvailable && latestManifest && (
             <button
@@ -234,21 +312,21 @@ export const Header: React.FC = () => {
             className="btn-icon"
             title="Notifications"
             aria-label="Notifications"
-            style={{ position: 'relative', padding: '8px', minHeight: '40px', minWidth: '40px' }}
+            style={{ position: 'relative', padding: '6px', minHeight: '38px', minWidth: '38px' }}
           >
-            <Bell size={22} color={unreadNotificationCount > 0 ? 'var(--accent-lavender)' : 'var(--text-secondary)'} />
+            <Bell size={20} color={unreadNotificationCount > 0 ? 'var(--accent-lavender)' : 'var(--text-secondary)'} />
             {unreadNotificationCount > 0 && (
               <span
                 style={{
                   position: 'absolute',
-                  top: '4px',
-                  right: '4px',
+                  top: '2px',
+                  right: '2px',
                   backgroundColor: 'var(--status-expense)',
                   color: '#FFFFFF',
-                  fontSize: '0.68rem',
+                  fontSize: '0.66rem',
                   fontWeight: 800,
                   borderRadius: '10px',
-                  padding: '2px 6px',
+                  padding: '2px 5px',
                   lineHeight: 1,
                   border: '1.5px solid var(--bg-dark)',
                 }}
@@ -258,10 +336,10 @@ export const Header: React.FC = () => {
             )}
           </button>
 
-          {/* Privacy Balance Toggle */}
+          {/* Privacy Balance Toggle (Desktop Only) */}
           <button
             onClick={toggleHideBalances}
-            className="btn-icon"
+            className="btn-icon desktop-only"
             title={settings.hideBalances ? 'Show Balances' : 'Hide Balances'}
             aria-label="Toggle hide balance privacy"
             style={{ padding: '8px', minHeight: '40px', minWidth: '40px' }}
@@ -269,12 +347,13 @@ export const Header: React.FC = () => {
             {settings.hideBalances ? <EyeOff size={20} color="var(--accent-cyan)" /> : <Eye size={20} />}
           </button>
 
-          {/* User Profile Avatar Link (Mobile Quick Settings Access) */}
+          {/* User Profile Avatar Link (Mobile & Desktop Quick Settings Access) */}
           <button
             onClick={() => setCurrentView('settings')}
-            className="btn-icon mobile-only"
-            style={{ padding: '4px', minHeight: '40px', minWidth: '40px' }}
+            className="btn-icon"
+            style={{ padding: '2px', minHeight: '36px', minWidth: '36px' }}
             aria-label="User Settings"
+            title="Settings & Profile"
           >
             <div
               style={{
@@ -287,16 +366,19 @@ export const Header: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '0.82rem',
+                fontSize: '0.8rem',
                 fontWeight: 700,
               }}
             >
-              {user?.email ? user.email.slice(0, 2).toUpperCase() : <User size={16} />}
+              {initials}
             </div>
           </button>
-
         </div>
       </header>
+
+      {/* Mobile Cloud Synchronization Bottom Sheet */}
+      <SyncBottomSheet isOpen={isSyncSheetOpen} onClose={() => setIsSyncSheetOpen(false)} />
     </>
   );
 };
+

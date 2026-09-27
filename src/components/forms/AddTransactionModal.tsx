@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Modal } from '../ui/Modal';
 import type { TransactionType } from '../../types/finance';
@@ -10,7 +10,7 @@ import { suggestCategoryForMerchant } from '../../utils/calculations';
 import { useFeatures } from '../../context/FeatureContext';
 
 export const AddTransactionModal: React.FC = () => {
-  const { pendingTemplate, clearPendingTemplate, saveTemplate } = useFeatures();
+  const { pendingTemplate, clearPendingTemplate } = useFeatures();
   const {
     isAddTransactionOpen,
     setIsAddTransactionOpen,
@@ -50,7 +50,36 @@ export const AddTransactionModal: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [isMapModalOpen, setIsMapModalOpen] = useState<boolean>(false);
 
-  // Form Reset Function: Reset all fields for new transaction
+  const locationContainerRef = useRef<HTMLDivElement>(null);
+  const isAutoSettingLocationRef = useRef<boolean>(false);
+
+  // Click Outside & Escape Listener for Location Suggestions
+  useEffect(() => {
+    const handlePointerDownOutside = (e: PointerEvent | MouseEvent) => {
+      if (
+        locationContainerRef.current &&
+        !locationContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDownOutside);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDownOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  // Form Reset Function
   const resetFormState = () => {
     const now = new Date();
     setType('EXPENSE');
@@ -87,7 +116,6 @@ export const AddTransactionModal: React.FC = () => {
     }
   };
 
-  // Reset form completely whenever modal opens
   useEffect(() => {
     if (isAddTransactionOpen) {
       resetFormState();
@@ -112,6 +140,10 @@ export const AddTransactionModal: React.FC = () => {
           if (dup.locationAddress) setLocationAddress(dup.locationAddress);
           if (dup.latitude) setLatitude(dup.latitude);
           if (dup.longitude) setLongitude(dup.longitude);
+          if (dup.locationName) {
+            isAutoSettingLocationRef.current = true;
+            setLocationQuery(dup.locationName);
+          }
           setIsDuplicated(true);
           sessionStorage.removeItem('spendly_duplicate_transaction');
         } catch {
@@ -138,11 +170,17 @@ export const AddTransactionModal: React.FC = () => {
         setDate(quickDate);
       }
     }
-  // The modal intentionally initializes once per open; clearing the consumed template must not reset the form.
   }, [isAddTransactionOpen]);
 
   // Debounced Place Search with Loading & Abort Control
   useEffect(() => {
+    if (isAutoSettingLocationRef.current) {
+      isAutoSettingLocationRef.current = false;
+      setIsSearchingLocations(false);
+      setShowSuggestions(false);
+      return;
+    }
+
     if (!locationQuery || locationQuery.trim().length < 2) {
       setLocationSuggestions([]);
       setIsSearchingLocations(false);
@@ -161,7 +199,7 @@ export const AddTransactionModal: React.FC = () => {
         setLocationSuggestions(results);
         setIsSearchingLocations(false);
       }
-    }, 350);
+    }, 300);
 
     return () => {
       active = false;
@@ -174,13 +212,18 @@ export const AddTransactionModal: React.FC = () => {
     try {
       const coords = await LocationService.getCurrentLocation();
       const details = await LocationService.reverseGeocode(coords.latitude, coords.longitude);
+      
+      isAutoSettingLocationRef.current = true;
       setLocationName(details.name);
       setLocationAddress(details.address || '');
       setLatitude(details.latitude);
       setLongitude(details.longitude);
       setLocationPlaceId(details.placeId);
       setLocationQuery(details.name);
+      setLocationSuggestions([]);
+      setIsSearchingLocations(false);
       setShowSuggestions(false);
+
       showToast(`Location set: ${details.name}`, 'info');
     } catch (err: any) {
       showToast(err.message || 'Location access is turned off. You can enter a place manually instead.', 'warning');
@@ -190,16 +233,20 @@ export const AddTransactionModal: React.FC = () => {
   };
 
   const handleSelectSuggestion = (item: LocationResult) => {
+    isAutoSettingLocationRef.current = true;
     setLocationName(item.name);
     setLocationAddress(item.address || '');
     setLatitude(item.latitude);
     setLongitude(item.longitude);
     setLocationPlaceId(item.placeId);
     setLocationQuery(item.name);
+    setLocationSuggestions([]);
+    setIsSearchingLocations(false);
     setShowSuggestions(false);
   };
 
   const handleClearLocation = () => {
+    isAutoSettingLocationRef.current = true;
     setLocationName('');
     setLocationAddress('');
     setLatitude(undefined);
@@ -207,10 +254,11 @@ export const AddTransactionModal: React.FC = () => {
     setLocationPlaceId(undefined);
     setLocationQuery('');
     setLocationSuggestions([]);
+    setIsSearchingLocations(false);
     setShowSuggestions(false);
   };
 
-  // Smart Category Suggestion algorithm & Merchant Memory
+  // Smart Category Suggestion algorithm
   useEffect(() => {
     if (!note.trim() || type === 'TRANSFER') {
       setSuggestedCatId(null);
@@ -272,9 +320,9 @@ export const AddTransactionModal: React.FC = () => {
       paymentMethod: finalPaymentMethod,
       locationName: finalLocName,
       locationAddress: locationAddress.trim() || undefined,
-      latitude,
-      longitude,
-      locationPlaceId,
+      latitude: finalLocName ? latitude : undefined,
+      longitude: finalLocName ? longitude : undefined,
+      locationPlaceId: finalLocName ? locationPlaceId : undefined,
     });
 
     setIsSuccess(true);
@@ -307,7 +355,7 @@ export const AddTransactionModal: React.FC = () => {
       isOpen={isAddTransactionOpen}
       onClose={handleCloseModal}
       title={isDuplicated ? 'Duplicate Transaction' : 'Add Transaction'}
-      subtitle={isDuplicated ? 'Review duplicated details before saving to your records.' : 'Fast transaction entry for your accounts.'}
+      subtitle={isDuplicated ? 'Review duplicated details before saving.' : 'Record a new expense, income, or transfer.'}
     >
       {isSuccess ? (
         <div style={{ padding: '32px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', textAlign: 'center' }}>
@@ -320,7 +368,7 @@ export const AddTransactionModal: React.FC = () => {
           </p>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {isDuplicated && (
             <div
               style={{
@@ -336,11 +384,11 @@ export const AddTransactionModal: React.FC = () => {
               }}
             >
               <ArrowLeftRight size={16} style={{ transform: 'rotate(90deg)', flexShrink: 0 }} />
-              <span>Duplicating transaction — Date & time set to now. Review details before saving.</span>
+              <span>Duplicating transaction — Review details before saving.</span>
             </div>
           )}
 
-          {/* Transaction Type Tabs */}
+          {/* 1. Transaction Type Tabs */}
           <div
             style={{
               display: 'grid',
@@ -354,7 +402,6 @@ export const AddTransactionModal: React.FC = () => {
           >
             {(['EXPENSE', 'INCOME', 'TRANSFER'] as TransactionType[]).map((t) => {
               const isActive = type === t;
-              let activeBg = 'var(--bg-surface-elevated)';
               let activeColor = 'var(--accent-cyan)';
               if (t === 'EXPENSE' && isActive) activeColor = 'var(--status-expense)';
               if (t === 'TRANSFER' && isActive) activeColor = 'var(--accent-blue)';
@@ -376,7 +423,7 @@ export const AddTransactionModal: React.FC = () => {
                   style={{
                     padding: '9px 12px',
                     borderRadius: 'var(--radius-sm)',
-                    backgroundColor: isActive ? activeBg : 'transparent',
+                    backgroundColor: isActive ? 'var(--bg-surface-elevated)' : 'transparent',
                     color: isActive ? activeColor : 'var(--text-secondary)',
                     fontWeight: isActive ? 700 : 500,
                     fontSize: '0.84rem',
@@ -390,7 +437,7 @@ export const AddTransactionModal: React.FC = () => {
             })}
           </div>
 
-          {/* Amount Input */}
+          {/* 2. Amount Input (Primary Field) */}
           <div>
             <label htmlFor="transaction-amount" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
               Amount (₹)
@@ -420,9 +467,9 @@ export const AddTransactionModal: React.FC = () => {
                 style={{
                   width: '100%',
                   paddingLeft: '38px',
-                  fontSize: '1.5rem',
+                  fontSize: '1.4rem',
                   fontWeight: 800,
-                  height: '56px',
+                  height: '52px',
                   backgroundColor: 'rgba(18, 23, 34, 0.95)',
                 }}
                 className="tabular-nums"
@@ -431,15 +478,101 @@ export const AddTransactionModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Note / Merchant Input */}
+          {/* 3 & 4. Category & Account Pickers */}
+          {type === 'TRANSFER' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label htmlFor="transaction-from-account" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  From Account
+                </label>
+                <select id="transaction-from-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '100%' }}>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} ({formatINR(acc.balance)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="transaction-to-account" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  To Account
+                </label>
+                <select id="transaction-to-account" value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} style={{ width: '100%' }}>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} ({formatINR(acc.balance)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+              <div>
+                <label htmlFor="transaction-category" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Category
+                </label>
+                <select id="transaction-category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={{ width: '100%' }}>
+                  {categories
+                    .filter((c) => (type === 'INCOME' ? c.type === 'INCOME' : c.type === 'EXPENSE'))
+                    .map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                </select>
+                {categories.find((c) => c.id === categoryId)?.name.toLowerCase() === 'other' && (
+                  <div style={{ marginTop: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="Custom category name..."
+                      value={customCategoryName}
+                      onChange={(e) => setCustomCategoryName(e.target.value)}
+                      style={{ width: '100%', fontSize: '0.82rem', padding: '6px 10px' }}
+                    />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label htmlFor="transaction-account" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Account
+                </label>
+                <select id="transaction-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '100%' }}>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} ({formatINR(acc.balance)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* 5 & 6. Date & Time Inputs (Full row on small screens) */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+              <label htmlFor="transaction-date" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                Date
+              </label>
+              <input id="transaction-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: '100%', fontSize: '0.84rem' }} />
+            </div>
+            <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
+              <label htmlFor="transaction-time" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                Time
+              </label>
+              <input id="transaction-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ width: '100%', fontSize: '0.84rem' }} />
+            </div>
+          </div>
+
+          {/* 7. Description / Note Input */}
           <div>
             <label htmlFor="transaction-note" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-              Note / Merchant Name
+              Description / Merchant
             </label>
             <input
               id="transaction-note"
               type="text"
-              placeholder="e.g. Swiggy, Amazon, Salary, Rent..."
+              placeholder="e.g. Dinner with friends, Swiggy, Amazon..."
               value={note}
               onChange={(e) => setNote(e.target.value)}
               style={{ width: '100%' }}
@@ -459,6 +592,7 @@ export const AddTransactionModal: React.FC = () => {
                   border: '1px solid var(--accent-emerald-border)',
                   fontSize: '0.8rem',
                   color: 'var(--accent-emerald)',
+                  flexWrap: 'wrap',
                 }}
               >
                 <Sparkles size={14} />
@@ -488,123 +622,13 @@ export const AddTransactionModal: React.FC = () => {
             )}
           </div>
 
-          {/* Account Pickers */}
-          {type === 'TRANSFER' ? (
-            <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label htmlFor="transaction-from-account" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  From Account
-                </label>
-                <select id="transaction-from-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '100%' }}>
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} ({formatINR(acc.balance)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="transaction-to-account" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  To Account
-                </label>
-                <select id="transaction-to-account" value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} style={{ width: '100%' }}>
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} ({formatINR(acc.balance)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          ) : (
-            <div className="form-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label htmlFor="transaction-account" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  Account
-                </label>
-                <select id="transaction-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '100%' }}>
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} ({formatINR(acc.balance)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="transaction-category" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  Category
-                </label>
-                <select id="transaction-category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={{ width: '100%' }}>
-                  {categories
-                    .filter((c) => (type === 'INCOME' ? c.type === 'INCOME' : c.type === 'EXPENSE'))
-                    .map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                </select>
-                {categories.find((c) => c.id === categoryId)?.name.toLowerCase() === 'other' && (
-                  <div style={{ marginTop: '8px' }}>
-                    <input
-                      type="text"
-                      placeholder="e.g. College fees, Gift, Repair"
-                      value={customCategoryName}
-                      onChange={(e) => setCustomCategoryName(e.target.value)}
-                      style={{ width: '100%', fontSize: '0.82rem', padding: '6px 10px' }}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Date, Time & Payment Method */}
-          <div className="form-grid-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-            <div>
-              <label htmlFor="transaction-date" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                Date
-              </label>
-              <input id="transaction-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }} />
-            </div>
-            <div>
-              <label htmlFor="transaction-time" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                Time
-              </label>
-              <input id="transaction-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }} />
-            </div>
-            <div>
-              <label htmlFor="transaction-payment-method" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                Payment Method
-              </label>
-              <select id="transaction-payment-method" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }}>
-                <option value="UPI">UPI</option>
-                <option value="Net Banking">Net Banking</option>
-                <option value="Debit Card">Debit Card</option>
-                <option value="Credit Card">Credit Card</option>
-                <option value="Cash">Cash</option>
-                <option value="Other">Other</option>
-              </select>
-              {paymentMethod === 'Other' && (
-                <div style={{ marginTop: '6px' }}>
-                  <input
-                    type="text"
-                    placeholder="Custom method..."
-                    value={customPaymentMethod}
-                    onChange={(e) => setCustomPaymentMethod(e.target.value)}
-                    style={{ width: '100%', fontSize: '0.78rem', padding: '4px 8px' }}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Location Field (Optional) */}
-          <div style={{ position: 'relative' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+          {/* 8. Location Field with Proper Popup Management & Coordinates */}
+          <div ref={locationContainerRef} style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
               <label htmlFor="transaction-location" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                 Location <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span>
               </label>
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={() => setIsMapModalOpen(true)}
@@ -648,14 +672,16 @@ export const AddTransactionModal: React.FC = () => {
               <input
                 id="transaction-location"
                 type="text"
-                placeholder="Search a place (e.g. Starbucks, Benz Circle)..."
+                placeholder="Search place (e.g. Vijayawada bus stand)..."
                 value={locationQuery}
                 onChange={(e) => {
                   setLocationQuery(e.target.value);
                   setLocationName(e.target.value);
                 }}
                 onFocus={() => {
-                  if (locationSuggestions.length > 0) setShowSuggestions(true);
+                  if (locationSuggestions.length > 0 && locationQuery.trim().length >= 2) {
+                    setShowSuggestions(true);
+                  }
                 }}
                 style={{
                   width: '100%',
@@ -668,7 +694,7 @@ export const AddTransactionModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleClearLocation}
-                  aria-label="Clear transaction location"
+                  aria-label="Clear location"
                   style={{
                     position: 'absolute',
                     right: '10px',
@@ -694,33 +720,34 @@ export const AddTransactionModal: React.FC = () => {
                   top: '100%',
                   left: 0,
                   right: 0,
-                  zIndex: 50,
+                  zIndex: 60,
                   marginTop: '4px',
                   backgroundColor: 'var(--bg-surface-elevated)',
                   border: '1px solid var(--border-strong)',
                   borderRadius: 'var(--radius-md)',
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-                  maxHeight: '240px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                  maxHeight: '220px',
                   overflowY: 'auto',
                 }}
               >
-                {/* 1. Loading State */}
                 {isSearchingLocations ? (
                   <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
                     <Loader2 size={15} style={{ animation: 'spin 1.5s linear infinite' }} />
                     <span>Searching places for "{locationQuery.trim()}"...</span>
                   </div>
                 ) : locationSuggestions.length > 0 ? (
-                  /* 2. Real Results Found */
                   <>
                     <div style={{ padding: '6px 12px', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Places & Landmarks ({locationSuggestions.length})
+                      Matching Places ({locationSuggestions.length})
                     </div>
                     {locationSuggestions.map((item, idx) => (
                       <button
                         key={item.placeId || idx}
                         type="button"
-                        onClick={() => handleSelectSuggestion(item)}
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          handleSelectSuggestion(item);
+                        }}
                         style={{
                           width: '100%',
                           textAlign: 'left',
@@ -754,53 +781,23 @@ export const AddTransactionModal: React.FC = () => {
                         </div>
                       </button>
                     ))}
-
-                    {/* Secondary Manual Fallback */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLocationName(locationQuery.trim());
-                        setLocationAddress('');
-                        setLatitude(undefined);
-                        setLongitude(undefined);
-                        setLocationPlaceId(undefined);
-                        setShowSuggestions(false);
-                        showToast(`Set custom location: "${locationQuery.trim()}"`, 'info');
-                      }}
-                      style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        padding: '8px 14px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                        border: 'none',
-                        color: 'var(--text-muted)',
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                      }}
-                    >
-                      <Plus size={13} />
-                      <span>Can't find exact place? Use "{locationQuery.trim()}" as custom location</span>
-                    </button>
                   </>
                 ) : (
-                  /* 3. Search Finished & 0 Results */
                   <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                      Couldn't find an exact place matching "{locationQuery.trim()}".
+                      No exact match for "{locationQuery.trim()}".
                     </div>
                     <button
                       type="button"
-                      onClick={() => {
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        isAutoSettingLocationRef.current = true;
                         setLocationName(locationQuery.trim());
                         setLocationAddress('');
                         setLatitude(undefined);
                         setLongitude(undefined);
                         setLocationPlaceId(undefined);
                         setShowSuggestions(false);
-                        showToast(`Set custom location: "${locationQuery.trim()}"`, 'info');
                       }}
                       style={{
                         width: '100%',
@@ -819,7 +816,7 @@ export const AddTransactionModal: React.FC = () => {
                       }}
                     >
                       <Plus size={14} />
-                      <span>Add "{locationQuery.trim()}" as custom location</span>
+                      <span>Use "{locationQuery.trim()}" as custom location</span>
                     </button>
                   </div>
                 )}
@@ -827,28 +824,39 @@ export const AddTransactionModal: React.FC = () => {
             )}
           </div>
 
-          {/* Always-visible action footer keeps save accessible on short screens. */}
-          <div className="transaction-form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
-            <button type="button" className="btn btn-secondary" onClick={() => {
-              const templateName = window.prompt('Template name', note.trim() || `${type.charAt(0)}${type.slice(1).toLowerCase()} template`);
-              if (!templateName?.trim()) return;
-              saveTemplate({ name: templateName.trim(), type, accountId, toAccountId: type === 'TRANSFER' ? toAccountId : undefined, categoryId: type === 'TRANSFER' ? undefined : categoryId, note: note.trim() || undefined, amount: Number(amount) > 0 ? Number(amount) : undefined, paymentMethod });
-            }}>Save as template</button>
-            <button
-              type="button"
-              onClick={handleCloseModal}
-              className="btn btn-secondary"
-            >
+          {/* 9. Payment Method */}
+          <div>
+            <label htmlFor="transaction-payment-method" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              Payment Method
+            </label>
+            <select id="transaction-payment-method" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }}>
+              <option value="UPI">UPI</option>
+              <option value="Net Banking">Net Banking</option>
+              <option value="Debit Card">Debit Card</option>
+              <option value="Credit Card">Credit Card</option>
+              <option value="Cash">Cash</option>
+              <option value="Other">Other</option>
+            </select>
+            {paymentMethod === 'Other' && (
+              <div style={{ marginTop: '6px' }}>
+                <input
+                  type="text"
+                  placeholder="Custom payment method..."
+                  value={customPaymentMethod}
+                  onChange={(e) => setCustomPaymentMethod(e.target.value)}
+                  style={{ width: '100%', fontSize: '0.78rem', padding: '6px 10px' }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 10. Actions Footer */}
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '12px' }}>
+            <button type="button" onClick={handleCloseModal} className="btn btn-secondary" style={{ padding: '10px 18px' }}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" style={{ padding: '10px 20px', minHeight: '44px' }}>
-              {type === 'TRANSFER' ? (
-                <>
-                  <ArrowLeftRight size={16} /> Save Transfer
-                </>
-              ) : (
-                `Save ${type.charAt(0) + type.slice(1).toLowerCase()}`
-              )}
+            <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ padding: '10px 22px', minHeight: '42px', fontSize: '0.88rem' }}>
+              {isSubmitting ? 'Saving...' : 'Save Transaction'}
             </button>
           </div>
         </form>
@@ -859,12 +867,14 @@ export const AddTransactionModal: React.FC = () => {
         onClose={() => setIsMapModalOpen(false)}
         initialLocation={latitude && longitude ? { name: locationName, address: locationAddress, latitude, longitude } : undefined}
         onSelectLocation={(loc) => {
+          isAutoSettingLocationRef.current = true;
           setLocationName(loc.name);
           setLocationAddress(loc.address || '');
           setLatitude(loc.latitude);
           setLongitude(loc.longitude);
           setLocationPlaceId(loc.placeId);
           setLocationQuery(loc.name);
+          setShowSuggestions(false);
         }}
       />
     </Modal>

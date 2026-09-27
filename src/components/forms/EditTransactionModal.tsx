@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Modal } from '../ui/Modal';
 import type { Transaction, TransactionType } from '../../types/finance';
@@ -49,6 +49,35 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [isMapModalOpen, setIsMapModalOpen] = useState<boolean>(false);
 
+  const locationContainerRef = useRef<HTMLDivElement>(null);
+  const isAutoSettingLocationRef = useRef<boolean>(false);
+
+  // Click Outside & Escape Listener
+  useEffect(() => {
+    const handlePointerDownOutside = (e: PointerEvent | MouseEvent) => {
+      if (
+        locationContainerRef.current &&
+        !locationContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDownOutside);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDownOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   useEffect(() => {
     if (transaction) {
       setType(transaction.type);
@@ -61,6 +90,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
       setNote(transaction.note || '');
       setPaymentMethod(transaction.paymentMethod || 'UPI');
 
+      isAutoSettingLocationRef.current = true;
       setLocationName(transaction.locationName || '');
       setLocationAddress(transaction.locationAddress || '');
       setLatitude(transaction.latitude);
@@ -72,8 +102,15 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
     }
   }, [transaction, accounts]);
 
-  // Debounced Place Search with Loading & Abort Control
+  // Debounced Place Search
   useEffect(() => {
+    if (isAutoSettingLocationRef.current) {
+      isAutoSettingLocationRef.current = false;
+      setIsSearchingLocations(false);
+      setShowSuggestions(false);
+      return;
+    }
+
     if (!locationQuery || locationQuery.trim().length < 2) {
       setLocationSuggestions([]);
       setIsSearchingLocations(false);
@@ -92,7 +129,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
         setLocationSuggestions(results);
         setIsSearchingLocations(false);
       }
-    }, 350);
+    }, 300);
 
     return () => {
       active = false;
@@ -105,13 +142,18 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
     try {
       const coords = await LocationService.getCurrentLocation();
       const details = await LocationService.reverseGeocode(coords.latitude, coords.longitude);
+
+      isAutoSettingLocationRef.current = true;
       setLocationName(details.name);
       setLocationAddress(details.address || '');
       setLatitude(details.latitude);
       setLongitude(details.longitude);
       setLocationPlaceId(details.placeId);
       setLocationQuery(details.name);
+      setLocationSuggestions([]);
+      setIsSearchingLocations(false);
       setShowSuggestions(false);
+
       showToast(`Location updated: ${details.name}`, 'info');
     } catch (err: any) {
       showToast(err.message || 'Location access is turned off. You can enter a place manually instead.', 'warning');
@@ -121,16 +163,20 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   };
 
   const handleSelectSuggestion = (item: LocationResult) => {
+    isAutoSettingLocationRef.current = true;
     setLocationName(item.name);
     setLocationAddress(item.address || '');
     setLatitude(item.latitude);
     setLongitude(item.longitude);
     setLocationPlaceId(item.placeId);
     setLocationQuery(item.name);
+    setLocationSuggestions([]);
+    setIsSearchingLocations(false);
     setShowSuggestions(false);
   };
 
   const handleRemoveLocation = () => {
+    isAutoSettingLocationRef.current = true;
     setLocationName('');
     setLocationAddress('');
     setLatitude(undefined);
@@ -138,6 +184,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
     setLocationPlaceId(undefined);
     setLocationQuery('');
     setLocationSuggestions([]);
+    setIsSearchingLocations(false);
     setShowSuggestions(false);
     showToast('Location removed from transaction', 'info');
   };
@@ -196,7 +243,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
       title="Edit Transaction"
       subtitle="Modify or update transaction details & location."
     >
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* Transaction Type Selector */}
         <div
           style={{
@@ -273,21 +320,8 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           </div>
         </div>
 
-        {/* Note / Merchant */}
-        <div>
-          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-            Note / Merchant Name
-          </label>
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            style={{ width: '100%' }}
-          />
-        </div>
-
-        {/* Account Pickers */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        {/* Category & Account */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
               {type === 'TRANSFER' ? 'From Account' : 'Account'}
@@ -324,42 +358,42 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
           </div>
         </div>
 
-        {/* Date, Time & Payment Method */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-          <div>
+        {/* Date & Time */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
             <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
               Date
             </label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }} />
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: '100%', fontSize: '0.84rem' }} />
           </div>
-          <div>
+          <div style={{ flex: '1 1 140px', minWidth: '130px' }}>
             <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
               Time
             </label>
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }} />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-              Payment Method
-            </label>
-            <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: '100%', fontSize: '0.82rem' }}>
-              <option value="UPI">UPI</option>
-              <option value="Net Banking">Net Banking</option>
-              <option value="Debit Card">Debit Card</option>
-              <option value="Credit Card">Credit Card</option>
-              <option value="Cash">Cash</option>
-              <option value="Other">Other</option>
-            </select>
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={{ width: '100%', fontSize: '0.84rem' }} />
           </div>
         </div>
 
+        {/* Note / Merchant */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            Note / Merchant Name
+          </label>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            style={{ width: '100%' }}
+          />
+        </div>
+
         {/* Location Section */}
-        <div style={{ position: 'relative' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+        <div ref={locationContainerRef} style={{ position: 'relative' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
             <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Location <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span>
             </label>
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={() => setIsMapModalOpen(true)}
@@ -387,7 +421,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                   className="btn btn-danger"
                   style={{ padding: '4px 10px', minHeight: '30px', fontSize: '0.76rem' }}
                 >
-                  Remove location
+                  Remove
                 </button>
               )}
             </div>
@@ -404,7 +438,9 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                 setLocationName(e.target.value);
               }}
               onFocus={() => {
-                if (locationSuggestions.length > 0) setShowSuggestions(true);
+                if (locationSuggestions.length > 0 && locationQuery.trim().length >= 2) {
+                  setShowSuggestions(true);
+                }
               }}
               style={{ width: '100%', paddingLeft: '36px', fontSize: '0.86rem' }}
             />
@@ -418,24 +454,22 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                 top: '100%',
                 left: 0,
                 right: 0,
-                zIndex: 50,
+                zIndex: 60,
                 marginTop: '4px',
                 backgroundColor: 'var(--bg-surface-elevated)',
                 border: '1px solid var(--border-strong)',
                 borderRadius: 'var(--radius-md)',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-                maxHeight: '240px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                maxHeight: '220px',
                 overflowY: 'auto',
               }}
             >
-              {/* 1. Loading State */}
               {isSearchingLocations ? (
                 <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
                   <Loader2 size={15} style={{ animation: 'spin 1.5s linear infinite' }} />
                   <span>Searching places for "{locationQuery.trim()}"...</span>
                 </div>
               ) : locationSuggestions.length > 0 ? (
-                /* 2. Real Results Found */
                 <>
                   <div style={{ padding: '6px 12px', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Places & Landmarks ({locationSuggestions.length})
@@ -444,7 +478,10 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                     <button
                       key={item.placeId || idx}
                       type="button"
-                      onClick={() => handleSelectSuggestion(item)}
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        handleSelectSuggestion(item);
+                      }}
                       style={{
                         width: '100%',
                         textAlign: 'left',
@@ -478,53 +515,23 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                       </div>
                     </button>
                   ))}
-
-                  {/* Secondary Manual Fallback */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLocationName(locationQuery.trim());
-                      setLocationAddress('');
-                      setLatitude(undefined);
-                      setLongitude(undefined);
-                      setLocationPlaceId(undefined);
-                      setShowSuggestions(false);
-                      showToast(`Set custom location: "${locationQuery.trim()}"`, 'info');
-                    }}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '8px 14px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                      border: 'none',
-                      color: 'var(--text-muted)',
-                      fontSize: '0.78rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <Plus size={13} />
-                    <span>Can't find exact place? Use "{locationQuery.trim()}" as custom location</span>
-                  </button>
                 </>
               ) : (
-                /* 3. Search Finished & 0 Results */
                 <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                    Couldn't find an exact place matching "{locationQuery.trim()}".
+                    No exact match for "{locationQuery.trim()}".
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      isAutoSettingLocationRef.current = true;
                       setLocationName(locationQuery.trim());
                       setLocationAddress('');
                       setLatitude(undefined);
                       setLongitude(undefined);
                       setLocationPlaceId(undefined);
                       setShowSuggestions(false);
-                      showToast(`Set custom location: "${locationQuery.trim()}"`, 'info');
                     }}
                     style={{
                       width: '100%',
@@ -578,12 +585,14 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
         onClose={() => setIsMapModalOpen(false)}
         initialLocation={latitude && longitude ? { name: locationName, address: locationAddress, latitude, longitude } : undefined}
         onSelectLocation={(loc) => {
+          isAutoSettingLocationRef.current = true;
           setLocationName(loc.name);
           setLocationAddress(loc.address || '');
           setLatitude(loc.latitude);
           setLongitude(loc.longitude);
           setLocationPlaceId(loc.placeId);
           setLocationQuery(loc.name);
+          setShowSuggestions(false);
         }}
       />
     </Modal>

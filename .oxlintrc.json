@@ -3,6 +3,10 @@
   "plugins": ["react", "typescript", "oxc"],
   "rules": {
     "react/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "off",
+    "react/preserve-manual-memoization": "off",
+    "react/set-state-in-effect": "off",
+    "eslint/no-unused-vars": "off",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
   }
 }

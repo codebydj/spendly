@@ -8,8 +8,25 @@ export interface VersionHistoryItem {
 
 export const VERSION_HISTORY: VersionHistoryItem[] = [
   {
-    version: 'V3.2.3',
+    version: 'V3.2.4',
     isCurrent: true,
+    date: '27 September 2026',
+    title: 'Transactions, Mobile UX, Settings & Notifications Update',
+    highlights: [
+      'Fixed blank Transactions screen on web and Android with ErrorBoundary & fallback states',
+      'Redesigned mobile transaction filtering with compact top bar & FilterBottomSheet',
+      'Improved Add/Edit Transaction responsiveness & mobile Date/Time field ordering',
+      'Fixed current-location coordinates capture & location suggestion popup behavior',
+      'Added mobile synchronization status indicator and compact bottom sheet access',
+      'Redesigned mobile Settings organization into logical groups & subpage navigation',
+      'Expanded Settings search with deep indexing for individual controls and options',
+      'Improved notification preferences and grouped notification history (Today, Yesterday, Earlier)',
+      'Added richer transaction, budget, recurring, sync, and financial insight notifications',
+      'Configured client push notification handling architecture and deep-linking',
+    ],
+  },
+  {
+    version: 'V3.2.3',
     date: '27 September 2026',
     title: 'Spendly V3.2.3 Mobile Maps & Stability Update',
     highlights: [
