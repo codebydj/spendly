@@ -5,7 +5,7 @@
   "releaseDate": "2026-09-27",
   "title": "Spendly V3.2.4 Available",
   "message": "Spendly V3.2.4 is now available with Transactions, Mobile UX, Settings & Notifications Update.",
-  "downloadUrl": "https://drive.google.com/file/d/1b0GKChliFIj01UyvPOkA_AY782YPeH7_/view?usp=sharing",
+  "downloadUrl": "https://drive.google.com/file/d/1mcbhHgm9usSgv7kaB4FyLqqO878Ic2Jj/view?usp=sharing",
   "minimumSupportedVersion": "1.0.0",
   "releaseNotes": [
     "Fixed blank Transactions screen on web and Android with ErrorBoundary & fallback states",
