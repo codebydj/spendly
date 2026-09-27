@@ -1082,7 +1082,7 @@ export const SettingsView: React.FC = () => {
                   </div>
 
                   {/* Accordion Release List */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '480px', overflowY: 'auto', paddingRight: '2px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '560px', overflowY: 'auto', paddingRight: '2px' }}>
                     {filteredVersionHistory.map((item) => {
                       const isExpanded = expandedVersion === item.version || (Boolean(versionSearchQuery.trim()) && filteredVersionHistory.length <= 3);
 
@@ -1102,70 +1102,94 @@ export const SettingsView: React.FC = () => {
                             onClick={() => setExpandedVersion(isExpanded ? null : item.version)}
                             style={{
                               width: '100%',
+                              minHeight: '64px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'space-between',
-                              padding: '12px 14px',
+                              padding: '12px 16px',
                               textAlign: 'left',
                               backgroundColor: 'transparent',
                               border: 'none',
                               cursor: 'pointer',
+                              gap: '12px',
                             }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                              <span
-                                style={{
-                                  fontWeight: 800,
-                                  fontSize: '0.9rem',
-                                  color: item.isCurrent ? 'var(--accent-cyan)' : 'var(--text-primary)',
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {item.version}
-                              </span>
-                              {item.isCurrent && (
-                                <span className="badge badge-cyan" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
-                                  Current
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, flex: 1 }}>
+                              {/* Version Title & Badge Row */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span
+                                  style={{
+                                    fontWeight: 800,
+                                    fontSize: '0.96rem',
+                                    color: item.isCurrent ? 'var(--accent-cyan)' : 'var(--text-primary)',
+                                    letterSpacing: '0.01em',
+                                  }}
+                                >
+                                  {item.version.startsWith('V') ? item.version : `V${item.version}`}
                                 </span>
-                              )}
-                              <span
+
+                                {item.isCurrent && (
+                                  <span className="badge badge-cyan" style={{ fontSize: '0.68rem', padding: '2px 8px', fontWeight: 700 }}>
+                                    Current
+                                  </span>
+                                )}
+
+                                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginLeft: 'auto', paddingRight: '4px' }}>
+                                  {item.date}
+                                </span>
+                              </div>
+
+                              {/* Release Summary Subtitle */}
+                              <div
                                 style={{
-                                  fontSize: '0.82rem',
+                                  fontSize: '0.84rem',
                                   fontWeight: 600,
                                   color: 'var(--text-secondary)',
                                   whiteSpace: 'nowrap',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
+                                  lineHeight: '1.3',
                                 }}
+                                title={item.title}
                               >
                                 {item.title}
-                              </span>
+                              </div>
                             </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{item.date}</span>
-                              {isExpanded ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />}
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'var(--text-muted)',
+                                flexShrink: 0,
+                                width: '24px',
+                                height: '24px',
+                              }}
+                            >
+                              {isExpanded ? <ChevronUp size={18} color="var(--accent-cyan)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
                             </div>
                           </button>
 
                           {isExpanded && (
                             <div
                               style={{
-                                padding: '0 14px 14px 14px',
+                                padding: '0 16px 16px 16px',
                                 borderTop: '1px solid var(--border-color)',
                                 marginTop: '4px',
-                                paddingTop: '10px',
+                                paddingTop: '12px',
                               }}
                             >
                               <ul
                                 style={{
                                   margin: 0,
                                   paddingLeft: '18px',
-                                  fontSize: '0.8rem',
+                                  fontSize: '0.82rem',
                                   color: 'var(--text-secondary)',
+                                  lineHeight: '1.5',
                                   display: 'flex',
                                   flexDirection: 'column',
-                                  gap: '4px',
+                                  gap: '6px',
                                 }}
                               >
                                 {item.highlights.map((h, i) => (

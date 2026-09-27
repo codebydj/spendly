@@ -95,12 +95,15 @@ const AppShell: React.FC = () => {
     postponeUpdate,
   } = useApp();
 
-  // Edge-to-edge StatusBar Setup
+  // Edge-to-edge StatusBar & Native Platform Class Setup
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
+      document.body.classList.add('is-native', 'capacitor-native');
       StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
       StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
       StatusBar.setBackgroundColor({ color: '#00000000' }).catch(() => {});
+    } else {
+      document.body.classList.remove('is-native', 'capacitor-native');
     }
   }, []);
 

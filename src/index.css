@@ -104,21 +104,35 @@ body,
   outline-offset: 3px;
 }
 
-/* App Chrome Text Selection Policy (Reqs 8, 9, 10, 11) */
-.app-container,
-.card-level-1,
-.card-level-2,
-.card-level-3,
-.card-level-4,
-.btn,
-.btn-micro,
-.btn-icon,
-.mobile-nav,
-.desktop-sidebar,
-.header,
-.badge,
-.transaction-row,
-.settings-row {
+/* App Chrome Text Selection Policy (Android / Capacitor Native APK Only - Req 1) */
+body.is-native .app-container,
+body.is-native .card-level-1,
+body.is-native .card-level-2,
+body.is-native .card-level-3,
+body.is-native .card-level-4,
+body.is-native .btn,
+body.is-native .btn-micro,
+body.is-native .btn-icon,
+body.is-native .mobile-nav,
+body.is-native .desktop-sidebar,
+body.is-native .header,
+body.is-native .badge,
+body.is-native .transaction-row,
+body.is-native .settings-row,
+body.capacitor-native .app-container,
+body.capacitor-native .card-level-1,
+body.capacitor-native .card-level-2,
+body.capacitor-native .card-level-3,
+body.capacitor-native .card-level-4,
+body.capacitor-native .btn,
+body.capacitor-native .btn-micro,
+body.capacitor-native .btn-icon,
+body.capacitor-native .mobile-nav,
+body.capacitor-native .desktop-sidebar,
+body.capacitor-native .header,
+body.capacitor-native .badge,
+body.capacitor-native .transaction-row,
+body.capacitor-native .settings-row {
   -webkit-user-select: none;
   user-select: none;
 }
