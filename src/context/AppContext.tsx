@@ -61,7 +61,7 @@ interface ToastMessage {
 interface AppContextType {
   // Navigation & View
   currentView: ViewType;
-  setCurrentView: (view: ViewType) => void;
+  setCurrentView: (view: ViewType | ((prev: ViewType) => ViewType)) => void;
   selectedAccountIdForDetail: string | null;
   setSelectedAccountIdForDetail: (id: string | null) => void;
 
@@ -168,11 +168,60 @@ interface AppContextType {
   unreadNotificationCount: number;
 }
 
+const getInitialViewFromHash = (): ViewType | null => {
+  if (typeof window === 'undefined') return null;
+  const hash = window.location.hash.replace(/^#\/?/, '').trim().toLowerCase();
+  const validViews: ViewType[] = [
+    'dashboard', 'transactions', 'accounts', 'budgets', 'goals', 'analytics',
+    'recurring', 'calendar', 'maps', 'notifications', 'settings', 'login',
+    'signup', 'update-password', 'link-expired'
+  ];
+  if (validViews.includes(hash as ViewType)) {
+    return hash as ViewType;
+  }
+  return null;
+};
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentView, setCurrentView] = useState<ViewType>('login');
+  const [currentView, setCurrentViewState] = useState<ViewType>(() => getInitialViewFromHash() || 'login');
   const [selectedAccountIdForDetail, setSelectedAccountIdForDetail] = useState<string | null>(null);
+
+  const setCurrentView = useCallback((newViewAction: ViewType | ((prev: ViewType) => ViewType)) => {
+    setCurrentViewState((prevView) => {
+      const nextView = typeof newViewAction === 'function' ? newViewAction(prevView) : newViewAction;
+      if (typeof window !== 'undefined') {
+        const validRouteViews: ViewType[] = [
+          'dashboard', 'transactions', 'accounts', 'budgets', 'goals', 'analytics',
+          'recurring', 'calendar', 'maps', 'notifications', 'settings'
+        ];
+        if (validRouteViews.includes(nextView)) {
+          window.location.hash = '#' + nextView;
+        }
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) mainContent.scrollTop = 0;
+        const pageContainer = document.querySelector('.page-container');
+        if (pageContainer) pageContainer.scrollTop = 0;
+      }
+      return nextView;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const v = getInitialViewFromHash();
+      if (v) {
+        setCurrentViewState(v);
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) mainContent.scrollTop = 0;
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Auth & Sync
   const [user, setUser] = useState<any>(null);

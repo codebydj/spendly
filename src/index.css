@@ -104,6 +104,34 @@ body,
   outline-offset: 3px;
 }
 
+/* App Chrome Text Selection Policy (Reqs 8, 9, 10, 11) */
+.app-container,
+.card-level-1,
+.card-level-2,
+.card-level-3,
+.card-level-4,
+.btn,
+.btn-micro,
+.btn-icon,
+.mobile-nav,
+.desktop-sidebar,
+.header,
+.badge,
+.transaction-row,
+.settings-row {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"],
+.selectable-text {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
 /* Tabular numbers for clean financial alignment */
 .tabular-nums {
   font-variant-numeric: tabular-nums;

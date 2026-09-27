@@ -20,6 +20,7 @@ import { formatINR, formatINRMasked } from '../utils/currency';
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  ArrowLeftRight,
   ChevronRight,
   Plus,
   Wallet,
@@ -320,12 +321,13 @@ export const DashboardView: React.FC = () => {
 
             <div
               style={{
-                fontSize: '2.6rem',
+                fontSize: 'clamp(1.8rem, 6vw, 2.6rem)',
                 fontWeight: 800,
                 color: 'var(--text-primary)',
                 marginTop: '6px',
                 lineHeight: 1.1,
                 letterSpacing: '-0.03em',
+                wordBreak: 'break-word',
               }}
               className="tabular-nums"
             >
@@ -357,42 +359,82 @@ export const DashboardView: React.FC = () => {
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '12px',
+            gap: '8px',
             marginTop: '22px',
             paddingTop: '18px',
             borderTop: '1px solid rgba(255, 255, 255, 0.12)',
           }}
         >
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 600 }}>
-              <ArrowDownLeft size={14} color="var(--accent-cyan)" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.74rem', fontWeight: 600 }}>
+              <ArrowDownLeft size={13} color="var(--accent-cyan)" />
               <span>Income</span>
             </div>
-            <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '3px', display: 'block' }} className="tabular-nums">
+            <span style={{ fontSize: 'clamp(0.95rem, 3.5vw, 1.15rem)', fontWeight: 700, color: 'var(--text-primary)', marginTop: '3px', display: 'block' }} className="tabular-nums">
               <AnimatedNumber value={monthlyIncome} isMasked={settings.hideBalances} />
             </span>
           </div>
 
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 600 }}>
-              <ArrowUpRight size={14} color="var(--status-expense)" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.74rem', fontWeight: 600 }}>
+              <ArrowUpRight size={13} color="var(--status-expense)" />
               <span>Expenses</span>
             </div>
-            <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '3px', display: 'block' }} className="tabular-nums">
+            <span style={{ fontSize: 'clamp(0.95rem, 3.5vw, 1.15rem)', fontWeight: 700, color: 'var(--text-primary)', marginTop: '3px', display: 'block' }} className="tabular-nums">
               <AnimatedNumber value={monthlyExpenses} isMasked={settings.hideBalances} />
             </span>
           </div>
 
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 600 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)', fontSize: '0.74rem', fontWeight: 600 }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent-violet)' }} />
               <span>Savings</span>
             </div>
-            <span style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--accent-cyan)', marginTop: '3px', display: 'block' }} className="tabular-nums">
+            <span style={{ fontSize: 'clamp(0.95rem, 3.5vw, 1.15rem)', fontWeight: 700, color: 'var(--accent-cyan)', marginTop: '3px', display: 'block' }} className="tabular-nums">
               <AnimatedNumber value={monthlySavings} isMasked={settings.hideBalances} />
             </span>
           </div>
         </div>
+      </div>
+
+      {/* QUICK ACTIONS STRIP (Req 2) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+        <button
+          type="button"
+          onClick={() => setIsAddTransactionOpen(true)}
+          className="btn btn-primary"
+          style={{ padding: '10px 4px', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}
+        >
+          <Plus size={16} />
+          <span>+ Expense</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsAddTransactionOpen(true)}
+          className="btn btn-secondary"
+          style={{ padding: '10px 4px', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}
+        >
+          <ArrowDownLeft size={16} color="var(--accent-cyan)" />
+          <span>+ Income</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsAddTransactionOpen(true)}
+          className="btn btn-secondary"
+          style={{ padding: '10px 4px', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}
+        >
+          <ArrowLeftRight size={16} color="var(--accent-blue)" />
+          <span>Transfer</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setCurrentView('transactions')}
+          className="btn btn-secondary"
+          style={{ padding: '10px 4px', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}
+        >
+          <Receipt size={16} color="var(--accent-violet)" />
+          <span>Activity</span>
+        </button>
       </div>
 
       {/* CASH FLOW SUMMARY (Today, Week, Month) */}

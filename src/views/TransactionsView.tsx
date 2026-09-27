@@ -13,6 +13,8 @@ import { formatINR } from '../utils/currency';
 import { useFeatures } from '../context/FeatureContext';
 import { PageTransition } from '../components/motion/PageTransition';
 
+import { TransactionDetailBottomSheet, TransactionDetailContent } from '../components/modals/TransactionDetailModal';
+
 export const TransactionsView: React.FC = () => {
   const { templates, applyTemplate, deleteTemplate, saveTemplate } = useFeatures();
   const {
@@ -25,6 +27,7 @@ export const TransactionsView: React.FC = () => {
     settings,
     showToast,
     setIsAddTransactionOpen,
+    deleteTransaction,
     user,
     authLoading,
   } = useApp();
@@ -41,9 +44,23 @@ export const TransactionsView: React.FC = () => {
   const [minAmount, setMinAmount] = useState('');
   const [maxAmount, setMaxAmount] = useState('');
 
-  // UI States
+  // UI & Master-Detail States
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+  const selectedTx = useMemo(
+    () => transactions.find((t) => t.id === selectedTxId) || null,
+    [transactions, selectedTxId]
+  );
+
+  const handleRowSelect = (tx: Transaction) => {
+    setSelectedTxId(tx.id);
+    if (window.innerWidth <= 768) {
+      setIsDetailSheetOpen(true);
+    }
+  };
 
   // Restore saved filter preferences for the current user
   useEffect(() => {
@@ -263,9 +280,11 @@ export const TransactionsView: React.FC = () => {
       }}
     >
       <PageTransition>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Summary Banner */}
-          <div className="card-level-3 hero-blue-glow" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '20px 24px' }}>
+        <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+          {/* Left Column: Transaction List & Toolbar */}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Summary Banner */}
+            <div className="card-level-3 hero-blue-glow" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '20px 24px' }}>
             <div>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>
                 MONTHLY SPENDING SUMMARY
@@ -513,6 +532,8 @@ export const TransactionsView: React.FC = () => {
                             toAccount={toAcc}
                             category={cat || ({ name: 'Unknown category' } as Category)}
                             hideBalances={settings.hideBalances}
+                            isSelected={selectedTxId === tx.id}
+                            onSelect={handleRowSelect}
                             onEdit={(t) => setEditingTx(t)}
                             onDuplicate={handleDuplicate}
                           />
@@ -698,6 +719,58 @@ export const TransactionsView: React.FC = () => {
               </div>
             </div>
           </BottomSheet>
+          </div>
+
+          {/* Right Column: Desktop Detail Panel (Reqs 20, 24, 25, 26) */}
+          <div className="desktop-only" style={{ width: '360px', flexShrink: 0, position: 'sticky', top: '90px' }}>
+            {selectedTx ? (
+              <div className="card-level-2" style={{ padding: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border-color)' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>Transaction Details</h3>
+                  <button className="btn-icon" onClick={() => setSelectedTxId(null)} aria-label="Close details">
+                    <X size={18} />
+                  </button>
+                </div>
+                <TransactionDetailContent
+                  transaction={selectedTx}
+                  account={accounts.find((a) => a.id === selectedTx.accountId)}
+                  toAccount={accounts.find((a) => a.id === selectedTx.toAccountId)}
+                  category={categories.find((c) => c.id === selectedTx.categoryId)}
+                  hideBalances={settings.hideBalances}
+                  onEdit={(t) => setEditingTx(t)}
+                  onDuplicate={handleDuplicate}
+                  onDelete={(id) => {
+                    deleteTransaction(id);
+                    setSelectedTxId(null);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="card-level-2" style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <Receipt size={32} color="var(--accent-blue)" style={{ margin: '0 auto 12px auto' }} />
+                <h4 style={{ fontSize: '0.96rem', fontWeight: 700, color: 'var(--text-primary)' }}>Transaction Details</h4>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Select a transaction to view its details.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Transaction Details BottomSheet (Req 22, 23) */}
+          <TransactionDetailBottomSheet
+            isOpen={isDetailSheetOpen}
+            onClose={() => setIsDetailSheetOpen(false)}
+            transaction={selectedTx}
+            account={accounts.find((a) => a?.id === selectedTx?.accountId)}
+            toAccount={accounts.find((a) => a?.id === selectedTx?.toAccountId)}
+            category={categories.find((c) => c?.id === selectedTx?.categoryId)}
+            onEdit={(t) => setEditingTx(t)}
+            onDuplicate={handleDuplicate}
+            onDelete={(id) => {
+              deleteTransaction(id);
+              setSelectedTxId(null);
+            }}
+          />
         </div>
       </PageTransition>
     </ErrorBoundary>

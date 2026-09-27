@@ -167,7 +167,13 @@ const AppShell: React.FC = () => {
     if (!user && !isAuthPage) {
       setCurrentView('login');
     } else if (user && isAuthPage && currentView !== 'update-password' && currentView !== 'link-expired') {
-      setCurrentView('dashboard');
+      const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#\/?/, '').trim().toLowerCase() : '';
+      const validAppViews = ['dashboard', 'transactions', 'accounts', 'budgets', 'goals', 'analytics', 'recurring', 'calendar', 'maps', 'notifications', 'settings'];
+      if (validAppViews.includes(hash)) {
+        setCurrentView(hash as any);
+      } else {
+        setCurrentView('dashboard');
+      }
     }
   }, [user, authLoading, currentView, setCurrentView]);
 

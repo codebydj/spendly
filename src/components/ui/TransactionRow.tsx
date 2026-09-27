@@ -13,6 +13,8 @@ interface TransactionRowProps {
   toAccount?: Account;
   category?: Category;
   hideBalances?: boolean;
+  isSelected?: boolean;
+  onSelect?: (tx: Transaction) => void;
   onEdit?: (tx: Transaction) => void;
   onDuplicate?: (tx: Transaction) => void;
   onDelete?: (id: string) => void;
@@ -25,6 +27,8 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
   toAccount,
   category,
   hideBalances = false,
+  isSelected = false,
+  onSelect,
   onEdit,
   onDuplicate,
   onDelete,
@@ -62,7 +66,11 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
     : undefined;
 
   const handleRowClick = () => {
-    if (onEdit) onEdit(transaction);
+    if (onSelect) {
+      onSelect(transaction);
+    } else if (onEdit) {
+      onEdit(transaction);
+    }
   };
 
   const handleMenuClick = (e: React.MouseEvent) => {
@@ -80,8 +88,8 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '12px 16px',
-          backgroundColor: 'var(--bg-solid-dark)',
-          border: '1px solid var(--border-color)',
+          backgroundColor: isSelected ? 'var(--bg-surface-elevated)' : 'var(--bg-solid-dark)',
+          border: isSelected ? '1px solid var(--accent-cyan)' : '1px solid var(--border-color)',
           borderRadius: 'var(--radius-md)',
           cursor: 'pointer',
           gap: '12px',
@@ -149,7 +157,7 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           <div style={{ textAlign: 'right' }}>
             <span style={{ fontSize: '0.98rem', fontWeight: 800, color: amountColor }} className="tabular-nums">
-              {hideBalances ? '₹•••••' : `${sign}${formatINRMasked(transaction.amount)}`}
+              {sign}{formatINRMasked(transaction.amount, hideBalances)}
             </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
               {formatDisplayTime(transaction.time, settings?.timeFormat) || transaction.date}

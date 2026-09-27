@@ -33,6 +33,8 @@ import {
   GripVertical,
   History,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   ArrowLeft,
   Search,
 } from 'lucide-react';
@@ -110,6 +112,21 @@ export const SettingsView: React.FC = () => {
   // Active Subpage / Section State
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Version History Accordion State (Reqs 39, 40, 41, 43)
+  const [expandedVersion, setExpandedVersion] = useState<string | null>(VERSION_HISTORY[0]?.version || 'V3.2.4');
+  const [versionSearchQuery, setVersionSearchQuery] = useState('');
+
+  const filteredVersionHistory = React.useMemo(() => {
+    if (!versionSearchQuery.trim()) return VERSION_HISTORY;
+    const q = versionSearchQuery.toLowerCase().trim();
+    return VERSION_HISTORY.filter(
+      (item) =>
+        item.version.toLowerCase().includes(q) ||
+        item.title.toLowerCase().includes(q) ||
+        item.highlights.some((h) => h.toLowerCase().includes(q))
+    );
+  }, [versionSearchQuery]);
 
   // App Lock Modal State
   const [isSetPinModalOpen, setIsSetPinModalOpen] = useState(false);
@@ -1039,38 +1056,128 @@ export const SettingsView: React.FC = () => {
                 </div>
               )}
 
-              {/* 9. VERSION HISTORY */}
+              {/* 9. VERSION HISTORY (Reqs 38, 39, 40, 41, 43, 81) */}
               {activeSectionId === 'history' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '460px', overflowY: 'auto' }}>
-                  {VERSION_HISTORY.map((item) => (
-                    <div
-                      key={item.version}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                        backgroundColor: item.isCurrent ? 'rgba(32, 196, 232, 0.08)' : 'transparent',
-                        padding: item.isCurrent ? '12px 14px' : '0',
-                        borderRadius: item.isCurrent ? 'var(--radius-md)' : '0',
-                        border: item.isCurrent ? '1px solid var(--accent-cyan-border)' : 'none',
-                        borderTop: !item.isCurrent ? '1px solid var(--border-color)' : undefined,
-                        paddingTop: !item.isCurrent ? '12px' : undefined,
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 800, fontSize: '0.95rem', color: item.isCurrent ? 'var(--accent-cyan)' : 'var(--text-primary)' }}>
-                          {item.version}
-                        </span>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{item.date}</span>
-                      </div>
-                      <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.title}</h4>
-                      <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        {item.highlights.map((h, i) => (
-                          <li key={i}>{h}</li>
-                        ))}
-                      </ul>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {/* Header & Search */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                    <div>
+                      <h4 style={{ fontSize: '0.96rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        Version History
+                      </h4>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Current Version: <strong style={{ color: 'var(--accent-cyan)' }}>V{APP_VERSION}</strong> • {VERSION_HISTORY.length} releases
+                      </p>
                     </div>
-                  ))}
+
+                    <div style={{ position: 'relative', minWidth: '180px' }}>
+                      <input
+                        type="text"
+                        placeholder="Search releases..."
+                        value={versionSearchQuery}
+                        onChange={(e) => setVersionSearchQuery(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', fontSize: '0.78rem' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Accordion Release List */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '480px', overflowY: 'auto', paddingRight: '2px' }}>
+                    {filteredVersionHistory.map((item) => {
+                      const isExpanded = expandedVersion === item.version || (Boolean(versionSearchQuery.trim()) && filteredVersionHistory.length <= 3);
+
+                      return (
+                        <div
+                          key={item.version}
+                          style={{
+                            backgroundColor: item.isCurrent ? 'rgba(32, 196, 232, 0.08)' : 'var(--bg-solid-dark)',
+                            border: item.isCurrent ? '1px solid var(--accent-cyan-border)' : '1px solid var(--border-color)',
+                            borderRadius: 'var(--radius-md)',
+                            overflow: 'hidden',
+                            transition: 'border-color 0.15s ease',
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setExpandedVersion(isExpanded ? null : item.version)}
+                            style={{
+                              width: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '12px 14px',
+                              textAlign: 'left',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                              <span
+                                style={{
+                                  fontWeight: 800,
+                                  fontSize: '0.9rem',
+                                  color: item.isCurrent ? 'var(--accent-cyan)' : 'var(--text-primary)',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {item.version}
+                              </span>
+                              {item.isCurrent && (
+                                <span className="badge badge-cyan" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                                  Current
+                                </span>
+                              )}
+                              <span
+                                style={{
+                                  fontSize: '0.82rem',
+                                  fontWeight: 600,
+                                  color: 'var(--text-secondary)',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {item.title}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{item.date}</span>
+                              {isExpanded ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />}
+                            </div>
+                          </button>
+
+                          {isExpanded && (
+                            <div
+                              style={{
+                                padding: '0 14px 14px 14px',
+                                borderTop: '1px solid var(--border-color)',
+                                marginTop: '4px',
+                                paddingTop: '10px',
+                              }}
+                            >
+                              <ul
+                                style={{
+                                  margin: 0,
+                                  paddingLeft: '18px',
+                                  fontSize: '0.8rem',
+                                  color: 'var(--text-secondary)',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '4px',
+                                }}
+                              >
+                                {item.highlights.map((h, i) => (
+                                  <li key={i}>{h}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 

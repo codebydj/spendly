@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -29,15 +30,16 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, subtitle, 
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
   const isMobile = window.innerWidth <= 768;
 
-  return (
+  const content = (
     <div
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 1000,
+        zIndex: 10000,
         backgroundColor: 'rgba(8, 11, 18, 0.85)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
@@ -109,4 +111,6 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, subtitle, 
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 };

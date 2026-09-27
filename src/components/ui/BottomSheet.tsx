@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface BottomSheetProps {
@@ -21,13 +22,14 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ isOpen, onClose, title
   }, [isOpen]);
 
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
-  return (
+  const content = (
     <div
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 1000,
+        zIndex: 10000,
         backgroundColor: 'rgba(8, 11, 18, 0.85)',
         backdropFilter: 'blur(6px)',
         WebkitBackdropFilter: 'blur(6px)',
@@ -41,7 +43,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ isOpen, onClose, title
       <div
         style={{
           width: '100%',
-          maxHeight: '90vh',
+          maxHeight: '85dvh',
           backgroundColor: 'var(--bg-surface-elevated)',
           borderTop: '1px solid var(--border-color)',
           borderTopLeftRadius: 'var(--radius-xl)',
@@ -75,4 +77,6 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ isOpen, onClose, title
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 };
