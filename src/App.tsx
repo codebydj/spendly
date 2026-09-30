@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
@@ -14,6 +14,8 @@ import { AddBudgetModal } from './components/forms/AddBudgetModal';
 import { AddRecurringModal } from './components/forms/AddRecurringModal';
 import { PinLockModal } from './components/forms/PinLockModal';
 import { UpdateModal } from './components/modals/UpdateModal';
+import { WhatsNewModal } from './components/modals/WhatsNewModal';
+import { APP_VERSION } from './config/appVersion';
 import { CommandPalette } from './components/modals/CommandPalette';
 import { BootstrapLoader } from './components/feedback/BootstrapLoader';
 import { PageTransition } from './components/motion/PageTransition';
@@ -94,6 +96,36 @@ const AppShell: React.FC = () => {
     setIsUpdateModalOpen,
     postponeUpdate,
   } = useApp();
+
+  const [isWhatsNewOpen, setIsWhatsNewOpen] = useState(false);
+
+  // One-time What's New dialog evaluation after app update
+  useEffect(() => {
+    if (authLoading) return;
+
+    const currentVer = APP_VERSION;
+    const lastSeen = localStorage.getItem('spendly_last_seen_whats_new');
+    const hasInstalledBefore = localStorage.getItem('spendly_installed_before');
+
+    if (!hasInstalledBefore && !lastSeen) {
+      // New installation: mark initialized so new users start cleanly
+      localStorage.setItem('spendly_installed_before', 'true');
+      localStorage.setItem('spendly_last_seen_whats_new', currentVer);
+    } else if (lastSeen !== currentVer) {
+      setIsWhatsNewOpen(true);
+    }
+  }, [authLoading]);
+
+  const handleCloseWhatsNew = () => {
+    localStorage.setItem('spendly_last_seen_whats_new', APP_VERSION);
+    localStorage.setItem('spendly_installed_before', 'true');
+    setIsWhatsNewOpen(false);
+  };
+
+  const handleExploreWhatsNew = () => {
+    handleCloseWhatsNew();
+    setCurrentView('settings');
+  };
 
   // Edge-to-edge StatusBar & Native Platform Class Setup
   useEffect(() => {
@@ -254,6 +286,11 @@ const AppShell: React.FC = () => {
         manifest={latestManifest}
         installedVersion={installedVersion}
         onLater={postponeUpdate}
+      />
+      <WhatsNewModal
+        isOpen={isWhatsNewOpen}
+        onClose={handleCloseWhatsNew}
+        onExplore={handleExploreWhatsNew}
       />
       <ToastContainer />
       <CommandPalette />

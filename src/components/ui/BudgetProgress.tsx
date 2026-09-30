@@ -20,9 +20,11 @@ export const BudgetProgress: React.FC<BudgetProgressProps> = ({
   onDelete,
 }) => {
   const remaining = limit - spent;
-  const percentage = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
+  const exactPercentage = limit > 0 ? (spent / limit) * 100 : 0;
+  const percentage = Math.min(100, Math.round(exactPercentage));
   const isOver = spent > limit;
-  const isWarning = percentage >= 80 && !isOver;
+  const isCritical = exactPercentage >= 90 && !isOver;
+  const isWarning = exactPercentage >= 75 && exactPercentage < 90;
 
   let statusBadge = (
     <span className="badge badge-violet" style={{ fontSize: '0.68rem' }}>
@@ -38,10 +40,17 @@ export const BudgetProgress: React.FC<BudgetProgressProps> = ({
       </span>
     );
     barColor = 'var(--status-danger)';
+  } else if (isCritical) {
+    statusBadge = (
+      <span className="badge badge-danger" style={{ fontSize: '0.68rem' }}>
+        90% CRITICAL
+      </span>
+    );
+    barColor = 'var(--status-warning)';
   } else if (isWarning) {
     statusBadge = (
       <span className="badge badge-warning" style={{ fontSize: '0.68rem' }}>
-        80% REACHED
+        75% REACHED
       </span>
     );
     barColor = 'var(--status-warning)';

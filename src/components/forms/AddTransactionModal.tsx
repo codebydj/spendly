@@ -8,6 +8,7 @@ import { SelectLocationMapModal } from '../modals/SelectLocationMapModal';
 import { formatINR } from '../../utils/currency';
 import { suggestCategoryForMerchant } from '../../utils/calculations';
 import { useFeatures } from '../../context/FeatureContext';
+import { formatAccountLabel, validateTransactionAmount, validateTransferAccounts } from '../../utils/accountUtils.ts';
 
 export const AddTransactionModal: React.FC = () => {
   const { pendingTemplate, clearPendingTemplate } = useFeatures();
@@ -36,6 +37,8 @@ export const AddTransactionModal: React.FC = () => {
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [isDuplicated, setIsDuplicated] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [amountError, setAmountError] = useState<string | null>(null);
+  const [transferError, setTransferError] = useState<string | null>(null);
 
   // Location State
   const [locationName, setLocationName] = useState<string>('');
@@ -277,15 +280,23 @@ export const AddTransactionModal: React.FC = () => {
     e.preventDefault();
     if (isSubmitting) return;
 
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      showToast('Please enter a valid amount', 'warning');
+    setAmountError(null);
+    setTransferError(null);
+
+    const amountValidation = validateTransactionAmount(amount);
+    if (!amountValidation.isValid) {
+      const msg = amountValidation.errorMessage || 'Please enter a valid amount';
+      setAmountError(msg);
+      showToast(msg, 'warning');
       return;
     }
     if (!accountId) return;
 
-    if (type === 'TRANSFER' && accountId === toAccountId) {
-      showToast('Source and Destination accounts must be different for transfers', 'warning');
+    const transferValidation = validateTransferAccounts(type, accountId, toAccountId);
+    if (!transferValidation.isValid) {
+      const msg = transferValidation.errorMessage || 'Invalid account selection for transfer';
+      setTransferError(msg);
+      showToast(msg, 'warning');
       return;
     }
 
@@ -310,7 +321,7 @@ export const AddTransactionModal: React.FC = () => {
 
     addTransaction({
       type,
-      amount: parsedAmount,
+      amount: amountValidation.parsedAmount,
       accountId,
       toAccountId: type === 'TRANSFER' ? toAccountId : undefined,
       categoryId: finalCategoryId,
@@ -421,14 +432,18 @@ export const AddTransactionModal: React.FC = () => {
                     }
                   }}
                   style={{
-                    padding: '9px 12px',
+                    width: '100%',
+                    padding: '9px 0',
+                    textAlign: 'center',
                     borderRadius: 'var(--radius-sm)',
                     backgroundColor: isActive ? 'var(--bg-surface-elevated)' : 'transparent',
                     color: isActive ? activeColor : 'var(--text-secondary)',
-                    fontWeight: isActive ? 700 : 500,
+                    fontWeight: 600,
                     fontSize: '0.84rem',
-                    border: isActive ? '1px solid var(--border-strong)' : 'none',
-                    transition: 'all 0.15s ease',
+                    border: isActive ? '1px solid var(--border-strong)' : '1px solid transparent',
+                    boxSizing: 'border-box',
+                    transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
+                    cursor: 'pointer',
                   }}
                 >
                   {t}
@@ -459,11 +474,16 @@ export const AddTransactionModal: React.FC = () => {
               <input
                 id="transaction-amount"
                 type="number"
-                step="any"
+                min="0.01"
+                step="0.01"
+                inputMode="decimal"
                 placeholder="0.00"
                 required
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  if (amountError) setAmountError(null);
+                }}
                 style={{
                   width: '100%',
                   paddingLeft: '38px',
@@ -471,11 +491,17 @@ export const AddTransactionModal: React.FC = () => {
                   fontWeight: 800,
                   height: '52px',
                   backgroundColor: 'rgba(18, 23, 34, 0.95)',
+                  borderColor: amountError ? 'var(--status-danger)' : undefined,
                 }}
                 className="tabular-nums"
                 autoFocus
               />
             </div>
+            {amountError && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--status-danger)', marginTop: '4px', display: 'block', fontWeight: 600 }}>
+                {amountError}
+              </span>
+            )}
           </div>
 
           {/* 3 & 4. Category & Account Pickers */}
@@ -488,7 +514,7 @@ export const AddTransactionModal: React.FC = () => {
                 <select id="transaction-from-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '100%' }}>
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.name} ({formatINR(acc.balance)})
+                      {formatAccountLabel(acc)} ({formatINR(acc.balance)})
                     </option>
                   ))}
                 </select>
@@ -500,11 +526,16 @@ export const AddTransactionModal: React.FC = () => {
                 <select id="transaction-to-account" value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} style={{ width: '100%' }}>
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.name} ({formatINR(acc.balance)})
+                      {formatAccountLabel(acc)} ({formatINR(acc.balance)})
                     </option>
                   ))}
                 </select>
               </div>
+              {transferError && (
+                <div role="alert" style={{ color: 'var(--danger)', fontSize: '0.8rem', fontWeight: 500 }}>
+                  {transferError}
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
@@ -540,7 +571,7 @@ export const AddTransactionModal: React.FC = () => {
                 <select id="transaction-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '100%' }}>
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.name} ({formatINR(acc.balance)})
+                      {formatAccountLabel(acc)} ({formatINR(acc.balance)})
                     </option>
                   ))}
                 </select>

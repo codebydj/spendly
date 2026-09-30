@@ -13,6 +13,8 @@ import { formatINR } from '../utils/currency';
 import { useFeatures } from '../context/FeatureContext';
 import { PageTransition } from '../components/motion/PageTransition';
 
+import { formatAccountLabel } from '../utils/accountUtils.ts';
+
 import { TransactionDetailBottomSheet, TransactionDetailContent } from '../components/modals/TransactionDetailModal';
 
 export const TransactionsView: React.FC = () => {
@@ -159,12 +161,7 @@ export const TransactionsView: React.FC = () => {
   // Deduplicate and Label Accounts with Duplicate Names (Req 60)
   const uniqueAccountOptions = useMemo(() => {
     return accounts.map((acc) => {
-      const sameNameCount = accounts.filter((a) => a.name.toLowerCase() === acc.name.toLowerCase()).length;
-      let displayName = acc.name;
-      if (sameNameCount > 1) {
-        displayName = `${acc.name} (${acc.type || 'Account'})`;
-      }
-      return { id: acc.id, name: displayName };
+      return { id: acc.id, name: formatAccountLabel(acc) };
     });
   }, [accounts]);
 

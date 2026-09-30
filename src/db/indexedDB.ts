@@ -1,7 +1,7 @@
-import type { AppSettings, PendingSyncOperation } from '../types/finance';
+import type { AppSettings, PendingSyncOperation, BackupData } from '../types/finance';
 
 const DB_NAME = 'SpendlyDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export const STORES = {
   ACCOUNTS: 'accounts',
@@ -12,7 +12,34 @@ export const STORES = {
   CATEGORIES: 'categories',
   SETTINGS: 'settings',
   PENDING_OPS: 'pending_sync_operations',
+  TRASH_SNAPSHOTS: 'trash_snapshots',
+  AUDIT_LOGS: 'audit_logs',
 } as const;
+
+export interface TrashSnapshot {
+  id: string;
+  user_id: string;
+  deleted_at: string;
+  expires_at: string; // 7 days from deletion
+  data: BackupData;
+  summary: {
+    accountsCount: number;
+    transactionsCount: number;
+    budgetsCount: number;
+    recurringCount: number;
+  };
+}
+
+export interface AuditLogEntry {
+  id: string;
+  user_id: string;
+  operation_id: string;
+  action: 'RESET_LOCAL' | 'DELETE_WORKSPACE' | 'RESTORE_TRASH' | 'EXPORT_DATA' | 'SYNC_FLUSH';
+  timestamp: string;
+  affectedCounts: Record<string, number>;
+  result: 'SUCCESS' | 'FAILED' | 'PARTIAL';
+  details?: string;
+}
 
 export class IndexedDBService {
   private static dbPromise: Promise<IDBDatabase> | null = null;
@@ -73,6 +100,18 @@ export class IndexedDBService {
           pStore.createIndex('status', 'status', { unique: false });
           pStore.createIndex('created_at', 'created_at', { unique: false });
         }
+
+        if (!db.objectStoreNames.contains(STORES.TRASH_SNAPSHOTS)) {
+          const tStore = db.createObjectStore(STORES.TRASH_SNAPSHOTS, { keyPath: 'id' });
+          tStore.createIndex('user_id', 'user_id', { unique: false });
+          tStore.createIndex('expires_at', 'expires_at', { unique: false });
+        }
+
+        if (!db.objectStoreNames.contains(STORES.AUDIT_LOGS)) {
+          const aStore = db.createObjectStore(STORES.AUDIT_LOGS, { keyPath: 'id' });
+          aStore.createIndex('user_id', 'user_id', { unique: false });
+          aStore.createIndex('timestamp', 'timestamp', { unique: false });
+        }
       };
 
       request.onsuccess = (event) => {
@@ -126,7 +165,6 @@ export class IndexedDBService {
         const tx = db.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
 
-        // Save each item with user_id attached
         items.forEach((item) => {
           const withUser = { ...item, user_id: userId };
           store.put(withUser);
@@ -211,6 +249,72 @@ export class IndexedDBService {
     }
   }
 
+  // TRASH SNAPSHOTS (7-Day Soft-Delete Storage)
+  public static async saveTrashSnapshot(userId: string, data: BackupData): Promise<TrashSnapshot> {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const snapshot: TrashSnapshot = {
+      id: `trash_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      user_id: userId,
+      deleted_at: now.toISOString(),
+      expires_at: expiresAt,
+      data,
+      summary: {
+        accountsCount: data.accounts?.length || 0,
+        transactionsCount: data.transactions?.length || 0,
+        budgetsCount: data.budgets?.length || 0,
+        recurringCount: data.recurringPayments?.length || 0,
+      },
+    };
+
+    await this.saveItem(STORES.TRASH_SNAPSHOTS, snapshot, userId);
+    return snapshot;
+  }
+
+  public static async getTrashSnapshots(userId: string): Promise<TrashSnapshot[]> {
+    try {
+      const now = new Date().toISOString();
+      const items = await this.getStoreItems<TrashSnapshot>(STORES.TRASH_SNAPSHOTS, userId);
+      // Filter non-expired snapshots (within 7 days)
+      return items
+        .filter((item) => item.expires_at >= now)
+        .sort((a, b) => new Date(b.deleted_at).getTime() - new Date(a.deleted_at).getTime());
+    } catch {
+      return [];
+    }
+  }
+
+  // AUDIT LOGS
+  public static async addAuditLog(
+    userId: string,
+    action: AuditLogEntry['action'],
+    affectedCounts: Record<string, number>,
+    result: AuditLogEntry['result'],
+    details?: string
+  ): Promise<AuditLogEntry> {
+    const entry: AuditLogEntry = {
+      id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      user_id: userId,
+      operation_id: `op_${Date.now()}`,
+      action,
+      timestamp: new Date().toISOString(),
+      affectedCounts,
+      result,
+      details,
+    };
+    await this.saveItem(STORES.AUDIT_LOGS, entry, userId);
+    return entry;
+  }
+
+  public static async getAuditLogs(userId: string): Promise<AuditLogEntry[]> {
+    try {
+      const items = await this.getStoreItems<AuditLogEntry>(STORES.AUDIT_LOGS, userId);
+      return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    } catch {
+      return [];
+    }
+  }
+
   // PENDING SYNC QUEUE MANAGEMENT
   public static async addPendingOperation(
     userId: string,
@@ -224,7 +328,6 @@ export class IndexedDBService {
       const tx = db.transaction(STORES.PENDING_OPS, 'readwrite');
       const store = tx.objectStore(STORES.PENDING_OPS);
 
-      // Check if there is an existing pending operation for this entity & entity_id
       const index = store.index('user_id');
       const req = index.getAll(userId);
 
@@ -232,7 +335,6 @@ export class IndexedDBService {
         const existingOps: PendingSyncOperation[] = req.result || [];
         const existing = existingOps.find((op) => op.entity === entity && op.entity_id === entityId);
 
-        // If newly creating a delete operation on an un-synced upsert, we can simplify
         let opId = existing ? existing.id : `op_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
         const op: PendingSyncOperation = {

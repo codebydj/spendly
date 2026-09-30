@@ -5,6 +5,7 @@ import type { Transaction, TransactionType } from '../../types/finance';
 import { Trash2, MapPin, Navigation, Loader2, Plus } from 'lucide-react';
 import { LocationService, type LocationResult } from '../../services/locationService';
 import { SelectLocationMapModal } from '../modals/SelectLocationMapModal';
+import { formatAccountLabel, validateTransactionAmount, validateTransferAccounts } from '../../utils/accountUtils.ts';
 
 interface EditTransactionModalProps {
   isOpen: boolean;
@@ -33,8 +34,10 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const [categoryId, setCategoryId] = useState<string>('');
   const [date, setDate] = useState<string>('');
   const [time, setTime] = useState<string>('');
-  const [note, setNote] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('UPI');
+  const [note, setNote] = useState<string>('');
+  const [amountError, setAmountError] = useState<string | null>(null);
+  const [transferError, setTransferError] = useState<string | null>(null);
 
   // Location State
   const [locationName, setLocationName] = useState<string>('');
@@ -193,9 +196,22 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
     e.preventDefault();
     if (!transaction) return;
 
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      showToast('Please enter a valid amount', 'warning');
+    setAmountError(null);
+    setTransferError(null);
+
+    const amountValidation = validateTransactionAmount(amount);
+    if (!amountValidation.isValid) {
+      const msg = amountValidation.errorMessage || 'Please enter a valid amount';
+      setAmountError(msg);
+      showToast(msg, 'warning');
+      return;
+    }
+
+    const transferValidation = validateTransferAccounts(type, accountId, toAccountId);
+    if (!transferValidation.isValid) {
+      const msg = transferValidation.errorMessage || 'Invalid account selection for transfer';
+      setTransferError(msg);
+      showToast(msg, 'warning');
       return;
     }
 
@@ -209,7 +225,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
 
     editTransaction(transaction.id, {
       type,
-      amount: parsedAmount,
+      amount: amountValidation.parsedAmount,
       accountId,
       toAccountId: type === 'TRANSFER' ? toAccountId : undefined,
       categoryId: finalCategoryId,
@@ -268,13 +284,18 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                 type="button"
                 onClick={() => setType(t)}
                 style={{
-                  padding: '8px 12px',
+                  width: '100%',
+                  padding: '9px 0',
+                  textAlign: 'center',
                   borderRadius: 'var(--radius-sm)',
                   backgroundColor: isActive ? 'var(--bg-surface-elevated)' : 'transparent',
                   color: isActive ? activeColor : 'var(--text-secondary)',
-                  fontWeight: isActive ? 700 : 500,
+                  fontWeight: 600,
                   fontSize: '0.84rem',
-                  border: isActive ? '1px solid var(--border-strong)' : 'none',
+                  border: isActive ? '1px solid var(--border-strong)' : '1px solid transparent',
+                  boxSizing: 'border-box',
+                  transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
+                  cursor: 'pointer',
                 }}
               >
                 {t}
@@ -304,20 +325,31 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             </span>
             <input
               type="number"
-              step="any"
+              min="0.01"
+              step="0.01"
+              inputMode="decimal"
               required
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                if (amountError) setAmountError(null);
+              }}
               style={{
                 width: '100%',
                 paddingLeft: '38px',
                 fontSize: '1.4rem',
                 fontWeight: 800,
                 height: '52px',
+                borderColor: amountError ? 'var(--status-danger)' : undefined,
               }}
               className="tabular-nums"
             />
           </div>
+          {amountError && (
+            <span style={{ fontSize: '0.75rem', color: 'var(--status-danger)', marginTop: '4px', display: 'block', fontWeight: 600 }}>
+              {amountError}
+            </span>
+          )}
         </div>
 
         {/* Category & Account */}
@@ -329,7 +361,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             <select value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ width: '100%' }}>
               {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
-                  {acc.name}
+                  {formatAccountLabel(acc)}
                 </option>
               ))}
             </select>
@@ -342,7 +374,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
               <select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)} style={{ width: '100%' }}>
                 {accounts.map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.name}
+                    {formatAccountLabel(acc)}
                   </option>
                 ))}
               </select>
@@ -357,6 +389,11 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             )}
           </div>
         </div>
+        {transferError && (
+          <div role="alert" style={{ color: 'var(--danger)', fontSize: '0.8rem', fontWeight: 500, marginTop: '6px' }}>
+            {transferError}
+          </div>
+        )}
 
         {/* Date & Time */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>

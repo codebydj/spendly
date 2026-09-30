@@ -16,8 +16,11 @@ import {
   AlertCircle,
   Tag,
   Check,
+  FastForward,
 } from 'lucide-react';
 import { EditRecurringModal } from '../components/forms/EditRecurringModal';
+import { formatAccountLabel } from '../utils/accountUtils.ts';
+import { advanceRecurringDueDate } from '../utils/dateUtils.ts';
 
 export const RecurringView: React.FC = () => {
   const {
@@ -104,14 +107,8 @@ export const RecurringView: React.FC = () => {
       paymentMethod: 'UPI',
     });
 
-    // 2. Advance next due date based on frequency
-    const current = new Date(reminder.nextDueDate);
-    if (reminder.frequency === 'DAILY') current.setDate(current.getDate() + 1);
-    else if (reminder.frequency === 'WEEKLY') current.setDate(current.getDate() + 7);
-    else if (reminder.frequency === 'YEARLY') current.setFullYear(current.getFullYear() + 1);
-    else current.setMonth(current.getMonth() + 1); // Monthly / Once
-
-    const nextDueDateStr = current.toISOString().slice(0, 10);
+    // 2. Advance next due date based on frequency safely
+    const nextDueDateStr = advanceRecurringDueDate(reminder.nextDueDate, reminder.frequency);
 
     editRecurring(reminder.id, {
       ...reminder,
@@ -120,6 +117,28 @@ export const RecurringView: React.FC = () => {
 
     setPaidHistory((prev) => new Set(prev).add(paidKey));
     showToast(`Marked "${reminder.title}" as paid & added expense transaction ${formatINR(reminder.amount)}`, 'success');
+  };
+
+  // Action: Snooze Reminder by days
+  const handleSnoozeReminder = (reminder: RecurringPayment, days: number) => {
+    const nextDueDateStr = advanceRecurringDueDate(reminder.nextDueDate, reminder.frequency, days);
+
+    editRecurring(reminder.id, {
+      ...reminder,
+      nextDueDate: nextDueDateStr,
+    });
+    showToast(`Snoozed "${reminder.title}" for ${days} day${days > 1 ? 's' : ''} (due ${nextDueDateStr})`, 'info');
+  };
+
+  // Action: Skip Reminder cycle without creating transaction
+  const handleSkipReminder = (reminder: RecurringPayment) => {
+    const nextDueDateStr = advanceRecurringDueDate(reminder.nextDueDate, reminder.frequency);
+
+    editRecurring(reminder.id, {
+      ...reminder,
+      nextDueDate: nextDueDateStr,
+    });
+    showToast(`Skipped current cycle for "${reminder.title}". Next due: ${nextDueDateStr}`, 'info');
   };
 
   return (
@@ -308,7 +327,7 @@ export const RecurringView: React.FC = () => {
             <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>{item.title}</h4>
             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Tag size={13} color="var(--accent-lavender)" />
-              {cat?.name || 'Bill'} • {acc?.name || 'Account'}
+              {cat?.name || 'Bill'} • {formatAccountLabel(acc)}
             </span>
           </div>
 
@@ -344,19 +363,44 @@ export const RecurringView: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexWrap: 'wrap',
             paddingTop: '12px',
             borderTop: '1px solid var(--border-color)',
             gap: '8px',
           }}
         >
-          <button
-            type="button"
-            onClick={() => handleMarkAsPaid(item)}
-            className="btn btn-secondary"
-            style={{ padding: '6px 12px', minHeight: '34px', fontSize: '0.78rem', color: 'var(--accent-cyan)', fontWeight: 700 }}
-          >
-            <Check size={14} /> Mark as Paid
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => handleMarkAsPaid(item)}
+              className="btn btn-secondary"
+              style={{ padding: '6px 12px', minHeight: '32px', fontSize: '0.78rem', color: 'var(--accent-cyan)', fontWeight: 700 }}
+            >
+              <Check size={14} /> Paid
+            </button>
+            {!item.isPaused && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleSnoozeReminder(item, 1)}
+                  className="btn btn-secondary"
+                  title="Snooze due date by 1 day"
+                  style={{ padding: '6px 10px', minHeight: '32px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}
+                >
+                  <Clock size={13} /> Snooze +1d
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSkipReminder(item)}
+                  className="btn btn-secondary"
+                  title="Skip this cycle without logging expense"
+                  style={{ padding: '6px 10px', minHeight: '32px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}
+                >
+                  <FastForward size={13} /> Skip
+                </button>
+              </>
+            )}
+          </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button

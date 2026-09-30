@@ -1,20 +1,22 @@
 {
-  "version": "3.2.4",
-  "versionName": "Spendly V3.2.4",
-  "buildDate": "2026-09-27",
-  "releaseDate": "2026-09-27",
-  "title": "Spendly V3.2.4 Available",
-  "message": "Spendly V3.2.4 is now available with Transactions, Mobile UX, Settings & Notifications Update.",
+  "version": "3.3.1",
+  "versionName": "Spendly V3.3.1",
+  "buildDate": "2026-09-30",
+  "releaseDate": "2026-09-30",
+  "title": "Spendly V3.3.1 Available",
+  "message": "Spendly V3.3.1 is now available with Mobile Experience, Notifications & Release UX Update.",
   "downloadUrl": "https://drive.google.com/file/d/1mcbhHgm9usSgv7kaB4FyLqqO878Ic2Jj/view?usp=sharing",
   "minimumSupportedVersion": "1.0.0",
   "releaseNotes": [
-    "Fixed blank Transactions screen on web and Android with ErrorBoundary & fallback states",
-    "Redesigned mobile transaction filtering with compact top bar & FilterBottomSheet",
-    "Improved Add/Edit Transaction responsiveness & mobile Date/Time field ordering",
-    "Fixed current-location coordinates capture & location suggestion popup behavior",
-    "Added mobile synchronization status indicator and compact bottom sheet access",
-    "Redesigned mobile Settings organization into logical groups & subpage navigation",
-    "Expanded Settings search with deep indexing for individual controls and options",
-    "Grouped notification history into Today, Yesterday, and Earlier with deep-links"
+    "Added one-time What's New experience after application updates.",
+    "Redesigned Version History with separate Features and Bugs Fixed sections.",
+    "Improved mobile notification center and notification actions.",
+    "Added richer deterministic financial insight notifications.",
+    "Improved mobile responsiveness across key Spendly screens.",
+    "Added additional polished transitions and loading feedback.",
+    "Fixed Add Transaction Expense/Income/Transfer selector shaking.",
+    "Fixed layout shifts when switching transaction types.",
+    "Improved mobile bottom-sheet and responsive behavior.",
+    "Fixed additional mobile spacing and interaction inconsistencies."
   ]
 }

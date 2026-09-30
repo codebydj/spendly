@@ -12,7 +12,8 @@ import {
   MapPin,
   Clock,
 } from 'lucide-react';
-import { formatINRMasked } from '../utils/currency';
+import { formatINRMasked, formatINRCompact } from '../utils/currency';
+
 
 type CalendarFilter = 'ALL' | 'EXPENSE' | 'INCOME' | 'TRANSFER' | 'RECURRING';
 
@@ -355,13 +356,13 @@ export const CalendarView: React.FC = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: '2px', marginTop: '2px' }}>
                     {dayObj.dayExpense > 0 && (filterType === 'ALL' || filterType === 'EXPENSE') && (
                       <span style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--status-expense)', letterSpacing: '-0.02em' }} className="tabular-nums">
-                        -{dayObj.dayExpense >= 1000 ? `${(dayObj.dayExpense / 1000).toFixed(1)}k` : dayObj.dayExpense}
+                        -{formatINRCompact(dayObj.dayExpense)}
                       </span>
                     )}
 
                     {dayObj.dayIncome > 0 && (filterType === 'ALL' || filterType === 'INCOME') && dayObj.dayExpense === 0 && (
                       <span style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--accent-cyan)', letterSpacing: '-0.02em' }} className="tabular-nums">
-                        +{dayObj.dayIncome >= 1000 ? `${(dayObj.dayIncome / 1000).toFixed(1)}k` : dayObj.dayIncome}
+                        +{formatINRCompact(dayObj.dayIncome)}
                       </span>
                     )}
 

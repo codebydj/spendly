@@ -2,8 +2,8 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import type { Transaction, Account, Category, BackupData } from '../types/finance';
-import { escapeCSVField } from './csv';
-export { escapeCSVField } from './csv';
+import { escapeCSVField } from './csv.ts';
+export { escapeCSVField } from './csv.ts';
 
 /**
  * Clean, robust, offline-first CSV and File Export engine for Spendly V3.1.6.
@@ -14,8 +14,12 @@ export interface ExportResult {
   success: boolean;
   count?: number;
   fileName?: string;
+  fileSize?: string;
+  createdTime?: string;
+  checksum?: string;
   message?: string;
 }
+
 
 /**
  * Escapes CSV field values strictly according to RFC 4180 standard.

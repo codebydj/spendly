@@ -18,6 +18,8 @@ import { BottomSheet } from '../components/ui/BottomSheet';
 import { formatINR, formatINRMasked } from '../utils/currency';
 import { CategoryIcon } from '../components/ui/CategoryIcon';
 import { TransactionRow } from '../components/ui/TransactionRow';
+import { hasValidCoordinates } from '../utils/coordinates';
+import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 
 interface LocationGroup {
   locationKey: string;
@@ -156,6 +158,7 @@ export const MapsView: React.FC = () => {
   const {
     transactions,
     categories,
+    accounts,
     settings,
     showToast,
     setCurrentView,
@@ -246,7 +249,7 @@ export const MapsView: React.FC = () => {
     const groupsMap: { [key: string]: LocationGroup } = {};
 
     filteredTransactions.forEach((tx) => {
-      const hasCoords = tx.latitude !== undefined && tx.longitude !== undefined && !isNaN(tx.latitude) && !isNaN(tx.longitude);
+      const hasCoords = hasValidCoordinates(tx.latitude, tx.longitude);
       const rawName = tx.locationName ? tx.locationName.trim() : '';
 
       let key: string;
@@ -532,9 +535,9 @@ export const MapsView: React.FC = () => {
     if (focusTxId) {
       sessionStorage.removeItem('spendly_map_focus_tx_id');
       const targetGroup = locationGroups.find((g) => g.transactions.some((t) => t.id === focusTxId));
-      if (targetGroup && targetGroup.latitude && targetGroup.longitude) {
+      if (targetGroup && hasValidCoordinates(targetGroup.latitude, targetGroup.longitude)) {
         setSelectedGroup(targetGroup);
-        leafletMapRef.current.flyTo([targetGroup.latitude, targetGroup.longitude], 15, { duration: 0.6 });
+        leafletMapRef.current.flyTo([targetGroup.latitude!, targetGroup.longitude!], 15, { duration: 0.6 });
         hasInitialFitRef.current = true;
         return;
       }
@@ -545,7 +548,7 @@ export const MapsView: React.FC = () => {
     if (savedCamera) {
       try {
         const { lat, lng, zoom } = JSON.parse(savedCamera);
-        if (lat && lng && zoom) {
+        if (hasValidCoordinates(lat, lng) && typeof zoom === 'number') {
           leafletMapRef.current.setView([lat, lng], zoom, { animate: false });
           hasInitialFitRef.current = true;
           return;
@@ -555,7 +558,7 @@ export const MapsView: React.FC = () => {
       }
     }
 
-    const mapGroups = locationGroups.filter((g) => g.latitude !== undefined && g.longitude !== undefined);
+    const mapGroups = locationGroups.filter((g) => hasValidCoordinates(g.latitude, g.longitude));
     if (mapGroups.length > 0) {
       const bounds = L.latLngBounds([]);
       mapGroups.forEach((g) => bounds.extend([g.latitude!, g.longitude!]));
@@ -687,8 +690,8 @@ export const MapsView: React.FC = () => {
 
   const handleSelectGroup = (group: LocationGroup) => {
     setSelectedGroup(group);
-    if (group.latitude !== undefined && group.longitude !== undefined && leafletMapRef.current) {
-      leafletMapRef.current.flyTo([group.latitude, group.longitude], 15, { duration: 0.5 });
+    if (hasValidCoordinates(group.latitude, group.longitude) && leafletMapRef.current) {
+      leafletMapRef.current.flyTo([group.latitude!, group.longitude!], 15, { duration: 0.5 });
     }
     if (window.innerWidth <= 768) {
       setIsMobileSheetOpen(true);
@@ -731,7 +734,8 @@ export const MapsView: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <ErrorBoundary fallbackTitle="Map Rendering Error" fallbackMessage="Map view encountered an issue loading coordinates. You can switch to List view or retry.">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* 1. Header Card */}
       <div className="card-level-3 hero-blue-glow" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
@@ -1047,9 +1051,21 @@ export const MapsView: React.FC = () => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
                 <span style={{ fontSize: '0.72rem', color: 'var(--accent-lavender)', fontWeight: 700 }}>TRANSACTIONS HERE</span>
-                {selectedGroup.transactions.map((tx) => (
-                  <TransactionRow key={tx.id} transaction={tx} hideBalances={settings.hideBalances} />
-                ))}
+                {selectedGroup.transactions.map((tx) => {
+                  const acc = accounts.find((a) => a.id === tx.accountId);
+                  const toAcc = tx.toAccountId ? accounts.find((a) => a.id === tx.toAccountId) : undefined;
+                  const cat = categories.find((c) => c.id === tx.categoryId);
+                  return (
+                    <TransactionRow
+                      key={tx.id}
+                      transaction={tx}
+                      account={acc}
+                      toAccount={toAcc}
+                      category={cat}
+                      hideBalances={settings.hideBalances}
+                    />
+                  );
+                })}
               </div>
 
               <div style={{ marginTop: '6px' }}>
@@ -1247,6 +1263,7 @@ export const MapsView: React.FC = () => {
           </div>
         </div>
       </BottomSheet>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 };

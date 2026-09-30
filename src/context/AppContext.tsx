@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
-import type { Account, Transaction, Budget, RecurringPayment, NotificationItem, AppSettings, Category, BackupData, AppVersionManifest } from '../types/finance';
+import type { Account, Transaction, TransactionType, Budget, RecurringPayment, NotificationItem, AppSettings, Category, BackupData, AppVersionManifest } from '../types/finance';
 import { Capacitor } from '@capacitor/core';
 import { StorageEngine } from '../db/storage';
 import { IndexedDBService, STORES } from '../db/indexedDB';
@@ -123,7 +123,12 @@ interface AppContextType {
   editTransaction: (id: string, tx: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => void;
   deleteTransaction: (id: string) => void;
   addAccount: (acc: Omit<Account, 'id' | 'updatedAt' | 'balance'>) => void;
+  editAccount: (id: string, updatedFields: Partial<Account>) => Promise<boolean>;
   archiveAccount: (id: string) => void;
+  restoreAccount: (id: string) => void;
+  adjustAccountBalance: (id: string, actualBalance: number, reason: string) => void;
+  reconcileAccount: (id: string, statementBalance: number, note?: string) => void;
+  deleteAccountPermanently: (id: string) => { success: boolean; message: string };
   addBudget: (b: Omit<Budget, 'id'>) => void;
   deleteBudget: (id: string) => void;
   addCategory: (cat: Omit<Category, 'id'>) => void;
@@ -690,7 +695,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const flushRes = await SyncService.flushPendingOperations(user.id);
       await refreshPendingOpsCount(user.id);
 
-      if (flushRes.success) {
+      if (flushRes.status === 'synced') {
         setSyncStatus('SYNCED');
         setLastSyncTime(new Date().toLocaleTimeString());
       } else {
@@ -1256,14 +1261,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // Archive Account
-  const archiveAccount = async (id: string) => {
+  // Edit Account
+  const editAccount = async (id: string, updatedFields: Partial<Account>): Promise<boolean> => {
     const target = accounts.find((a) => a.id === id);
-    if (!target) return;
-    const updatedAcc: Account = { ...target, isArchived: true, updatedAt: new Date().toISOString() };
+    if (!target) return false;
 
-    setAccounts((prev) => prev.map((acc) => (acc.id === id ? updatedAcc : acc)));
-    showToast('Account archived', 'info');
+    const updatedAcc: Account = {
+      ...target,
+      ...updatedFields,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updatedList = accounts.map((acc) => {
+      if (acc.id === id) {
+        return updatedAcc;
+      }
+      if (updatedFields.isDefault && acc.id !== id) {
+        return { ...acc, isDefault: false };
+      }
+      return acc;
+    });
+
+    const recalculated = updateAccountBalances(updatedList, transactions);
+    setAccounts(recalculated);
 
     if (user?.id) {
       await IndexedDBService.saveItem(STORES.ACCOUNTS, updatedAcc, user.id);
@@ -1276,6 +1296,136 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSyncStatus('LOCAL_CHANGES');
       }
     }
+
+    return true;
+  };
+
+  // Archive Account
+  const archiveAccount = async (id: string) => {
+    const target = accounts.find((a) => a.id === id);
+    if (!target) return;
+    const updatedAcc: Account = { ...target, isArchived: true, updatedAt: new Date().toISOString() };
+
+    setAccounts((prev) => prev.map((acc) => (acc.id === id ? updatedAcc : acc)));
+    showToast(`Account "${target.name}" archived`, 'info');
+
+    if (user?.id) {
+      await IndexedDBService.saveItem(STORES.ACCOUNTS, updatedAcc, user.id);
+      await IndexedDBService.addPendingOperation(user.id, 'accounts', updatedAcc.id, 'upsert', updatedAcc);
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
+    }
+  };
+
+  // Restore Account
+  const restoreAccount = async (id: string) => {
+    const target = accounts.find((a) => a.id === id);
+    if (!target) return;
+    const updatedAcc: Account = { ...target, isArchived: false, updatedAt: new Date().toISOString() };
+
+    setAccounts((prev) => prev.map((acc) => (acc.id === id ? updatedAcc : acc)));
+    showToast(`Restored account "${target.name}"`, 'success');
+
+    if (user?.id) {
+      await IndexedDBService.saveItem(STORES.ACCOUNTS, updatedAcc, user.id);
+      await IndexedDBService.addPendingOperation(user.id, 'accounts', updatedAcc.id, 'upsert', updatedAcc);
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
+    }
+  };
+
+  // Adjust Account Balance
+  const adjustAccountBalance = (id: string, actualBalance: number, reason: string) => {
+    const target = accounts.find((a) => a.id === id);
+    if (!target) return;
+
+    const currentBalance = target.balance;
+    const diff = actualBalance - currentBalance;
+
+    if (Math.abs(diff) < 0.01) return;
+
+    const adjustmentType: TransactionType = diff >= 0 ? 'INCOME' : 'EXPENSE';
+    const adjustmentAmount = Math.abs(diff);
+
+    addTransaction({
+      type: adjustmentType,
+      amount: adjustmentAmount,
+      accountId: id,
+      categoryId: categories.find((c) => c.name === 'Other')?.id || categories[0]?.id || '',
+      date: new Date().toISOString().slice(0, 10),
+      time: new Date().toTimeString().slice(0, 5),
+      note: `Balance Adjustment: ${reason}`,
+      paymentMethod: 'Adjustment',
+    });
+  };
+
+  // Reconcile Account
+  const reconcileAccount = async (id: string, statementBalance: number, _note?: string) => {
+    const target = accounts.find((a) => a.id === id);
+    if (!target) return;
+
+    const nowStr = new Date().toISOString();
+    const updatedAcc: Account = {
+      ...target,
+      lastReconciledAt: nowStr,
+      lastReconciledBalance: statementBalance,
+      updatedAt: nowStr,
+    };
+
+    setAccounts((prev) => prev.map((acc) => (acc.id === id ? updatedAcc : acc)));
+
+    if (user?.id) {
+      await IndexedDBService.saveItem(STORES.ACCOUNTS, updatedAcc, user.id);
+      await IndexedDBService.addPendingOperation(user.id, 'accounts', updatedAcc.id, 'upsert', updatedAcc);
+      await refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
+    }
+  };
+
+  // Delete Account Permanently
+  const deleteAccountPermanently = (id: string): { success: boolean; message: string } => {
+    const target = accounts.find((a) => a.id === id);
+    if (!target) return { success: false, message: 'Account not found' };
+
+    const dependentTxs = transactions.filter((t) => t.accountId === id || t.toAccountId === id);
+    if (dependentTxs.length > 0) {
+      return {
+        success: false,
+        message: `Cannot permanently delete "${target.name}" because it contains ${dependentTxs.length} transaction records. Please reassign or delete transactions first.`,
+      };
+    }
+
+    setAccounts((prev) => prev.filter((acc) => acc.id !== id));
+    showToast(`Permanently deleted account "${target.name}"`, 'info');
+
+    if (user?.id) {
+      IndexedDBService.deleteItem(STORES.ACCOUNTS, id);
+      IndexedDBService.addPendingOperation(user.id, 'accounts', id, 'delete');
+      refreshPendingOpsCount(user.id);
+
+      if (navigator.onLine) {
+        triggerCloudSync();
+      } else {
+        setSyncStatus('LOCAL_CHANGES');
+      }
+    }
+
+    return { success: true, message: `Permanently deleted account "${target.name}"` };
   };
 
   // Add Budget
@@ -1742,7 +1892,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         editTransaction,
         deleteTransaction,
         addAccount,
+        editAccount,
         archiveAccount,
+        restoreAccount,
+        adjustAccountBalance,
+        reconcileAccount,
+        deleteAccountPermanently,
         addBudget,
         deleteBudget,
         addCategory,

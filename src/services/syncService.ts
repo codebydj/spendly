@@ -1,6 +1,6 @@
-import { supabase } from './supabase';
-import type { Account, Transaction, Budget, RecurringPayment, NotificationItem, AppSettings, BackupData } from '../types/finance';
-import { IndexedDBService } from '../db/indexedDB';
+import { supabase } from './supabase.ts';
+import type { Account, Transaction, Budget, RecurringPayment, NotificationItem, AppSettings, BackupData } from '../types/finance.ts';
+import { IndexedDBService } from '../db/indexedDB.ts';
 
 export interface UserCloudData {
   accounts: Account[];
@@ -13,7 +13,50 @@ export interface UserCloudData {
   hasCloudData: boolean;
 }
 
+export interface EntitySyncResult {
+  entity: 'accounts' | 'transactions' | 'budgets' | 'categories' | 'recurring_payments' | 'settings' | 'notifications';
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  errors: Array<{
+    recordId?: string;
+    code?: string;
+    message: string;
+  }>;
+}
+
+export interface WorkspaceSyncResult {
+  status: 'synced' | 'partial' | 'failed';
+  results: EntitySyncResult[];
+  pendingChanges: number;
+  startedAt: string;
+  completedAt: string;
+}
+
+const MAX_SYNC_RETRIES = 5;
+
 export class SyncService {
+  /** Validate recurring payment payload before writing to Supabase */
+  public static validateRecurringPayment(payload: any): { valid: boolean; reason?: string } {
+    if (!payload) return { valid: false, reason: 'Payload is null or undefined' };
+    if (!payload.title || typeof payload.title !== 'string' || !payload.title.trim()) {
+      return { valid: false, reason: 'Recurring payment title is required' };
+    }
+    if (typeof payload.amount !== 'number' || isNaN(payload.amount) || payload.amount <= 0) {
+      return { valid: false, reason: 'Recurring payment amount must be greater than 0' };
+    }
+    if (!payload.account_id || typeof payload.account_id !== 'string') {
+      return { valid: false, reason: 'Valid Account ID is required' };
+    }
+    if (!payload.category_id || typeof payload.category_id !== 'string') {
+      return { valid: false, reason: 'Valid Category ID is required' };
+    }
+    if (!payload.next_due_date || typeof payload.next_due_date !== 'string') {
+      return { valid: false, reason: 'Valid next due date is required' };
+    }
+    return { valid: true };
+  }
+
   // 1. Fetch All User Data From Supabase Cloud
   public static async fetchUserData(userId: string): Promise<UserCloudData> {
     try {
@@ -30,65 +73,51 @@ export class SyncService {
       if (accRes.error) {
         console.error('SUPABASE ERROR [accounts.select]:', {
           message: accRes.error.message,
-          details: accRes.error.details,
-          hint: accRes.error.hint,
           code: accRes.error.code,
         });
       }
       if (txRes.error) {
         console.error('SUPABASE ERROR [transactions.select]:', {
           message: txRes.error.message,
-          details: txRes.error.details,
-          hint: txRes.error.hint,
           code: txRes.error.code,
         });
       }
       if (bRes.error) {
         console.error('SUPABASE ERROR [budgets.select]:', {
           message: bRes.error.message,
-          details: bRes.error.details,
-          hint: bRes.error.hint,
           code: bRes.error.code,
         });
       }
       if (rRes.error) {
         console.error('SUPABASE ERROR [recurring_payments.select]:', {
           message: rRes.error.message,
-          details: rRes.error.details,
-          hint: rRes.error.hint,
           code: rRes.error.code,
         });
       }
       if (nRes.error) {
         console.error('SUPABASE ERROR [notifications.select]:', {
           message: nRes.error.message,
-          details: nRes.error.details,
-          hint: nRes.error.hint,
           code: nRes.error.code,
         });
       }
       if (sRes.error) {
         console.error('SUPABASE ERROR [user_settings.select]:', {
           message: sRes.error.message,
-          details: sRes.error.details,
-          hint: sRes.error.hint,
           code: sRes.error.code,
         });
       }
       if (pRes.error) {
         console.error('SUPABASE ERROR [profiles.select]:', {
           message: pRes.error.message,
-          details: pRes.error.details,
-          hint: pRes.error.hint,
           code: pRes.error.code,
         });
       }
 
-      const accounts = (accRes.data || []).map(this.mapAccountFromDb);
-      const transactions = (txRes.data || []).map(this.mapTransactionFromDb);
-      const budgets = (bRes.data || []).map(this.mapBudgetFromDb);
-      const recurringPayments = (rRes.data || []).map(this.mapRecurringFromDb);
-      const notifications = (nRes.data || []).map(this.mapNotificationFromDb);
+      const accounts = (accRes.data || []).map((row) => this.mapAccountFromDb(row));
+      const transactions = (txRes.data || []).map((row) => this.mapTransactionFromDb(row));
+      const budgets = (bRes.data || []).map((row) => this.mapBudgetFromDb(row));
+      const recurringPayments = (rRes.data || []).map((row) => this.mapRecurringFromDb(row));
+      const notifications = (nRes.data || []).map((row) => this.mapNotificationFromDb(row));
       const settings = sRes.data ? this.mapSettingsFromDb(sRes.data) : null;
       const profile = pRes.data ? { fullName: pRes.data.full_name, email: pRes.data.email } : null;
 
@@ -124,22 +153,66 @@ export class SyncService {
     }
   }
 
-  // 2. Flush Pending Sync Queue to Supabase Cloud
+  // 2. Flush Pending Sync Queue to Supabase Cloud with Result Aggregation
   public static async flushPendingOperations(
     userId: string
-  ): Promise<{ success: boolean; processedCount: number; errors: string[] }> {
+  ): Promise<WorkspaceSyncResult> {
+    const startedAt = new Date().toISOString();
     const ops = await IndexedDBService.getPendingOperations(userId);
+
+    const entityMap: Record<EntitySyncResult['entity'], EntitySyncResult> = {
+      accounts: { entity: 'accounts', attempted: 0, succeeded: 0, failed: 0, errors: [] },
+      transactions: { entity: 'transactions', attempted: 0, succeeded: 0, failed: 0, errors: [] },
+      budgets: { entity: 'budgets', attempted: 0, succeeded: 0, failed: 0, errors: [] },
+      categories: { entity: 'categories', attempted: 0, succeeded: 0, failed: 0, errors: [] },
+      recurring_payments: { entity: 'recurring_payments', attempted: 0, succeeded: 0, failed: 0, errors: [] },
+      settings: { entity: 'settings', attempted: 0, succeeded: 0, failed: 0, errors: [] },
+      notifications: { entity: 'notifications', attempted: 0, succeeded: 0, failed: 0, errors: [] },
+    };
+
     if (ops.length === 0) {
-      return { success: true, processedCount: 0, errors: [] };
+      return {
+        status: 'synced',
+        results: Object.values(entityMap),
+        pendingChanges: 0,
+        startedAt,
+        completedAt: new Date().toISOString(),
+      };
     }
 
     console.log(`[Spendly Sync Engine] Flushing ${ops.length} pending operations for user ${userId}...`);
-    let processedCount = 0;
-    const errors: string[] = [];
 
     for (const op of ops) {
+      // Map pending_ops entity name to entity type
+      let entityType: EntitySyncResult['entity'] = 'transactions';
+      if (op.entity === 'accounts') entityType = 'accounts';
+      else if (op.entity === 'budgets') entityType = 'budgets';
+      else if (op.entity === 'recurring_payments') entityType = 'recurring_payments';
+      else if (op.entity === 'notifications') entityType = 'notifications';
+      else if (op.entity === 'user_settings') entityType = 'settings';
+      else if (op.entity === 'categories') entityType = 'categories';
+
+      const res = entityMap[entityType];
+      res.attempted++;
+
+      // Dead-letter check for max retries
+      if ((op.retry_count || 0) >= MAX_SYNC_RETRIES) {
+        op.status = 'failed';
+        op.error = `Exceeded max retry attempts (${MAX_SYNC_RETRIES}). Moved to Dead-Letter Queue.`;
+        await IndexedDBService.updatePendingOperation(op);
+        res.failed++;
+        res.errors.push({
+          recordId: op.entity_id,
+          code: 'DEAD_LETTER_MAX_RETRIES',
+          message: op.error,
+        });
+        continue;
+      }
+
       try {
         let opSuccess = false;
+        let errorMessage = '';
+        let errorCode = '';
 
         if (op.operation === 'upsert') {
           if (op.entity === 'transactions' && op.payload) {
@@ -149,7 +222,14 @@ export class SyncService {
           } else if (op.entity === 'budgets' && op.payload) {
             opSuccess = await this.upsertBudget(op.payload, userId);
           } else if (op.entity === 'recurring_payments' && op.payload) {
-            opSuccess = await this.upsertRecurring(op.payload, userId);
+            const val = this.validateRecurringPayment(this.mapRecurringToDb(op.payload, userId));
+            if (!val.valid) {
+              opSuccess = false;
+              errorMessage = val.reason || 'Invalid recurring payment payload';
+              errorCode = 'PAYLOAD_VALIDATION_ERROR';
+            } else {
+              opSuccess = await this.upsertRecurring(op.payload, userId);
+            }
           } else if (op.entity === 'notifications' && op.payload) {
             opSuccess = await this.upsertNotification(op.payload, userId);
           } else if (op.entity === 'user_settings' && op.payload) {
@@ -169,29 +249,55 @@ export class SyncService {
 
         if (opSuccess) {
           await IndexedDBService.removePendingOperation(op.id);
-          processedCount++;
+          res.succeeded++;
         } else {
           op.retry_count = (op.retry_count || 0) + 1;
           op.status = 'failed';
-          op.error = 'Cloud sync operation failed';
+          op.error = errorMessage || 'Cloud write returned failure status';
           await IndexedDBService.updatePendingOperation(op);
-          errors.push(`Failed operation ${op.operation} on ${op.entity}:${op.entity_id}`);
-          break; // Preserve exact operational sequence
+          res.failed++;
+          res.errors.push({
+            recordId: op.entity_id,
+            code: errorCode || 'CLOUD_WRITE_FAILURE',
+            message: op.error,
+          });
+
+          // Exponential backoff pause before next record
+          const delayMs = Math.min(1000 * Math.pow(2, op.retry_count - 1), 8000);
+          await new Promise((r) => setTimeout(r, delayMs));
         }
       } catch (err: any) {
         op.retry_count = (op.retry_count || 0) + 1;
         op.status = 'failed';
         op.error = err?.message || String(err);
         await IndexedDBService.updatePendingOperation(op);
-        errors.push(`Exception in ${op.operation} on ${op.entity}:${op.entity_id}: ${err.message}`);
-        break;
+        res.failed++;
+        res.errors.push({
+          recordId: op.entity_id,
+          code: 'EXCEPTION',
+          message: op.error || 'Exception occurred',
+        });
       }
     }
 
+    const remainingOps = await IndexedDBService.getPendingOperations(userId);
+    const results = Object.values(entityMap);
+    const totalFailed = results.reduce((sum, r) => sum + r.failed, 0);
+    const totalSucceeded = results.reduce((sum, r) => sum + r.succeeded, 0);
+
+    let status: WorkspaceSyncResult['status'] = 'synced';
+    if (totalFailed > 0 && totalSucceeded > 0) {
+      status = 'partial';
+    } else if (totalFailed > 0 && totalSucceeded === 0) {
+      status = 'failed';
+    }
+
     return {
-      success: errors.length === 0,
-      processedCount,
-      errors,
+      status,
+      results,
+      pendingChanges: remainingOps.length,
+      startedAt,
+      completedAt: new Date().toISOString(),
     };
   }
 
@@ -204,8 +310,6 @@ export class SyncService {
         if (error) {
           console.error('SUPABASE ERROR [accounts.upsert]:', {
             message: error.message,
-            details: error.details,
-            hint: error.hint,
             code: error.code,
           });
           throw new Error(`Accounts upload failed: ${error.message} (${error.code})`);
@@ -218,8 +322,6 @@ export class SyncService {
         if (error) {
           console.error('SUPABASE ERROR [transactions.upsert]:', {
             message: error.message,
-            details: error.details,
-            hint: error.hint,
             code: error.code,
           });
           throw new Error(`Transactions upload failed: ${error.message} (${error.code})`);
@@ -232,8 +334,6 @@ export class SyncService {
         if (error) {
           console.error('SUPABASE ERROR [budgets.upsert]:', {
             message: error.message,
-            details: error.details,
-            hint: error.hint,
             code: error.code,
           });
           throw new Error(`Budgets upload failed: ${error.message} (${error.code})`);
@@ -242,21 +342,29 @@ export class SyncService {
 
       if (data.recurringPayments.length > 0) {
         const rRows = data.recurringPayments.map((r) => this.mapRecurringToDb(r, userId));
-        let { error } = await supabase.from('recurring_payments').upsert(rRows);
-        if (error && (error.code === 'PGRST204' || error.message?.includes('due_time'))) {
-          // Safe fallback for legacy Supabase schema cache
-          const fallbackRows = rRows.map(({ due_time, ...rest }: any) => rest);
-          const fallbackRes = await supabase.from('recurring_payments').upsert(fallbackRows);
-          error = fallbackRes.error;
+        // Validate each recurring payment before upsert
+        for (const row of rRows) {
+          const val = this.validateRecurringPayment(row);
+          if (!val.valid) {
+            console.warn(`[SyncService] Skipping invalid recurring payment "${row.title}": ${val.reason}`);
+          }
         }
-        if (error) {
-          console.error('SUPABASE ERROR [recurring_payments.upsert]:', {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code,
-          });
-          throw new Error(`Recurring payments upload failed: ${error.message} (${error.code})`);
+        const validRows = rRows.filter((row) => this.validateRecurringPayment(row).valid);
+
+        if (validRows.length > 0) {
+          let { error } = await supabase.from('recurring_payments').upsert(validRows);
+          if (error && (error.code === 'PGRST204' || error.message?.includes('due_time'))) {
+            const fallbackRows = validRows.map(({ due_time, ...rest }: any) => rest);
+            const fallbackRes = await supabase.from('recurring_payments').upsert(fallbackRows);
+            error = fallbackRes.error;
+          }
+          if (error) {
+            console.error('SUPABASE ERROR [recurring_payments.upsert]:', {
+              message: error.message,
+              code: error.code,
+            });
+            throw new Error(`Recurring payments upload failed: ${error.message} (${error.code})`);
+          }
         }
       }
 
@@ -266,8 +374,6 @@ export class SyncService {
         if (error) {
           console.error('SUPABASE ERROR [notifications.upsert]:', {
             message: error.message,
-            details: error.details,
-            hint: error.hint,
             code: error.code,
           });
           throw new Error(`Notifications upload failed: ${error.message} (${error.code})`);
@@ -279,8 +385,6 @@ export class SyncService {
         if (error) {
           console.error('SUPABASE ERROR [user_settings.upsert]:', {
             message: error.message,
-            details: error.details,
-            hint: error.hint,
             code: error.code,
           });
           throw new Error(`Settings upload failed: ${error.message} (${error.code})`);
@@ -346,7 +450,7 @@ export class SyncService {
       const row = this.mapAccountToDb(account, userId);
       const { error } = await supabase.from('accounts').upsert(row);
       if (error) {
-        console.error('Supabase upsertAccount error:', error);
+        console.error('Supabase upsertAccount error:', error.message, error.code);
         return false;
       }
       return true;
@@ -360,7 +464,7 @@ export class SyncService {
     try {
       const { error } = await supabase.from('accounts').delete().eq('id', accountId).eq('user_id', userId);
       if (error) {
-        console.error('Supabase deleteAccount error:', error);
+        console.error('Supabase deleteAccount error:', error.message, error.code);
         return false;
       }
       return true;
@@ -376,7 +480,7 @@ export class SyncService {
       const row = this.mapTransactionToDb(tx, userId);
       const { error } = await supabase.from('transactions').upsert(row);
       if (error) {
-        console.error('Supabase upsertTransaction error:', error);
+        console.error('Supabase upsertTransaction error:', error.message, error.code);
         return false;
       }
       return true;
@@ -390,7 +494,7 @@ export class SyncService {
     try {
       const { error } = await supabase.from('transactions').delete().eq('id', txId).eq('user_id', userId);
       if (error) {
-        console.error('Supabase deleteTransaction error:', error);
+        console.error('Supabase deleteTransaction error:', error.message, error.code);
         return false;
       }
       return true;
@@ -406,7 +510,7 @@ export class SyncService {
       const row = this.mapBudgetToDb(budget, userId);
       const { error } = await supabase.from('budgets').upsert(row);
       if (error) {
-        console.error('Supabase upsertBudget error:', error);
+        console.error('Supabase upsertBudget error:', error.message, error.code);
         return false;
       }
       return true;
@@ -420,7 +524,7 @@ export class SyncService {
     try {
       const { error } = await supabase.from('budgets').delete().eq('id', budgetId).eq('user_id', userId);
       if (error) {
-        console.error('Supabase deleteBudget error:', error);
+        console.error('Supabase deleteBudget error:', error.message, error.code);
         return false;
       }
       return true;
@@ -434,9 +538,14 @@ export class SyncService {
   public static async upsertRecurring(recurring: RecurringPayment, userId: string): Promise<boolean> {
     try {
       const row = this.mapRecurringToDb(recurring, userId);
+      const val = this.validateRecurringPayment(row);
+      if (!val.valid) {
+        console.error('upsertRecurring payload validation failed:', val.reason);
+        return false;
+      }
       const { error } = await supabase.from('recurring_payments').upsert(row);
       if (error) {
-        console.error('Supabase upsertRecurring error:', error);
+        console.error('Supabase upsertRecurring error:', error.message, error.code);
         return false;
       }
       return true;
@@ -454,7 +563,7 @@ export class SyncService {
         .eq('id', recurringId)
         .eq('user_id', userId);
       if (error) {
-        console.error('Supabase deleteRecurring error:', error);
+        console.error('Supabase deleteRecurring error:', error.message, error.code);
         return false;
       }
       return true;
@@ -470,7 +579,7 @@ export class SyncService {
       const row = this.mapNotificationToDb(notification, userId);
       const { error } = await supabase.from('notifications').upsert(row);
       if (error) {
-        console.error('Supabase upsertNotification error:', error);
+        console.error('Supabase upsertNotification error:', error.message, error.code);
         return false;
       }
       return true;
@@ -484,7 +593,7 @@ export class SyncService {
     try {
       const { error } = await supabase.from('notifications').delete().eq('user_id', userId);
       if (error) {
-        console.error('Supabase clearNotifications error:', error);
+        console.error('Supabase clearNotifications error:', error.message, error.code);
         return false;
       }
       return true;
@@ -500,7 +609,7 @@ export class SyncService {
       const row = this.mapSettingsToDb(settings, userId);
       const { error } = await supabase.from('user_settings').upsert(row);
       if (error) {
-        console.error('Supabase upsertSettings error:', error);
+        console.error('Supabase upsertSettings error:', error.message, error.code);
         return false;
       }
       return true;
@@ -523,7 +632,7 @@ export class SyncService {
       );
 
       if (dbError) {
-        console.error('Profile update failed:', dbError);
+        console.error('Profile update failed:', dbError.message);
       }
 
       const { error: authError } = await supabase.auth.updateUser({
@@ -531,7 +640,7 @@ export class SyncService {
       });
 
       if (authError) {
-        console.error('Profile update failed:', authError);
+        console.error('Profile update failed:', authError.message);
       }
 
       if (dbError && authError) {
@@ -569,7 +678,7 @@ export class SyncService {
 
       const err = txRes.error || accRes.error || bRes.error || rRes.error || nRes.error;
       if (err) {
-        console.error('SUPABASE ERROR [deleteAllUserData]:', err);
+        console.error('SUPABASE ERROR [deleteAllUserData]:', err.message);
         return { success: false, error: err.message };
       }
       return { success: true };
@@ -582,15 +691,27 @@ export class SyncService {
   public static mapAccountFromDb(row: any): Account {
     return {
       id: row.id,
+      userId: row.user_id || undefined,
       name: row.name,
-      type: row.type,
+      institution: row.institution || undefined,
+      type: row.type || 'BANK',
+      lastFourDigits: row.last_four_digits || row.last_four || undefined,
+      branchName: row.branch_name || undefined,
+      routingCode: row.routing_code || row.ifsc_code || undefined,
+      currency: row.currency || '₹',
+      color: row.color || undefined,
+      iconName: row.icon_name || undefined,
+      description: row.description || undefined,
       balance: Number(row.opening_balance || 0),
       openingBalance: Number(row.opening_balance || 0),
-      creditLimit: row.credit_limit ? Number(row.credit_limit) : undefined,
-      institution: row.institution || undefined,
-      color: row.color || undefined,
-      currency: row.currency || '₹',
+      creditLimit: row.credit_limit !== null && row.credit_limit !== undefined ? Number(row.credit_limit) : undefined,
+      includeInNetWorth: row.include_in_net_worth !== false,
+      includeInAnalytics: row.include_in_analytics !== false,
+      isDefault: row.is_default || false,
       isArchived: row.is_archived || false,
+      lastReconciledAt: row.last_reconciled_at || undefined,
+      lastReconciledBalance: row.last_reconciled_balance !== null && row.last_reconciled_balance !== undefined ? Number(row.last_reconciled_balance) : undefined,
+      createdAt: row.created_at || new Date().toISOString(),
       updatedAt: row.updated_at || new Date().toISOString(),
     };
   }
@@ -600,13 +721,23 @@ export class SyncService {
       id: acc.id,
       user_id: userId,
       name: acc.name,
+      institution: acc.institution || null,
       type: acc.type,
+      last_four_digits: acc.lastFourDigits || null,
+      branch_name: acc.branchName || null,
+      routing_code: acc.routingCode || null,
+      currency: acc.currency || '₹',
+      color: acc.color || null,
+      icon_name: acc.iconName || null,
+      description: acc.description || null,
       opening_balance: acc.openingBalance,
       credit_limit: acc.creditLimit || 0,
-      institution: acc.institution || null,
-      color: acc.color || null,
-      currency: acc.currency || '₹',
+      include_in_net_worth: acc.includeInNetWorth !== false,
+      include_in_analytics: acc.includeInAnalytics !== false,
+      is_default: acc.isDefault || false,
       is_archived: acc.isArchived || false,
+      last_reconciled_at: acc.lastReconciledAt || null,
+      last_reconciled_balance: acc.lastReconciledBalance !== undefined ? acc.lastReconciledBalance : null,
       updated_at: acc.updatedAt || new Date().toISOString(),
     };
   }

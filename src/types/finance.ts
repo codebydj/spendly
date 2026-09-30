@@ -1,18 +1,37 @@
-export type AccountType = 'BANK' | 'CASH' | 'CREDIT_CARD' | 'WALLET' | 'OTHER';
+export type AccountType =
+  | 'BANK'
+  | 'CASH'
+  | 'CREDIT_CARD'
+  | 'WALLET'
+  | 'INVESTMENT'
+  | 'LOAN'
+  | 'OTHER';
 
 export type TransactionType = 'EXPENSE' | 'INCOME' | 'TRANSFER';
 
 export interface Account {
   id: string;
+  userId?: string;
   name: string;
+  institution?: string;
   type: AccountType;
+  lastFourDigits?: string;
+  branchName?: string;
+  routingCode?: string;
+  currency: string;
+  color?: string;
+  iconName?: string;
+  description?: string;
   balance: number; // Derived dynamically; openingBalance + transactions
   openingBalance: number;
-  creditLimit?: number; // For Credit Cards
-  institution?: string;
-  color?: string;
-  currency: string;
+  creditLimit?: number; // For Credit Cards / Overdraft
+  includeInNetWorth?: boolean;
+  includeInAnalytics?: boolean;
+  isDefault?: boolean;
   isArchived?: boolean;
+  lastReconciledAt?: string;
+  lastReconciledBalance?: number;
+  createdAt?: string;
   updatedAt: string;
 }
 
@@ -48,10 +67,17 @@ export interface Transaction {
   updatedAt: string;
 }
 
+export type BudgetPeriod = 'WEEKLY' | 'MONTHLY' | 'CUSTOM';
+
 export interface Budget {
   id: string;
   categoryId: string;
   monthlyLimit: number;
+  period?: BudgetPeriod;
+  rolloverEnabled?: boolean;
+  notifyOn75?: boolean;
+  notifyOn90?: boolean;
+  notifyOn100?: boolean;
 }
 
 export interface RecurringPayment {

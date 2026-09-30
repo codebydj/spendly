@@ -1,11 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/ui/GlassCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { SpendlyLogo } from '../components/ui/SpendlyLogo';
-import { AlertTriangle, Calendar, Info, Check, Trash2, Bell, ArrowUpRight } from 'lucide-react';
+import { AlertTriangle, Calendar, Info, Check, CheckCheck, Trash2, Bell, ArrowUpRight } from 'lucide-react';
 import { PageTransition } from '../components/motion/PageTransition';
 import type { NotificationItem } from '../types/finance';
+
+type NotificationFilter = 'ALL' | 'UNREAD' | 'FINANCIAL' | 'REMINDERS' | 'UPDATES';
 
 export const NotificationsView: React.FC = () => {
   const {
@@ -18,9 +20,29 @@ export const NotificationsView: React.FC = () => {
     setIsAddTransactionOpen,
   } = useApp();
 
+  const [activeFilter, setActiveFilter] = useState<NotificationFilter>('ALL');
+
   const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
 
-  // Group Notifications by Today, Yesterday, Earlier (Req 47)
+  // Mark all notifications read
+  const handleMarkAllRead = () => {
+    notifications.forEach((n) => {
+      if (!n.isRead) markNotificationRead(n.id);
+    });
+  };
+
+  // Filtered Notifications
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter((n) => {
+      if (activeFilter === 'UNREAD') return !n.isRead;
+      if (activeFilter === 'FINANCIAL') return n.type === 'BUDGET_ALERT' || n.type === 'SUMMARY';
+      if (activeFilter === 'REMINDERS') return n.type === 'RECURRING_REMINDER' || n.type === 'DAILY_REMINDER';
+      if (activeFilter === 'UPDATES') return n.type === 'APP_UPDATE';
+      return true;
+    });
+  }, [notifications, activeFilter]);
+
+  // Group Notifications by Today, Yesterday, Earlier
   const groupedNotifications = useMemo(() => {
     const today: NotificationItem[] = [];
     const yesterday: NotificationItem[] = [];
@@ -30,7 +52,7 @@ export const NotificationsView: React.FC = () => {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const yesterdayStart = todayStart - 86400000;
 
-    notifications.forEach((item) => {
+    filteredNotifications.forEach((item) => {
       const itemTime = new Date(item.date).getTime();
       if (itemTime >= todayStart) {
         today.push(item);
@@ -46,9 +68,9 @@ export const NotificationsView: React.FC = () => {
       { label: 'Yesterday', items: yesterday },
       { label: 'Earlier', items: earlier },
     ].filter((group) => group.items.length > 0);
-  }, [notifications]);
+  }, [filteredNotifications]);
 
-  // Handle Deep Links (Req 46)
+  // Handle Deep Links & Action Click
   const handleNotificationClick = (item: NotificationItem) => {
     markNotificationRead(item.id);
 
@@ -65,9 +87,26 @@ export const NotificationsView: React.FC = () => {
     } else if (item.type === 'DAILY_REMINDER') {
       setIsAddTransactionOpen(true);
     } else if (item.type === 'SUMMARY') {
-      setCurrentView('analytics');
+      setCurrentView('transactions');
     } else {
       setCurrentView('dashboard');
+    }
+  };
+
+  const getActionLabel = (type: NotificationItem['type']) => {
+    switch (type) {
+      case 'BUDGET_ALERT':
+        return 'View Budget';
+      case 'RECURRING_REMINDER':
+        return 'View Reminder';
+      case 'DAILY_REMINDER':
+        return 'Add Transaction';
+      case 'APP_UPDATE':
+        return 'View Update';
+      case 'SUMMARY':
+        return 'View Transactions';
+      default:
+        return 'View';
     }
   };
 
@@ -86,23 +125,82 @@ export const NotificationsView: React.FC = () => {
               )}
             </div>
             <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
-              Financial insights, budget limits, bill reminders, and app update alerts.
+              Financial insights, budget alerts, payment reminders, and Spendly updates.
             </span>
           </div>
 
-          {notifications.length > 0 && (
-            <button onClick={clearNotifications} className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '0.84rem' }}>
-              <Trash2 size={15} /> Clear All
-            </button>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {unreadCount > 0 && (
+              <button
+                onClick={handleMarkAllRead}
+                className="btn btn-secondary"
+                style={{ padding: '8px 14px', fontSize: '0.84rem' }}
+                title="Mark all as read"
+              >
+                <CheckCheck size={15} color="var(--accent-cyan)" /> Mark All Read
+              </button>
+            )}
+
+            {notifications.length > 0 && (
+              <button onClick={clearNotifications} className="btn btn-secondary" style={{ padding: '8px 14px', fontSize: '0.84rem' }}>
+                <Trash2 size={15} /> Clear All
+              </button>
+            )}
+          </div>
         </GlassCard>
 
-        {/* Feed / Empty State (Req 49) */}
-        {notifications.length === 0 ? (
+        {/* Filter Chips Row */}
+        {notifications.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              overflowX: 'auto',
+              paddingBottom: '4px',
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            {[
+              { key: 'ALL', label: 'All' },
+              { key: 'UNREAD', label: `Unread (${unreadCount})` },
+              { key: 'FINANCIAL', label: 'Financial Alerts' },
+              { key: 'REMINDERS', label: 'Reminders' },
+              { key: 'UPDATES', label: 'Updates' },
+            ].map((chip) => {
+              const isActive = activeFilter === chip.key;
+              return (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => setActiveFilter(chip.key as NotificationFilter)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '0.78rem',
+                    fontWeight: isActive ? 700 : 500,
+                    backgroundColor: isActive ? 'var(--accent-cyan)' : 'var(--bg-solid-dark)',
+                    color: isActive ? '#000000' : 'var(--text-secondary)',
+                    border: isActive ? '1px solid var(--accent-cyan)' : '1px solid var(--border-color)',
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    flexShrink: 0,
+                  }}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Feed / Empty State */}
+        {filteredNotifications.length === 0 ? (
           <EmptyState
             icon={<Bell size={26} />}
             title="You're all caught up"
-            description="Budget alerts, reminders, updates and useful financial insights will appear here when available."
+            description="Budget alerts, reminders, financial insights and Spendly updates will appear here."
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -171,9 +269,9 @@ export const NotificationsView: React.FC = () => {
                           <button
                             onClick={() => handleNotificationClick(n)}
                             className="btn btn-secondary"
-                            style={{ padding: '6px 10px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            style={{ padding: '6px 12px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                           >
-                            <span>Open</span> <ArrowUpRight size={13} />
+                            <span>{getActionLabel(n.type)}</span> <ArrowUpRight size={13} />
                           </button>
 
                           {!n.isRead && (

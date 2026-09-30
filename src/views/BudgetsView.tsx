@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { BudgetProgress } from '../components/ui/BudgetProgress';
 import { EmptyState } from '../components/ui/EmptyState';
-import { Plus, PiggyBank, X } from 'lucide-react';
+import { Plus, PiggyBank, X, Pencil } from 'lucide-react';
 import { formatINR } from '../utils/currency';
+import type { Budget } from '../types/finance';
+import { EditBudgetModal } from '../components/forms/EditBudgetModal';
 
 export const BudgetsView: React.FC = () => {
   const {
@@ -16,6 +18,7 @@ export const BudgetsView: React.FC = () => {
   } = useApp();
 
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const currentMonthPrefix = new Date().toISOString().slice(0, 7);
 
   // Compute category spending for current month
@@ -164,7 +167,16 @@ export const BudgetsView: React.FC = () => {
               const spent = categorySpentMap[b.categoryId] || 0;
 
               return (
-                <div key={b.id} className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '18px 20px' }}>
+                <div key={b.id} className="card-level-2" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '18px 20px', position: 'relative' }}>
+                  <button
+                    onClick={() => setEditingBudget(b)}
+                    className="btn-icon"
+                    title={`Edit ${cat?.name || 'Category'} budget`}
+                    style={{ position: 'absolute', top: '14px', right: '40px', padding: '4px', color: 'var(--text-secondary)' }}
+                  >
+                    <Pencil size={14} />
+                  </button>
+
                   <BudgetProgress
                     categoryName={cat?.name || 'Category'}
                     categoryColor={cat?.color || 'var(--accent-violet)'}
@@ -179,6 +191,12 @@ export const BudgetsView: React.FC = () => {
           </div>
         )}
       </div>
+
+      <EditBudgetModal
+        isOpen={Boolean(editingBudget)}
+        onClose={() => setEditingBudget(null)}
+        budget={editingBudget}
+      />
     </div>
   );
 };
