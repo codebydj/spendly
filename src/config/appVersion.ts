@@ -10,7 +10,7 @@ export const APP_NAME = 'Spendly';
 export const APP_PACKAGE_ID = 'com.spendly.finance';
 
 export const ANDROID_APK_DOWNLOAD_URL =
-  'https://drive.google.com/file/d/1mcbhHgm9usSgv7kaB4FyLqqO878Ic2Jj/view?usp=sharing';
+  'https://drive.google.com/file/d/1DKqTxfQJNwCWcXCHQrPw8Kfh1xqlnSl7/view?usp=sharing';
 
 export const APP_RELEASE_NOTES = [
   'Added one-time What\'s New experience after application updates.',
